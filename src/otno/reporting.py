@@ -34,6 +34,8 @@ def collect_run_rows(runs_dir: str | Path) -> list[dict[str, Any]]:
             training = config.get("training", {}) if isinstance(config, dict) else {}
             if isinstance(training, dict):
                 row.setdefault("data_fraction", float(training.get("data_fraction", 1.0)))
+                if "steps_per_epoch" in training:
+                    row.setdefault("steps_per_epoch", int(training["steps_per_epoch"]))
                 if "orbit_data_fraction" in training:
                     row.setdefault("orbit_data_fraction", float(training["orbit_data_fraction"]))
                 if "orbit_steps_per_epoch" in training:

@@ -190,7 +190,16 @@ def validate_config(config: dict[str, Any], *, require_dataset: bool = True) -> 
     method = str(training.get("method", "baseline")).lower()
     if method not in _ALLOWED_METHODS:
         raise ValueError(f"Unknown training.method={method!r}")
-    for key in ("epochs", "batch_size", "eval_every", "latency_repeats", "stop_after_epochs", "orbit_batch_size", "orbit_steps_per_epoch"):
+    for key in (
+        "epochs",
+        "batch_size",
+        "eval_every",
+        "latency_repeats",
+        "stop_after_epochs",
+        "steps_per_epoch",
+        "orbit_batch_size",
+        "orbit_steps_per_epoch",
+    ):
         _check_positive_int(training, "training", key)
     for key in ("eval_orbit_samples", "latency_warmup", "num_workers"):
         _check_nonnegative_int(training, "training", key)

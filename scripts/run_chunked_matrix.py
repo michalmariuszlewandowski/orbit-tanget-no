@@ -17,6 +17,7 @@ if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
 from run_matrix import _command, _jobs
+from otno.config import apply_dotted_overrides, load_config
 
 
 def _read_json(path: Path) -> dict[str, Any]:
@@ -52,6 +53,69 @@ def _summarize(run_dir: Path) -> str:
     return "no metrics yet"
 
 
+def _belt(done: int, total: int, *, width: int = 24) -> str:
+    total = max(1, int(total))
+    done = min(max(0, int(done)), total)
+    filled = round(width * done / total)
+    return "[" + "#" * filled + "." * (width - filled) + f"] {done}/{total}"
+
+
+def _effective_epochs(config: str, overrides: dict[str, Any]) -> int:
+    config_path = Path(config)
+    if not config_path.is_absolute():
+        config_path = ROOT / config_path
+    merged = apply_dotted_overrides(load_config(config_path), overrides)
+    return int(merged.get("training", {}).get("epochs", 0))
+
+
+def _completed_epochs(run_dir: Path, total_epochs: int) -> int:
+    if (run_dir / "test_metrics.json").exists():
+        return total_epochs
+    partial_path = run_dir / "partial_metrics.json"
+    if partial_path.exists():
+        metrics = _read_json(partial_path)
+        return int(metrics.get("completed_epoch", 0) or 0)
+    train_path = run_dir / "train_metrics.jsonl"
+    if train_path.exists():
+        with train_path.open("r", encoding="utf-8") as f:
+            return sum(1 for line in f if line.strip())
+    return 0
+
+
+def _run_command(cmd: list[str], log_file, *, stream_output: bool) -> int:
+    if not stream_output:
+        completed = subprocess.run(
+            cmd,
+            cwd=ROOT,
+            stdout=log_file,
+            stderr=subprocess.STDOUT,
+            check=False,
+        )
+        return int(completed.returncode)
+    process = subprocess.Popen(
+        cmd,
+        cwd=ROOT,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        bufsize=1,
+    )
+    assert process.stdout is not None
+    while True:
+        chunk = process.stdout.read(1)
+        if chunk:
+            log_file.write(chunk)
+            log_file.flush()
+            sys.stdout.write(chunk)
+            sys.stdout.flush()
+            continue
+        if process.poll() is not None:
+            break
+    return int(process.wait())
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(
         description="Run a matrix in resume-friendly training chunks."
@@ -61,15 +125,26 @@ def main() -> None:
     parser.add_argument("--max-chunks-per-job", type=int, default=100)
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--continue-on-error", action="store_true")
+    parser.add_argument(
+        "--stream-output",
+        action="store_true",
+        help="Tee each training subprocess to the terminal as well as the chunk log.",
+    )
     args = parser.parse_args()
     if args.chunk_epochs <= 0:
         raise SystemExit("--chunk-epochs must be positive")
 
-    for config, overrides in _jobs(Path(args.matrix)):
+    jobs = _jobs(Path(args.matrix))
+    for job_index, (config, overrides) in enumerate(jobs, start=1):
         run_dir_text = str(overrides.get("runtime.run_dir", "")).strip()
         if not run_dir_text:
             raise SystemExit(f"matrix job missing runtime.run_dir: {config}")
         run_dir = ROOT / run_dir_text
+        total_epochs = _effective_epochs(config, overrides)
+        print(
+            f"matrix {_belt(job_index - 1, len(jobs))} job {job_index}/{len(jobs)}",
+            flush=True,
+        )
         print(f"job {run_dir_text}", flush=True)
 
         if (run_dir / "test_metrics.json").exists():
@@ -86,7 +161,9 @@ def main() -> None:
             cmd = _command(config, chunk_overrides)
             log_path = _next_chunk_log(run_dir)
             run_dir.mkdir(parents=True, exist_ok=True)
+            completed_epochs = _completed_epochs(run_dir, total_epochs)
             print(f"  launch {log_path.relative_to(ROOT)}", flush=True)
+            print(f"  progress {_belt(completed_epochs, total_epochs)} epochs", flush=True)
             print("  " + " ".join(shlex.quote(part) for part in cmd), flush=True)
             if args.dry_run:
                 break
@@ -94,20 +171,19 @@ def main() -> None:
             with log_path.open("w", encoding="utf-8") as log_file:
                 log_file.write(" ".join(shlex.quote(part) for part in cmd) + "\n")
                 log_file.flush()
-                completed = subprocess.run(
+                returncode = _run_command(
                     cmd,
-                    cwd=ROOT,
-                    stdout=log_file,
-                    stderr=subprocess.STDOUT,
-                    check=False,
+                    log_file,
+                    stream_output=args.stream_output,
                 )
-            if completed.returncode != 0:
-                print(f"  failed rc={completed.returncode}: {log_path}", flush=True)
+            if returncode != 0:
+                print(f"  failed rc={returncode}: {log_path}", flush=True)
                 if not args.continue_on_error:
-                    raise SystemExit(completed.returncode)
+                    raise SystemExit(returncode)
                 break
 
             print(f"  {_summarize(run_dir)}", flush=True)
+            print(f"  progress {_belt(_completed_epochs(run_dir, total_epochs), total_epochs)} epochs", flush=True)
             if (run_dir / "test_metrics.json").exists():
                 break
         else:
@@ -116,6 +192,7 @@ def main() -> None:
                 print(f"  {message}", flush=True)
             else:
                 raise SystemExit(message)
+        print(f"matrix {_belt(job_index, len(jobs))} jobs", flush=True)
 
 
 if __name__ == "__main__":

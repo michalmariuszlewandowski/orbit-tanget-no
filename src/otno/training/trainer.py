@@ -218,6 +218,7 @@ def train_from_config(config: dict[str, Any]) -> dict[str, Any]:
         orbit_steps_per_epoch = int(training_cfg.get("orbit_steps_per_epoch", len(orbit_loader)))
     val_loader = _loader(dataset_path, "val", config, shuffle=False)
     test_loader = _loader(dataset_path, "test", config, shuffle=False)
+    steps_per_epoch = int(training_cfg.get("steps_per_epoch", len(train_loader)))
 
     target_epoch = epochs
     if stop_after_epochs is not None:
@@ -225,7 +226,7 @@ def train_from_config(config: dict[str, Any]) -> dict[str, Any]:
 
     for epoch in range(start_epoch, target_epoch + 1):
         model.train()
-        steps_this_epoch = orbit_steps_per_epoch if orbit_steps_per_epoch is not None else len(train_loader)
+        steps_this_epoch = orbit_steps_per_epoch if orbit_steps_per_epoch is not None else steps_per_epoch
         progress = tqdm(range(steps_this_epoch), desc=f"epoch {epoch}/{epochs}", leave=False)
         train_iter = iter(train_loader)
         orbit_iter = iter(orbit_loader) if orbit_loader is not None else None
