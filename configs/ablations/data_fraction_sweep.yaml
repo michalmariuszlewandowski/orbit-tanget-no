@@ -1,0 +1,21 @@
+experiments:
+  - config: configs/pilot/1d_burgers_translation_galilean.yaml
+    overrides:
+      training.data_fraction: 0.05
+      runtime.run_dir: runs/ablations/data_fraction/0.05
+  - config: configs/pilot/1d_burgers_translation_galilean.yaml
+    overrides:
+      training.data_fraction: 0.1
+      runtime.run_dir: runs/ablations/data_fraction/0.1
+  - config: configs/pilot/1d_burgers_translation_galilean.yaml
+    overrides:
+      training.data_fraction: 0.25
+      runtime.run_dir: runs/ablations/data_fraction/0.25
+  - config: configs/pilot/1d_burgers_translation_galilean.yaml
+    overrides:
+      training.data_fraction: 0.5
+      runtime.run_dir: runs/ablations/data_fraction/0.5
+  - config: configs/pilot/1d_burgers_translation_galilean.yaml
+    overrides:
+      training.data_fraction: 1.0
+      runtime.run_dir: runs/ablations/data_fraction/1.0

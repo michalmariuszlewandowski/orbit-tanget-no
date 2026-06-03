@@ -1,0 +1,125 @@
+from __future__ import annotations
+
+import torch
+
+from otno.symmetry.transforms import BaseTransform, TransformSample
+
+
+def _flatten_per_sample(x: torch.Tensor) -> torch.Tensor:
+    return x.reshape(x.shape[0], -1)
+
+
+def _broadcast_mask(mask: torch.Tensor, x: torch.Tensor) -> torch.Tensor:
+    while mask.ndim < x.ndim:
+        mask = mask.unsqueeze(-1)
+    return torch.broadcast_to(mask.to(device=x.device, dtype=x.dtype), x.shape)
+
+
+def relative_l2_per_sample(
+    pred: torch.Tensor,
+    target: torch.Tensor,
+    *,
+    mask: torch.Tensor | None = None,
+    eps: float = 1e-8,
+) -> torch.Tensor:
+    """Return per-example relative L2 errors."""
+    if pred.shape != target.shape:
+        raise ValueError(f"pred and target shapes differ: {tuple(pred.shape)} vs {tuple(target.shape)}")
+    diff = pred - target
+    ref = target
+    if mask is not None:
+        m = _broadcast_mask(mask, diff)
+        diff = diff * m
+        ref = ref * m
+    diff_flat = _flatten_per_sample(diff)
+    denom = _flatten_per_sample(ref).norm(dim=-1).clamp_min(eps)
+    return diff_flat.norm(dim=-1) / denom
+
+
+def relative_l2_loss(
+    pred: torch.Tensor,
+    target: torch.Tensor,
+    *,
+    mask: torch.Tensor | None = None,
+    eps: float = 1e-8,
+) -> torch.Tensor:
+    return relative_l2_per_sample(pred, target, mask=mask, eps=eps).mean()
+
+
+def relative_defect_per_sample(
+    pred_t: torch.Tensor,
+    pred_equiv: torch.Tensor,
+    *,
+    mask: torch.Tensor | None = None,
+    eps: float = 1e-8,
+) -> torch.Tensor:
+    if pred_t.shape != pred_equiv.shape:
+        raise ValueError(
+            f"pred_t and pred_equiv shapes differ: {tuple(pred_t.shape)} vs {tuple(pred_equiv.shape)}"
+        )
+    diff = pred_t - pred_equiv
+    ref = pred_equiv
+    if mask is not None:
+        m = _broadcast_mask(mask, diff)
+        diff = diff * m
+        ref = ref * m
+    return _flatten_per_sample(diff).norm(dim=-1) / _flatten_per_sample(ref).norm(dim=-1).clamp_min(eps)
+
+
+def mean_squared_per_sample(x: torch.Tensor, mask: torch.Tensor | None = None) -> torch.Tensor:
+    """Return a per-example mean square, using the valid mask as denominator when supplied."""
+    if mask is not None:
+        m = _broadcast_mask(mask, x)
+        masked = x * m
+        denom = m.reshape(m.shape[0], -1).sum(dim=-1).clamp_min(1.0)
+        return masked.reshape(masked.shape[0], -1).pow(2).sum(dim=-1) / denom
+    flat = _flatten_per_sample(x)
+    return flat.pow(2).mean(dim=-1)
+
+
+def orbit_consistency_loss(
+    model: torch.nn.Module,
+    a: torch.Tensor,
+    transform: BaseTransform,
+    *,
+    sample: TransformSample | None = None,
+    base_pred: torch.Tensor | None = None,
+    normalize_by_epsilon: bool = True,
+    eta: float = 1e-6,
+) -> tuple[torch.Tensor, dict[str, float]]:
+    if sample is None:
+        sample = transform.sample(a.shape[0], a.device, a.dtype)
+    if base_pred is None:
+        base_pred = model(a)
+    a_t = transform.apply_input(a, sample)
+    pred_from_transformed_input = model(a_t)
+    transformed_pred = transform.apply_output(base_pred, sample)
+    mask = transform.output_mask(pred_from_transformed_input, sample)
+    per_sample = mean_squared_per_sample(pred_from_transformed_input - transformed_pred, mask=mask)
+    if normalize_by_epsilon:
+        per_sample = per_sample / (sample.epsilon.pow(2) + eta)
+    loss = per_sample.mean()
+    defect = relative_defect_per_sample(pred_from_transformed_input, transformed_pred, mask=mask)
+    stats = {
+        "orbit_loss": float(loss.detach().cpu()),
+        "orbit_defect_relative": float(defect.detach().mean().cpu()),
+        "epsilon_mean": float(sample.epsilon.detach().mean().cpu()),
+        "epsilon_max": float(sample.epsilon.detach().max().cpu()),
+    }
+    return loss, stats
+
+
+def augmented_supervised_loss(
+    model: torch.nn.Module,
+    a: torch.Tensor,
+    u: torch.Tensor,
+    transform: BaseTransform,
+    *,
+    sample: TransformSample | None = None,
+) -> torch.Tensor:
+    if sample is None:
+        sample = transform.sample(a.shape[0], a.device, a.dtype)
+    a_t = transform.apply_input(a, sample)
+    u_t = transform.apply_output(u, sample)
+    mask = transform.output_mask(u_t, sample)
+    return relative_l2_loss(model(a_t), u_t, mask=mask)

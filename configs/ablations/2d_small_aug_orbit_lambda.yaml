@@ -1,0 +1,33 @@
+experiments:
+  # Cheap 2D diagnostic: find whether orbit consistency can beat augmentation
+  # before spending on full n=64 runs.
+  - config: configs/pilot/2d_navier_stokes_translation_d4_small.yaml
+    overrides:
+      training.method: aug
+      runtime.overwrite: false
+      runtime.run_dir: runs/ablations/2d_small_aug_orbit_lambda/aug
+
+  - config: configs/pilot/2d_navier_stokes_translation_d4_small.yaml
+    overrides:
+      training.method: aug_orbit
+      training.lambda_orbit: 0.01
+      runtime.overwrite: false
+      runtime.run_dir: runs/ablations/2d_small_aug_orbit_lambda/aug_orbit/lambda_0.01
+  - config: configs/pilot/2d_navier_stokes_translation_d4_small.yaml
+    overrides:
+      training.method: aug_orbit
+      training.lambda_orbit: 0.05
+      runtime.overwrite: false
+      runtime.run_dir: runs/ablations/2d_small_aug_orbit_lambda/aug_orbit/lambda_0.05
+  - config: configs/pilot/2d_navier_stokes_translation_d4_small.yaml
+    overrides:
+      training.method: aug_orbit
+      training.lambda_orbit: 0.1
+      runtime.overwrite: false
+      runtime.run_dir: runs/ablations/2d_small_aug_orbit_lambda/aug_orbit/lambda_0.1
+  - config: configs/pilot/2d_navier_stokes_translation_d4_small.yaml
+    overrides:
+      training.method: aug_orbit
+      training.lambda_orbit: 0.25
+      runtime.overwrite: false
+      runtime.run_dir: runs/ablations/2d_small_aug_orbit_lambda/aug_orbit/lambda_0.25

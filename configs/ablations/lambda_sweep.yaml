@@ -1,0 +1,21 @@
+experiments:
+  - config: configs/pilot/1d_burgers_translation_galilean.yaml
+    overrides:
+      training.lambda_orbit: 0.0
+      runtime.run_dir: runs/ablations/lambda/0.0
+  - config: configs/pilot/1d_burgers_translation_galilean.yaml
+    overrides:
+      training.lambda_orbit: 0.01
+      runtime.run_dir: runs/ablations/lambda/0.01
+  - config: configs/pilot/1d_burgers_translation_galilean.yaml
+    overrides:
+      training.lambda_orbit: 0.05
+      runtime.run_dir: runs/ablations/lambda/0.05
+  - config: configs/pilot/1d_burgers_translation_galilean.yaml
+    overrides:
+      training.lambda_orbit: 0.1
+      runtime.run_dir: runs/ablations/lambda/0.1
+  - config: configs/pilot/1d_burgers_translation_galilean.yaml
+    overrides:
+      training.lambda_orbit: 0.5
+      runtime.run_dir: runs/ablations/lambda/0.5

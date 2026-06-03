@@ -1,0 +1,53 @@
+# Combined supervised augmentation + local orbit consistency.
+seed: 23
+dataset:
+  kind: burgers1d
+  path: data/1d_burgers_n128.pt
+  generate_if_missing: true
+  n: 128
+  num_train: 2048
+  num_val: 256
+  num_test: 512
+  final_time: 0.5
+  dt: 0.001
+  viscosity: 0.01
+  modes: 8
+  amplitude: 0.8
+  mean: 0.0
+  solver_batch_size: 64
+  dealias: true
+  seed: 23
+model:
+  name: fno1d
+  in_channels: 1
+  out_channels: 1
+  width: 64
+  modes: 16
+  depth: 4
+  add_grid: false
+symmetry:
+  transforms:
+    - name: translation1d
+      max_shift: 0.25
+    - name: burgers1d_galilean
+      max_boost: 0.35
+      final_time: 0.5
+  probabilities: [0.5, 0.5]
+training:
+  method: aug_orbit
+  epochs: 150
+  batch_size: 32
+  lr: 0.001
+  weight_decay: 0.0001
+  lambda_aug: 1.0
+  lambda_orbit: 0.05
+  eval_every: 10
+  eval_orbit_samples: 4
+  grad_clip: 1.0
+  latency_repeats: 20
+  latency_warmup: 5
+
+runtime:
+  deterministic: false
+  device: auto
+  run_dir: runs/baselines/1d_burgers/aug_orbit

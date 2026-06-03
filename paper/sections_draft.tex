@@ -1,0 +1,126 @@
+\section{Related Work}
+
+Neural operators learn mappings between function spaces and are therefore a natural model class for parametric PDE solution operators. DeepONet introduced a branch--trunk architecture for learning nonlinear operators from function samples and output coordinates \citep{lu2021deeponet}. Fourier Neural Operators (FNOs) parameterize global integral kernels in Fourier space and provide an efficient backbone for PDE families on regular grids \citep{li2021fno}. The general neural-operator framework formalizes these models as discretization-invariant compositions of integral operators and nonlinearities, with applications to Burgers' equation, Darcy flow, and Navier--Stokes \citep{kovachki2023neuraloperator}. Physics-Informed Neural Operators (PINOs) add PDE residual constraints to operator learning, combining supervised operator regression with physics-based optimization \citep{li2024pino}. Subsequent work extends neural operators to geometric settings: Geo-FNO learns deformations from irregular physical domains to latent uniform grids \citep{li2023geofno}, GINO combines graph and Fourier operator components for large-scale three-dimensional PDEs on varying geometries \citep{li2023gino}, and NORM uses Laplacian eigenfunctions to define neural operators on Riemannian manifolds \citep{chen2024norm}. Operator-learning benchmarks such as PDEBench and The Well provide reusable datasets and baselines for time-dependent PDEs and broader physical simulation families \citep{takamoto2022pdebench,ohana2024well}. This literature establishes FNO-style models as computationally efficient solution-operator backbones, while also showing that domain geometry, discontinuities, and discretization effects require additional structure \citep{lanthaler2023discontinuous}.
+
+Symmetry has been used as an inductive bias through architectures, losses, and data transformations. Group-equivariant convolutional networks replace ordinary convolution by group convolution to share weights across symmetry orbits \citep{cohen2016gcnn}; steerable CNNs generalize this principle through representation-constrained kernels \citep{weiler2019e2cnn}; and gauge-equivariant CNNs extend equivariance from global transformations to local frame changes on manifolds \citep{cohen2019gauge}. For operator learning, Group-Equivariant FNOs encode translation, rotation, and reflection symmetries in Fourier layers \citep{helwig2023gfno}. A parallel line derives symmetries from the governing differential equations. Lie Point Symmetry Data Augmentation constructs solution-preserving transformations from a PDE's Lie point symmetry group and uses them to reduce sample complexity for neural PDE solvers \citep{brandstetter2022lpsda}. Lie-symmetry losses for PINNs enforce conservation of solution families under infinitesimal generators \citep{akhoundsadegh2023liepinn}. Generalized Lie symmetries for PINOs further argue that evolutionary representatives can provide stronger training signals than point symmetries alone \citep{wang2025generalizedliepino}. These works support the central premise that PDE symmetries should constrain the learned solution operator, not only the training data distribution.
+
+Model-agnostic symmetry methods provide the closest precedent for the proposed direction. Tangent propagation used transformation tangents to impose local invariance constraints on neural networks \citep{simard1991tangentprop}. Lie Algebra Canonicalization uses infinitesimal generators to construct canonicalized inputs for pretrained models and neural operators under arbitrary Lie groups, including non-compact groups commonly arising in PDEs \citep{shumaylov2025lielac}. PACE-FNO applies a related canonicalization strategy to FNOs under symmetry-induced shifts, estimating a Lie-algebraic input frame, predicting in a canonical frame, and restoring the output frame for translations, rotations, and Galilean boosts \citep{xu2026pacefno}. Our method studies a complementary point in this design space: a stochastic local orbit-consistency objective that acts directly on an existing neural operator. The regularizer uses known infinitesimal generators, evaluates finite group perturbations, supports labeled training and unlabeled adaptation, and leaves the inference map identical to the base operator. Its role is to reduce the operator-level equivariance defect while retaining the computational profile of the underlying backbone.
+
+\section{Approach: Orbit-Tangent Neural Operators}
+
+\subsection{Problem setting}
+Let \(\mathcal{A}\) be an input function space and \(\mathcal{U}\) an output function space. A PDE family induces a solution operator
+\[
+    \mathcal{S}: \mathcal{A} \to \mathcal{U}, \qquad u = \mathcal{S}(a),
+\]
+where \(a\) may contain initial conditions, coefficients, forcing terms, boundary data, geometry descriptors, or physical parameters. Let \(G\) be a Lie group acting on the full problem family through representations \(T_g^{\mathcal{A}}\) on inputs and \(T_g^{\mathcal{U}}\) on outputs. The relevant symmetry assumption is closure of the full data-generating problem under the action: the PDE, domain class, boundary or initial conditions, coefficient fields, and observation map must transform consistently. Under this assumption the exact solution operator satisfies
+\[
+    \mathcal{S}(T_g^{\mathcal{A}} a) = T_g^{\mathcal{U}} \mathcal{S}(a), \qquad g\in G.
+\]
+We train a neural operator \(\mathcal{G}_\theta:\mathcal{A}\to\mathcal{U}\) to approximate \(\mathcal{S}\) while reducing its equivariance defect along sampled group orbits.
+
+\subsection{Stochastic local orbit consistency}
+Let \(\{X_1,\ldots,X_m\}\) be infinitesimal generators of the Lie algebra \(\mathfrak{g}\). For each minibatch, sample a generator index \(i\), a small scalar step \(\epsilon\), and set \(g=\exp(\epsilon X_i)\). The supervised loss is
+\[
+    \mathcal{L}_{\mathrm{sup}}(\theta)
+    =
+    \mathbb{E}_{(a,u)}
+    \left[ \frac{\|\mathcal{G}_\theta(a)-u\|_{\mathcal{U}}^2}{\|u\|_{\mathcal{U}}^2 + \delta} \right].
+\]
+The orbit-consistency loss is
+\[
+    \mathcal{L}_{\mathrm{orb}}(\theta)
+    =
+    \mathbb{E}_{a,i,\epsilon}
+    \left[
+    \frac{
+    \left\|
+    \mathcal{G}_\theta(T_g^{\mathcal{A}}a)
+    -
+    T_g^{\mathcal{U}}\mathcal{G}_\theta(a)
+    \right\|_{\mathcal{U}}^2
+    }{\epsilon^2 + \eta}
+    \right],
+\]
+with small numerical constants \(\delta,\eta>0\). The training objective is
+\[
+    \min_\theta\; \mathcal{L}_{\mathrm{sup}}(\theta) + \lambda\mathcal{L}_{\mathrm{orb}}(\theta).
+\]
+The loss requires the input action, the output action, and two model evaluations. It can be evaluated on unlabeled inputs because the target is the transformed model prediction.
+
+\subsection{Infinitesimal interpretation}
+Assume that the group action and \(\mathcal{G}_\theta\) are differentiable. Let \(X_i^{\mathcal{A}}a\) denote the infinitesimal action on inputs and \(X_i^{\mathcal{U}}v\) the infinitesimal action on outputs. Taylor expansion gives
+\[
+\begin{aligned}
+    \mathcal{G}_\theta(T_{\exp(\epsilon X_i)}^{\mathcal{A}}a)
+    -
+    T_{\exp(\epsilon X_i)}^{\mathcal{U}}\mathcal{G}_\theta(a)
+    & =
+    \epsilon
+    \left(
+    D\mathcal{G}_\theta(a)[X_i^{\mathcal{A}}a]
+    -
+    X_i^{\mathcal{U}}\mathcal{G}_\theta(a)
+    \right)
+    + O(\epsilon^2).
+\end{aligned}
+\]
+Thus \(\mathcal{L}_{\mathrm{orb}}\) is a finite-difference estimator of the squared Lie-algebraic equivariance defect
+\[
+    \left\|
+    D\mathcal{G}_\theta(a)[X_i^{\mathcal{A}}a]
+    -
+    X_i^{\mathcal{U}}\mathcal{G}_\theta(a)
+    \right\|_{\mathcal{U}}^2.
+\]
+This form avoids explicit Jacobian-vector products and scales with ordinary forward passes.
+
+\subsection{Unlabeled adaptation}
+Given a pretrained neural operator \(\mathcal{G}_{\theta_0}\), the same loss can adapt the model on target-domain inputs \(a\sim \mathcal{D}_{\mathrm{target}}\) without PDE solves. A conservative adaptation objective is
+\[
+    \min_{\theta\in\Theta_{\mathrm{adapt}}}
+    \mathcal{L}_{\mathrm{orb}}^{\mathrm{target}}(\theta)
+    +
+    \beta\|\theta-\theta_0\|_2^2,
+\]
+where \(\Theta_{\mathrm{adapt}}\) may include all parameters, a final block, normalization parameters, or lightweight adapters. This targets symmetry-induced distribution shift along known group orbits while preserving the learned dynamics encoded by the base operator.
+
+\subsection{Approximate and partially broken symmetries}
+Many datasets preserve a PDE symmetry only on part of the domain or only after transforming auxiliary fields. Boundary conditions, forcing distributions, non-periodic domains, interpolation artifacts, and observation masks can break exact equivariance. We handle these cases with a validity weight \(w_{a,g}\) in the output norm:
+\[
+    \mathcal{L}_{\mathrm{orb}}^{w}(\theta)
+    =
+    \mathbb{E}_{a,i,\epsilon}
+    \left[
+    \frac{
+    \left\|
+    w_{a,g}\odot
+    \left(
+    \mathcal{G}_\theta(T_g^{\mathcal{A}}a)
+    -
+    T_g^{\mathcal{U}}\mathcal{G}_\theta(a)
+    \right)
+    \right\|_{\mathcal{U}}^2
+    }{\epsilon^2+\eta}
+    \right].
+\]
+The weight can encode valid overlap after a spatial transformation, boundary exclusions, confidence in interpolation, or known regions where the transformed problem remains physically meaningful.
+
+\subsection{Orbit error control}
+The orbit-consistency defect directly controls one component of out-of-distribution error along a symmetry orbit. If the true solution operator is equivariant and \(T_g^{\mathcal{U}}\) is bounded, then for any \(a\in\mathcal{A}\) and \(g\in G\),
+\[
+\begin{aligned}
+    \|\mathcal{G}_\theta(T_g^{\mathcal{A}}a)-\mathcal{S}(T_g^{\mathcal{A}}a)\|_{\mathcal{U}}
+    &\le
+    \|\mathcal{G}_\theta(T_g^{\mathcal{A}}a)-T_g^{\mathcal{U}}\mathcal{G}_\theta(a)\|_{\mathcal{U}} \\
+    &\quad+
+    \|T_g^{\mathcal{U}}\|\,
+    \|\mathcal{G}_\theta(a)-\mathcal{S}(a)\|_{\mathcal{U}}.
+\end{aligned}
+\]
+The first term is the learned operator's equivariance defect; the second term is the in-distribution prediction error transported by the output action. This decomposition motivates reducing \(\mathcal{L}_{\mathrm{orb}}\) when test inputs differ from training inputs by known PDE symmetries.
+
+\subsection{Computational profile and implementation}
+With one sampled generator per minibatch, the method adds one transformed forward pass during training. With \(K\) sampled transformations, the cost is approximately \(K+1\) forward passes plus interpolation or grid transforms. Inference uses the unchanged base operator \(\mathcal{G}_\theta(a)\). The method therefore preserves the inference latency, memory footprint, and deployment path of the chosen backbone.
+
+The implementation is architecture-agnostic. For an FNO backbone, transformations are applied to the input fields on the physical grid, the transformed prediction is compared with the transformed original prediction, and gradients are backpropagated through the two evaluations. Integer translations on periodic grids require only tensor rolls. Non-integer translations, rotations, and Galilean boosts require differentiable resampling and the corresponding transformation of all channels that define the PDE instance. The experimental instantiations should start with exact periodic symmetries for one- and two-dimensional Burgers-type systems, then extend to Navier--Stokes or shallow-water systems where the forcing, boundary conditions, and observation map remain closed under the selected group action.

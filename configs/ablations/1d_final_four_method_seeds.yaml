@@ -1,0 +1,31 @@
+experiments:
+  # Final full-label four-method table, replicated over the paper seed set.
+  - config: configs/baselines/1d_burgers_baseline.yaml
+    seeds: [23, 31, 47]
+    overrides:
+      training.data_fraction: 1.0
+      runtime.overwrite: false
+      runtime.run_dir: runs/final_1d/four_method/baseline
+
+  - config: configs/baselines/1d_burgers_aug.yaml
+    seeds: [23, 31, 47]
+    overrides:
+      training.data_fraction: 1.0
+      runtime.overwrite: false
+      runtime.run_dir: runs/final_1d/four_method/aug
+
+  - config: configs/pilot/1d_burgers_translation_galilean.yaml
+    seeds: [23, 31, 47]
+    overrides:
+      training.data_fraction: 1.0
+      training.lambda_orbit: 0.05
+      runtime.overwrite: false
+      runtime.run_dir: runs/final_1d/four_method/orbit
+
+  - config: configs/baselines/1d_burgers_aug_orbit.yaml
+    seeds: [23, 31, 47]
+    overrides:
+      training.data_fraction: 1.0
+      training.lambda_orbit: 0.25
+      runtime.overwrite: false
+      runtime.run_dir: runs/final_1d/four_method/aug_orbit

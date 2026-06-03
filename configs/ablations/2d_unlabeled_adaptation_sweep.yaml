@@ -1,0 +1,41 @@
+adaptations:
+  # Unlabeled target-input adaptation from full-label 2D augmentation checkpoints.
+  # Labels in the target split are used only for before/after evaluation.
+  - config: configs/pilot/2d_navier_stokes_unlabeled_adapt.yaml
+    overrides:
+      seed: 23
+      adaptation.checkpoint: runs/ablations/2d_full_seed_replication/seed_23/aug/checkpoints/best.pt
+      adaptation.trainable: projector
+      runtime.run_dir: runs/adaptation/2d_ns_sweep/seed_23/projector
+  - config: configs/pilot/2d_navier_stokes_unlabeled_adapt.yaml
+    overrides:
+      seed: 23
+      adaptation.checkpoint: runs/ablations/2d_full_seed_replication/seed_23/aug/checkpoints/best.pt
+      adaptation.trainable: last_block
+      runtime.run_dir: runs/adaptation/2d_ns_sweep/seed_23/last_block
+
+  - config: configs/pilot/2d_navier_stokes_unlabeled_adapt.yaml
+    overrides:
+      seed: 31
+      adaptation.checkpoint: runs/ablations/2d_full_aug_orbit_lambda/aug/checkpoints/best.pt
+      adaptation.trainable: projector
+      runtime.run_dir: runs/adaptation/2d_ns_sweep/seed_31/projector
+  - config: configs/pilot/2d_navier_stokes_unlabeled_adapt.yaml
+    overrides:
+      seed: 31
+      adaptation.checkpoint: runs/ablations/2d_full_aug_orbit_lambda/aug/checkpoints/best.pt
+      adaptation.trainable: last_block
+      runtime.run_dir: runs/adaptation/2d_ns_sweep/seed_31/last_block
+
+  - config: configs/pilot/2d_navier_stokes_unlabeled_adapt.yaml
+    overrides:
+      seed: 47
+      adaptation.checkpoint: runs/ablations/2d_full_seed_replication/seed_47/aug/checkpoints/best.pt
+      adaptation.trainable: projector
+      runtime.run_dir: runs/adaptation/2d_ns_sweep/seed_47/projector
+  - config: configs/pilot/2d_navier_stokes_unlabeled_adapt.yaml
+    overrides:
+      seed: 47
+      adaptation.checkpoint: runs/ablations/2d_full_seed_replication/seed_47/aug/checkpoints/best.pt
+      adaptation.trainable: last_block
+      runtime.run_dir: runs/adaptation/2d_ns_sweep/seed_47/last_block

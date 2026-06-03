@@ -1,0 +1,25 @@
+seed: 31
+
+dataset:
+  path: data/2d_ns_vorticity_n64.pt
+  split: test
+
+adaptation:
+  checkpoint: runs/ablations/2d_full_aug_orbit_lambda/aug/checkpoints/best.pt
+  trainable: projector
+  epochs: 20
+  batch_size: 16
+  lr: 0.0001
+  weight_decay: 0.0
+  beta_l2_initial: 0.0001
+  normalize_by_epsilon: true
+  orbit_eta: 0.000001
+  eval_orbit_samples: 4
+  grad_clip: 1.0
+  latency_repeats: 20
+  latency_warmup: 5
+
+runtime:
+  deterministic: false
+  device: auto
+  run_dir: runs/adaptation/2d_ns/projector/seed_31

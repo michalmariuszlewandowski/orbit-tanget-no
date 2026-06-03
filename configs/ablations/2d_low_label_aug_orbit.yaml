@@ -1,0 +1,34 @@
+experiments:
+  # Low-label 2D comparison for the label-efficiency story.
+  # Full-resolution n64 Navier-Stokes, 150 epochs, paired seeds.
+  - config: configs/pilot/2d_navier_stokes_translation_d4.yaml
+    seeds: [23, 31, 47]
+    overrides:
+      training.method: aug
+      training.data_fraction: 0.1
+      runtime.overwrite: false
+      runtime.run_dir: runs/ablations/2d_low_label_aug_orbit/fraction_0.1/aug
+  - config: configs/pilot/2d_navier_stokes_translation_d4.yaml
+    seeds: [23, 31, 47]
+    overrides:
+      training.method: aug_orbit
+      training.lambda_orbit: 0.05
+      training.data_fraction: 0.1
+      runtime.overwrite: false
+      runtime.run_dir: runs/ablations/2d_low_label_aug_orbit/fraction_0.1/aug_orbit_lambda_0.05
+
+  - config: configs/pilot/2d_navier_stokes_translation_d4.yaml
+    seeds: [23, 31, 47]
+    overrides:
+      training.method: aug
+      training.data_fraction: 0.25
+      runtime.overwrite: false
+      runtime.run_dir: runs/ablations/2d_low_label_aug_orbit/fraction_0.25/aug
+  - config: configs/pilot/2d_navier_stokes_translation_d4.yaml
+    seeds: [23, 31, 47]
+    overrides:
+      training.method: aug_orbit
+      training.lambda_orbit: 0.05
+      training.data_fraction: 0.25
+      runtime.overwrite: false
+      runtime.run_dir: runs/ablations/2d_low_label_aug_orbit/fraction_0.25/aug_orbit_lambda_0.05

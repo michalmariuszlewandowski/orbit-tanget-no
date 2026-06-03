@@ -1,0 +1,74 @@
+experiments:
+  # Focused refinement for augmentation + orbit consistency.
+  # Tests whether the 100% label tradeoff is just an over-strong orbit weight.
+  - config: configs/baselines/1d_burgers_aug_orbit.yaml
+    seeds: [23, 31, 47]
+    overrides:
+      training.data_fraction: 0.05
+      training.lambda_orbit: 0.01
+      runtime.overwrite: false
+      runtime.run_dir: runs/ablations/aug_orbit_lambda_refinement/0.05/lambda_0.01
+  - config: configs/baselines/1d_burgers_aug_orbit.yaml
+    seeds: [23, 31, 47]
+    overrides:
+      training.data_fraction: 0.05
+      training.lambda_orbit: 0.05
+      runtime.overwrite: false
+      runtime.run_dir: runs/ablations/aug_orbit_lambda_refinement/0.05/lambda_0.05
+  - config: configs/baselines/1d_burgers_aug_orbit.yaml
+    seeds: [23, 31, 47]
+    overrides:
+      training.data_fraction: 0.05
+      training.lambda_orbit: 0.1
+      runtime.overwrite: false
+      runtime.run_dir: runs/ablations/aug_orbit_lambda_refinement/0.05/lambda_0.1
+  - config: configs/baselines/1d_burgers_aug_orbit.yaml
+    seeds: [23, 31, 47]
+    overrides:
+      training.data_fraction: 0.05
+      training.lambda_orbit: 0.25
+      runtime.overwrite: false
+      runtime.run_dir: runs/ablations/aug_orbit_lambda_refinement/0.05/lambda_0.25
+  - config: configs/baselines/1d_burgers_aug_orbit.yaml
+    seeds: [23, 31, 47]
+    overrides:
+      training.data_fraction: 0.05
+      training.lambda_orbit: 0.5
+      runtime.overwrite: false
+      runtime.run_dir: runs/ablations/aug_orbit_lambda_refinement/0.05/lambda_0.5
+
+  - config: configs/baselines/1d_burgers_aug_orbit.yaml
+    seeds: [23, 31, 47]
+    overrides:
+      training.data_fraction: 1.0
+      training.lambda_orbit: 0.01
+      runtime.overwrite: false
+      runtime.run_dir: runs/ablations/aug_orbit_lambda_refinement/1.0/lambda_0.01
+  - config: configs/baselines/1d_burgers_aug_orbit.yaml
+    seeds: [23, 31, 47]
+    overrides:
+      training.data_fraction: 1.0
+      training.lambda_orbit: 0.05
+      runtime.overwrite: false
+      runtime.run_dir: runs/ablations/aug_orbit_lambda_refinement/1.0/lambda_0.05
+  - config: configs/baselines/1d_burgers_aug_orbit.yaml
+    seeds: [23, 31, 47]
+    overrides:
+      training.data_fraction: 1.0
+      training.lambda_orbit: 0.1
+      runtime.overwrite: false
+      runtime.run_dir: runs/ablations/aug_orbit_lambda_refinement/1.0/lambda_0.1
+  - config: configs/baselines/1d_burgers_aug_orbit.yaml
+    seeds: [23, 31, 47]
+    overrides:
+      training.data_fraction: 1.0
+      training.lambda_orbit: 0.25
+      runtime.overwrite: false
+      runtime.run_dir: runs/ablations/aug_orbit_lambda_refinement/1.0/lambda_0.25
+  - config: configs/baselines/1d_burgers_aug_orbit.yaml
+    seeds: [23, 31, 47]
+    overrides:
+      training.data_fraction: 1.0
+      training.lambda_orbit: 0.5
+      runtime.overwrite: false
+      runtime.run_dir: runs/ablations/aug_orbit_lambda_refinement/1.0/lambda_0.5

@@ -1,0 +1,37 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "orbit-tangent-no"
+version = "0.1.0"
+description = "Orbit-tangent consistency experiments for Lie-symmetric neural operators"
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [{name = "Orbit Tangent NO Authors"}]
+dependencies = [
+    "torch>=2.1",
+    "numpy>=1.24",
+    "pyyaml>=6.0",
+    "tqdm>=4.66",
+    "pandas>=2.0",
+    "matplotlib>=3.8",
+    "pytest>=9.0.3",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0", "ruff>=0.5"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+src = ["src", "scripts", "tests"]
+
+[tool.ruff.lint.per-file-ignores]
+"scripts/*.py" = ["E402"]

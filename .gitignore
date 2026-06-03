@@ -1,0 +1,30 @@
+.venv/
+.pytest_cache/
+__pycache__/
+*.py[cod]
+*.egg-info/
+
+# Large/generated experiment artifacts.
+data/
+runs/*
+!runs/paper_tables/
+!runs/paper_tables/**
+
+# Model/data binaries and checkpoints.
+*.pt
+*.pth
+*.ckpt
+*.bin
+*.npy
+*.npz
+*.pkl
+
+# Local build and editor noise.
+build/
+dist/
+*.log
+*.aux
+*.out
+*.toc
+.DS_Store
+Thumbs.db

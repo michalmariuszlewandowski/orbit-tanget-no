@@ -1,0 +1,6 @@
+method,lambda_orbit,model_name,dataset_kind,relative_l2_mean,relative_l2_std,relative_l2_count,orbit_ood_relative_l2_mean,orbit_ood_relative_l2_std,orbit_ood_relative_l2_count,equivariance_defect_relative_mean,equivariance_defect_relative_std,equivariance_defect_relative_count,latency_ms_per_sample_mean,latency_ms_per_sample_std,latency_ms_per_sample_count,latency_ms_per_batch_mean,latency_ms_per_batch_std,latency_ms_per_batch_count
+aug,0.05,fno2d,navier_stokes_vorticity2d,0.010258607799187303,,1,0.010280438495101407,,1,0.0020248164373697364,,1,2.398040000025503,,1,38.36864000040805,,1
+aug_orbit,0.01,fno2d,navier_stokes_vorticity2d,0.009882499580271542,,1,0.009926048573106527,,1,0.0019587151277846715,,1,2.1056881249933213,,1,33.69100999989314,,1
+aug_orbit,0.05,fno2d,navier_stokes_vorticity2d,0.009918272029608488,,1,0.009964780590962619,,1,0.001962948632581174,,1,2.406140624952968,,1,38.49824999924749,,1
+aug_orbit,0.1,fno2d,navier_stokes_vorticity2d,0.009912248118780553,,1,0.00995784709812142,,1,0.0019636790004824434,,1,2.594497500012949,,1,41.51196000020718,,1
+aug_orbit,0.25,fno2d,navier_stokes_vorticity2d,0.009961999719962478,,1,0.010006693686591461,,1,0.0019644436927137576,,1,2.419721875048708,,1,38.71555000077933,,1
