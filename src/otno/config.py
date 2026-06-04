@@ -201,7 +201,7 @@ def validate_config(config: dict[str, Any], *, require_dataset: bool = True) -> 
         "orbit_steps_per_epoch",
     ):
         _check_positive_int(training, "training", key)
-    for key in ("eval_orbit_samples", "latency_warmup", "num_workers"):
+    for key in ("eval_orbit_samples", "latency_warmup", "num_workers", "unlabeled_orbit_steps_per_epoch"):
         _check_nonnegative_int(training, "training", key)
     data_fraction = float(training.get("data_fraction", 1.0))
     if data_fraction <= 0 or data_fraction > 1:

@@ -1,0 +1,28 @@
+experiments:
+  # Clean semi-supervised control: the labeled supervised/augmentation phase uses
+  # the natural low-label loader length, then unlabeled orbit-only updates are
+  # added as a separate phase. This avoids replaying labeled batches merely to
+  # match the unlabeled orbit budget.
+  - config: configs/pilot/2d_navier_stokes_translation_d4.yaml
+    seeds: [23, 31, 47]
+    overrides:
+      training.method: semi_aug_orbit
+      training.data_fraction: 0.01
+      training.orbit_data_fraction: 1.0
+      training.unlabeled_orbit_steps_per_epoch: 4
+      training.orbit_batch_size: 16
+      training.lambda_orbit: 0.05
+      runtime.overwrite: false
+      runtime.run_dir: runs/ablations/2d_split_semi_supervised_low_label_aug_orbit/fraction_0.01/semi_aug_orbit_lambda_0.05_unlabeled_steps_4
+
+  - config: configs/pilot/2d_navier_stokes_translation_d4.yaml
+    seeds: [23, 31, 47]
+    overrides:
+      training.method: semi_aug_orbit
+      training.data_fraction: 0.02
+      training.orbit_data_fraction: 1.0
+      training.unlabeled_orbit_steps_per_epoch: 4
+      training.orbit_batch_size: 16
+      training.lambda_orbit: 0.05
+      runtime.overwrite: false
+      runtime.run_dir: runs/ablations/2d_split_semi_supervised_low_label_aug_orbit/fraction_0.02/semi_aug_orbit_lambda_0.05_unlabeled_steps_4

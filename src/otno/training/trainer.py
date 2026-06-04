@@ -97,7 +97,7 @@ def _maybe_protect_run_dir(run_dir: Path, runtime_cfg: dict[str, Any]) -> None:
         raise FileExistsError(f"Run directory already contains artifacts and runtime.overwrite=false: {run_dir}")
 
 
-def _torch_save_atomic(payload: Any, path: Path, *, attempts: int = 5) -> None:
+def _torch_save_atomic(payload: Any, path: Path, *, attempts: int = 20) -> None:
     ensure_dir(path.parent)
     last_error: BaseException | None = None
     for attempt in range(attempts):
@@ -113,7 +113,7 @@ def _torch_save_atomic(payload: Any, path: Path, *, attempts: int = 5) -> None:
             except OSError:
                 pass
             if attempt + 1 < attempts:
-                time.sleep(0.25 * (attempt + 1))
+                time.sleep(min(5.0, 0.5 * (attempt + 1)))
     assert last_error is not None
     raise last_error
 
@@ -145,6 +145,7 @@ def train_from_config(config: dict[str, Any]) -> dict[str, Any]:
     eta = float(training_cfg.get("orbit_eta", 1e-6))
     eval_every = int(training_cfg.get("eval_every", 5))
     grad_clip = training_cfg.get("grad_clip", None)
+    unlabeled_orbit_steps_per_epoch = int(training_cfg.get("unlabeled_orbit_steps_per_epoch", 0))
     aug_methods = {"aug", "augmentation", "aug_orbit", "orbit_aug", "semi_aug_orbit", "semisup_aug_orbit", "semi_supervised_aug_orbit"}
     orbit_methods = {"orbit", "orb", "aug_orbit", "orbit_aug", "semi_aug_orbit", "semisup_aug_orbit", "semi_supervised_aug_orbit"}
     semi_orbit_methods = {"semi_aug_orbit", "semisup_aug_orbit", "semi_supervised_aug_orbit"}
@@ -219,6 +220,7 @@ def train_from_config(config: dict[str, Any]) -> dict[str, Any]:
     val_loader = _loader(dataset_path, "val", config, shuffle=False)
     test_loader = _loader(dataset_path, "test", config, shuffle=False)
     steps_per_epoch = int(training_cfg.get("steps_per_epoch", len(train_loader)))
+    split_unlabeled_orbit = method in semi_orbit_methods and unlabeled_orbit_steps_per_epoch > 0
 
     target_epoch = epochs
     if stop_after_epochs is not None:
@@ -226,14 +228,29 @@ def train_from_config(config: dict[str, Any]) -> dict[str, Any]:
 
     for epoch in range(start_epoch, target_epoch + 1):
         model.train()
-        steps_this_epoch = orbit_steps_per_epoch if orbit_steps_per_epoch is not None else steps_per_epoch
-        progress = tqdm(range(steps_this_epoch), desc=f"epoch {epoch}/{epochs}", leave=False)
+        supervised_steps = orbit_steps_per_epoch if orbit_steps_per_epoch is not None and not split_unlabeled_orbit else steps_per_epoch
+        steps_this_epoch = supervised_steps + (unlabeled_orbit_steps_per_epoch if split_unlabeled_orbit else 0)
+        progress = tqdm(total=steps_this_epoch, desc=f"epoch {epoch}/{epochs}", leave=False)
         train_iter = iter(train_loader)
         orbit_iter = iter(orbit_loader) if orbit_loader is not None else None
         epoch_loss = 0.0
         epoch_logs: dict[str, float] = {}
         num_batches = 0
-        for _ in progress:
+
+        def _accumulate(loss_value: torch.Tensor, logs: dict[str, float]) -> None:
+            nonlocal epoch_loss, num_batches
+            loss_value.backward()
+            if grad_clip is not None:
+                torch.nn.utils.clip_grad_norm_(model.parameters(), float(grad_clip))
+            optimizer.step()
+            epoch_loss += float(loss_value.detach().cpu())
+            for key, value in logs.items():
+                epoch_logs[key] = epoch_logs.get(key, 0.0) + float(value)
+            num_batches += 1
+            progress.set_postfix(loss=epoch_loss / num_batches)
+
+        for _ in range(supervised_steps):
+            progress.update(1)
             try:
                 batch = next(train_iter)
             except StopIteration:
@@ -253,7 +270,7 @@ def train_from_config(config: dict[str, Any]) -> dict[str, Any]:
                 loss = loss + lambda_aug * aug_loss
                 logs["aug_loss"] = float(aug_loss.detach().cpu())
 
-            if method in orbit_methods:
+            if method in orbit_methods and not split_unlabeled_orbit:
                 if transform is None:
                     raise ValueError("Orbit method requires a symmetry transform")
                 orbit_a = a
@@ -277,21 +294,44 @@ def train_from_config(config: dict[str, Any]) -> dict[str, Any]:
                 loss = loss + lambda_orbit * orb_loss
                 logs.update(orb_stats)
 
-            loss.backward()
-            if grad_clip is not None:
-                torch.nn.utils.clip_grad_norm_(model.parameters(), float(grad_clip))
-            optimizer.step()
-            epoch_loss += float(loss.detach().cpu())
-            for key, value in logs.items():
-                epoch_logs[key] = epoch_logs.get(key, 0.0) + float(value)
-            num_batches += 1
-            progress.set_postfix(loss=epoch_loss / num_batches)
+            _accumulate(loss, logs)
+
+        if split_unlabeled_orbit:
+            if transform is None:
+                raise ValueError("Semi-supervised orbit method requires a symmetry transform")
+            if orbit_iter is None or orbit_loader is None:
+                raise ValueError("Semi-supervised orbit method requires an unlabeled orbit loader")
+            for _ in range(unlabeled_orbit_steps_per_epoch):
+                progress.update(1)
+                try:
+                    orbit_batch = next(orbit_iter)
+                except StopIteration:
+                    orbit_iter = iter(orbit_loader)
+                    orbit_batch = next(orbit_iter)
+                orbit_a = orbit_batch["a"].to(device)
+                optimizer.zero_grad(set_to_none=True)
+                orbit_base_pred = model(orbit_a)
+                orb_loss, orb_stats = orbit_consistency_loss(
+                    model,
+                    orbit_a,
+                    transform,
+                    base_pred=orbit_base_pred,
+                    normalize_by_epsilon=normalize_by_epsilon,
+                    eta=eta,
+                )
+                loss = lambda_orbit * orb_loss
+                logs = {f"unlabeled_{key}": value for key, value in orb_stats.items()}
+                logs["unlabeled_weighted_orbit_loss"] = float(loss.detach().cpu())
+                _accumulate(loss, logs)
+        progress.close()
 
         scheduler.step()
         train_record = {
             "epoch": epoch,
             "train_loss": epoch_loss / max(1, num_batches),
             "lr": scheduler.get_last_lr()[0],
+            "train_supervised_steps": supervised_steps,
+            "train_unlabeled_orbit_steps": unlabeled_orbit_steps_per_epoch if split_unlabeled_orbit else 0,
             **{f"train_{k}": v / max(1, num_batches) for k, v in epoch_logs.items()},
         }
         append_jsonl(train_record, run_dir / "train_metrics.jsonl")
