@@ -1,0 +1,20 @@
+experiments:
+  # One-seed n64 scale-up of the boosted-Galilean 1%-label result.
+  - config: configs/pilot/2d_navier_stokes_galilean.yaml
+    seeds: [23]
+    overrides:
+      training.method: aug
+      training.data_fraction: 0.01
+      training.steps_per_epoch: 4
+      runtime.overwrite: false
+      runtime.run_dir: runs/ablations/2d_galilean_n64_low_label_pilot/fraction_0.01/aug_steps_4
+
+  - config: configs/pilot/2d_navier_stokes_galilean.yaml
+    seeds: [23]
+    overrides:
+      training.method: aug_orbit
+      training.data_fraction: 0.01
+      training.steps_per_epoch: 4
+      training.lambda_orbit: 0.05
+      runtime.overwrite: false
+      runtime.run_dir: runs/ablations/2d_galilean_n64_low_label_pilot/fraction_0.01/aug_orbit_lambda_0.05_steps_4
