@@ -6,6 +6,7 @@ from otno.symmetry.transforms import (
     CompositeTransform,
     D4Pseudoscalar2D,
     D4Scalar2D,
+    NavierStokes2DGalilean,
     Translation1D,
     Translation2D,
 )
@@ -23,6 +24,14 @@ def _build_one(cfg: dict) -> BaseTransform:
             final_time=cfg.get("final_time", 0.5),
             channel=cfg.get("channel", 0),
             length=cfg.get("length", 1.0),
+        )
+    if name in {"navier_stokes2d_galilean", "ns2d_galilean", "galilean2d", "vorticity2d_galilean"}:
+        return NavierStokes2DGalilean(
+            max_boost=cfg.get("max_boost", 0.5),
+            final_time=cfg.get("final_time", 0.5),
+            length=cfg.get("length", 1.0),
+            boost_x_channel=cfg.get("boost_x_channel", 1),
+            boost_y_channel=cfg.get("boost_y_channel", 2),
         )
     if name in {"d4_scalar2d", "d4"}:
         return D4Scalar2D()

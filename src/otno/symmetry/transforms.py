@@ -158,6 +158,53 @@ class Burgers1DGalilean(BaseTransform):
         return self._add_boost(shifted, boost)
 
 
+class NavierStokes2DGalilean(BaseTransform):
+    """Galilean boosts for 2D vorticity maps with explicit boost channels.
+
+    Inputs are expected to contain ``[omega0, boost_x, boost_y]`` channels. A
+    sampled boost delta leaves omega0 unchanged, adds the delta to the boost
+    channels, and shifts the final vorticity by delta * final_time.
+    """
+
+    name = "navier_stokes2d_galilean"
+
+    def __init__(
+        self,
+        max_boost: float = 0.5,
+        final_time: float = 0.5,
+        length: float = 1.0,
+        boost_x_channel: int = 1,
+        boost_y_channel: int = 2,
+    ):
+        self.max_boost = float(max_boost)
+        self.final_time = float(final_time)
+        self.length = float(length)
+        self.boost_x_channel = int(boost_x_channel)
+        self.boost_y_channel = int(boost_y_channel)
+
+    def sample(self, batch_size: int, device: torch.device, dtype: torch.dtype = torch.float32) -> TransformSample:
+        boost = (2 * torch.rand(batch_size, 2, device=device, dtype=dtype) - 1) * self.max_boost
+        eps = torch.linalg.norm(boost, dim=-1).clamp_min(1e-6)
+        return TransformSample({"boost": boost}, eps, self.name)
+
+    def apply_input(self, a: torch.Tensor, sample: TransformSample) -> torch.Tensor:
+        channels = max(self.boost_x_channel, self.boost_y_channel) + 1
+        if a.ndim != 4 or a.shape[-1] < channels:
+            raise ValueError(
+                "NavierStokes2DGalilean expects inputs [batch, h, w, channels] "
+                f"with at least {channels} channels, got {tuple(a.shape)}"
+            )
+        boost = sample.params["boost"]
+        y = a.clone()
+        y[..., self.boost_x_channel] = y[..., self.boost_x_channel] + boost[:, 0].view(-1, 1, 1)
+        y[..., self.boost_y_channel] = y[..., self.boost_y_channel] + boost[:, 1].view(-1, 1, 1)
+        return y
+
+    def apply_output(self, u: torch.Tensor, sample: TransformSample) -> torch.Tensor:
+        shift = sample.params["boost"] * self.final_time
+        return periodic_shift_2d(u, shift, length=self.length)
+
+
 class D4Scalar2D(BaseTransform):
     """Discrete dihedral transforms on a square for scalar 2D fields.
 

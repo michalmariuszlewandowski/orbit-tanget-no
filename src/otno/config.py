@@ -12,7 +12,11 @@ _ALLOWED_DATASETS = {
     "burgers1d",
     "1d_burgers",
     "navier_stokes_vorticity2d",
+    "navier_stokes_vorticity2d_boosted",
+    "boosted_navier_stokes_vorticity2d",
     "ns2d",
+    "ns2d_boosted",
+    "boosted_ns2d",
     "2d_navier_stokes",
 }
 _ALLOWED_MODELS = {
@@ -47,6 +51,10 @@ _ALLOWED_TRANSFORMS = {
     "burgers1d_galilean",
     "galilean1d",
     "burgers_galilean",
+    "navier_stokes2d_galilean",
+    "ns2d_galilean",
+    "galilean2d",
+    "vorticity2d_galilean",
     "d4_scalar2d",
     "d4",
     "d4_pseudoscalar2d",
@@ -174,10 +182,27 @@ def validate_config(config: dict[str, Any], *, require_dataset: bool = True) -> 
             _check_positive_int(dataset, "dataset", key)
         _check_nonnegative_float(dataset, "dataset", "final_time")
         _check_nonnegative_float(dataset, "dataset", "viscosity")
-        if kind in {"burgers1d", "1d_burgers", "navier_stokes_vorticity2d", "ns2d", "2d_navier_stokes"}:
+        if kind in {
+            "burgers1d",
+            "1d_burgers",
+            "navier_stokes_vorticity2d",
+            "navier_stokes_vorticity2d_boosted",
+            "boosted_navier_stokes_vorticity2d",
+            "ns2d",
+            "ns2d_boosted",
+            "boosted_ns2d",
+            "2d_navier_stokes",
+        }:
             _check_positive_float(dataset, "dataset", "dt")
         elif "dt" in dataset:
             _check_nonnegative_float(dataset, "dataset", "dt")
+        if kind in {
+            "navier_stokes_vorticity2d_boosted",
+            "boosted_navier_stokes_vorticity2d",
+            "ns2d_boosted",
+            "boosted_ns2d",
+        }:
+            _check_nonnegative_float(dataset, "dataset", "max_boost")
 
     model = config.get("model", {})
     name = str(model.get("name", "fno1d")).lower()
@@ -224,6 +249,8 @@ def validate_config(config: dict[str, Any], *, require_dataset: bool = True) -> 
                 raise ValueError(f"Unknown symmetry transform={tname!r}")
             for key in ("max_shift", "max_boost", "length"):
                 _check_positive_float(transform, "symmetry", key)
+            for key in ("final_time",):
+                _check_nonnegative_float(transform, "symmetry", key)
             for key in ("min_shift", "min_boost"):
                 _check_nonnegative_float(transform, "symmetry", key)
         if "probabilities" in symmetry and "transforms" in symmetry:

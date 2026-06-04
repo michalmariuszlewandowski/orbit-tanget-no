@@ -1,0 +1,53 @@
+experiments:
+  # D4-only low-label pilot. Translation is removed because no-grid FNOs are
+  # already strongly translation friendly; this isolates the less automatic
+  # vorticity pseudoscalar D4 symmetry.
+  - config: configs/pilot/2d_navier_stokes_translation_d4.yaml
+    seeds: [23]
+    overrides:
+      symmetry.transforms:
+        - name: d4_vorticity2d
+      symmetry.probabilities: [1.0]
+      training.method: aug
+      training.data_fraction: 0.01
+      training.steps_per_epoch: 4
+      runtime.overwrite: false
+      runtime.run_dir: runs/ablations/2d_d4_focused_low_label_pilot/fraction_0.01/aug_steps_4
+
+  - config: configs/pilot/2d_navier_stokes_translation_d4.yaml
+    seeds: [23]
+    overrides:
+      symmetry.transforms:
+        - name: d4_vorticity2d
+      symmetry.probabilities: [1.0]
+      training.method: aug_orbit
+      training.data_fraction: 0.01
+      training.steps_per_epoch: 4
+      training.lambda_orbit: 0.05
+      runtime.overwrite: false
+      runtime.run_dir: runs/ablations/2d_d4_focused_low_label_pilot/fraction_0.01/aug_orbit_lambda_0.05_steps_4
+
+  - config: configs/pilot/2d_navier_stokes_translation_d4.yaml
+    seeds: [23]
+    overrides:
+      symmetry.transforms:
+        - name: d4_vorticity2d
+      symmetry.probabilities: [1.0]
+      training.method: aug
+      training.data_fraction: 0.02
+      training.steps_per_epoch: 4
+      runtime.overwrite: false
+      runtime.run_dir: runs/ablations/2d_d4_focused_low_label_pilot/fraction_0.02/aug_steps_4
+
+  - config: configs/pilot/2d_navier_stokes_translation_d4.yaml
+    seeds: [23]
+    overrides:
+      symmetry.transforms:
+        - name: d4_vorticity2d
+      symmetry.probabilities: [1.0]
+      training.method: aug_orbit
+      training.data_fraction: 0.02
+      training.steps_per_epoch: 4
+      training.lambda_orbit: 0.05
+      runtime.overwrite: false
+      runtime.run_dir: runs/ablations/2d_d4_focused_low_label_pilot/fraction_0.02/aug_orbit_lambda_0.05_steps_4

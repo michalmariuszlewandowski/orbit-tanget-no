@@ -1,0 +1,41 @@
+experiments:
+  # D4-only 1%-label lambda refinement. The 0.05 point and the matching aug
+  # baseline already live in 2d_d4_focused_low_label_pilot.
+  - config: configs/pilot/2d_navier_stokes_translation_d4.yaml
+    seeds: [23]
+    overrides:
+      symmetry.transforms:
+        - name: d4_vorticity2d
+      symmetry.probabilities: [1.0]
+      training.method: aug_orbit
+      training.data_fraction: 0.01
+      training.steps_per_epoch: 4
+      training.lambda_orbit: 0.01
+      runtime.overwrite: false
+      runtime.run_dir: runs/ablations/2d_d4_focused_lambda_refinement/fraction_0.01/aug_orbit_lambda_0.01_steps_4
+
+  - config: configs/pilot/2d_navier_stokes_translation_d4.yaml
+    seeds: [23]
+    overrides:
+      symmetry.transforms:
+        - name: d4_vorticity2d
+      symmetry.probabilities: [1.0]
+      training.method: aug_orbit
+      training.data_fraction: 0.01
+      training.steps_per_epoch: 4
+      training.lambda_orbit: 0.1
+      runtime.overwrite: false
+      runtime.run_dir: runs/ablations/2d_d4_focused_lambda_refinement/fraction_0.01/aug_orbit_lambda_0.1_steps_4
+
+  - config: configs/pilot/2d_navier_stokes_translation_d4.yaml
+    seeds: [23]
+    overrides:
+      symmetry.transforms:
+        - name: d4_vorticity2d
+      symmetry.probabilities: [1.0]
+      training.method: aug_orbit
+      training.data_fraction: 0.01
+      training.steps_per_epoch: 4
+      training.lambda_orbit: 0.2
+      runtime.overwrite: false
+      runtime.run_dir: runs/ablations/2d_d4_focused_lambda_refinement/fraction_0.01/aug_orbit_lambda_0.2_steps_4

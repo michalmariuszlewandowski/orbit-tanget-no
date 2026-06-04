@@ -1,0 +1,2 @@
+data_fraction,seed,lambda_orbit,aug_relative_l2,aug_orbit_relative_l2,relative_l2_delta_pct,aug_ood_relative_l2,aug_orbit_ood_relative_l2,orbit_ood_delta_pct,aug_defect,aug_orbit_defect,defect_delta_pct
+0.01,23,0.05,1.0537799000740051,0.9240379706025124,-12.312052019817532,1.09017126634717,0.9559041131287812,-12.316152274704228,0.6900918055325747,0.5733970357105136,-16.910035575919135

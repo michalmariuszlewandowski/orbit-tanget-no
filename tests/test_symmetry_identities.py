@@ -58,3 +58,44 @@ def test_navier_stokes_translation_commutes_with_solver_small_time():
         sample,
     )
     assert torch.allclose(left, right, atol=2e-4, rtol=2e-4)
+
+
+def test_navier_stokes_galilean_boost_identity_small_time():
+    from otno.data.solvers2d import random_fourier_field_2d, solve_navier_stokes_vorticity_2d
+    from otno.symmetry.transforms import NavierStokes2DGalilean
+
+    final_time = 0.02
+    omega0 = random_fourier_field_2d(2, 16, smoothness=4.0, amplitude=0.1, seed=7)
+    base_boost = torch.tensor([[0.03, -0.02], [-0.01, 0.04]])
+    a = torch.cat(
+        [
+            omega0[..., None],
+            base_boost[:, None, None, :].expand(2, 16, 16, 2),
+        ],
+        dim=-1,
+    )
+    transform = NavierStokes2DGalilean(max_boost=0.1, final_time=final_time)
+    sample = TransformSample(
+        params={"boost": torch.tensor([[0.04, -0.03], [-0.02, 0.01]])},
+        epsilon=torch.ones(2),
+        name="navier_stokes2d_galilean",
+    )
+    transformed = transform.apply_input(a, sample)
+    left = solve_navier_stokes_vorticity_2d(
+        transformed[..., 0],
+        viscosity=1e-2,
+        final_time=final_time,
+        dt=0.002,
+        ambient_velocity=transformed[:, 0, 0, 1:3],
+    )[..., None]
+    right = transform.apply_output(
+        solve_navier_stokes_vorticity_2d(
+            a[..., 0],
+            viscosity=1e-2,
+            final_time=final_time,
+            dt=0.002,
+            ambient_velocity=base_boost,
+        )[..., None],
+        sample,
+    )
+    assert torch.allclose(left, right, atol=2e-4, rtol=2e-4)

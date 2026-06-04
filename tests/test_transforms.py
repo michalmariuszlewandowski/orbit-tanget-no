@@ -6,6 +6,7 @@ from otno.symmetry.transforms import (
     Burgers1DGalilean,
     D4Pseudoscalar2D,
     D4Scalar2D,
+    NavierStokes2DGalilean,
     Translation1D,
     TransformSample,
     periodic_shift_1d,
@@ -45,6 +46,23 @@ def test_burgers_galilean_shapes():
     y_out = transform.apply_output(x, sample)
     assert y_in.shape == x.shape
     assert y_out.shape == x.shape
+
+
+def test_navier_stokes_2d_galilean_boost_channels_and_output_shape():
+    transform = NavierStokes2DGalilean(max_boost=0.2, final_time=0.5)
+    x = torch.zeros(2, 8, 8, 3)
+    sample = TransformSample(
+        params={"boost": torch.tensor([[0.1, -0.2], [-0.05, 0.03]])},
+        epsilon=torch.ones(2),
+        name="navier_stokes2d_galilean",
+    )
+    y_in = transform.apply_input(x, sample)
+    y_out = transform.apply_output(x[..., :1], sample)
+    assert y_in.shape == x.shape
+    assert y_out.shape == x[..., :1].shape
+    assert torch.allclose(y_in[:, :, :, 0], x[:, :, :, 0])
+    assert torch.allclose(y_in[0, :, :, 1], torch.full((8, 8), 0.1))
+    assert torch.allclose(y_in[0, :, :, 2], torch.full((8, 8), -0.2))
 
 
 def test_d4_scalar2d_shape_and_manual_sample():

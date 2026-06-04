@@ -1,0 +1,274 @@
+evaluations:
+  # Existing 1%-label 2D checkpoints, evaluated under stronger translation
+  # shifts while keeping the discrete D4 component fixed.
+  - severity: train_radius
+    severity_scale: 1.0
+    methods: [update_aug]
+    seeds: [23, 31, 47]
+    checkpoint: runs/ablations/2d_update_matched_low_label_control/fraction_0.01/aug_steps_4/seed_{seed}/checkpoints/best.pt
+    out_dir: runs/ablations/2d_low_label_ood_severity/scale_1.0/update_aug/seed_{seed}
+    split: test
+    orbit_samples: 4
+    batch_size: 16
+    symmetry:
+      transforms:
+        - name: translation2d
+          max_shift: 0.25
+          length: 1.0
+        - name: d4_vorticity2d
+      probabilities: [0.75, 0.25]
+
+  - severity: train_radius
+    severity_scale: 1.0
+    methods: [update_aug_orbit]
+    seeds: [23, 31, 47]
+    checkpoint: runs/ablations/2d_update_matched_low_label_control/fraction_0.01/aug_orbit_lambda_0.05_steps_4/seed_{seed}/checkpoints/best.pt
+    out_dir: runs/ablations/2d_low_label_ood_severity/scale_1.0/update_aug_orbit/seed_{seed}
+    split: test
+    orbit_samples: 4
+    batch_size: 16
+    symmetry:
+      transforms:
+        - name: translation2d
+          max_shift: 0.25
+          length: 1.0
+        - name: d4_vorticity2d
+      probabilities: [0.75, 0.25]
+
+  - severity: train_radius
+    severity_scale: 1.0
+    methods: [mixed_semi_aug_orbit]
+    seeds: [23, 31, 47]
+    checkpoint: runs/ablations/2d_semi_supervised_low_label_aug_orbit/fraction_0.01/semi_aug_orbit_lambda_0.05_steps_4/seed_{seed}/checkpoints/best.pt
+    out_dir: runs/ablations/2d_low_label_ood_severity/scale_1.0/mixed_semi_aug_orbit/seed_{seed}
+    split: test
+    orbit_samples: 4
+    batch_size: 16
+    symmetry:
+      transforms:
+        - name: translation2d
+          max_shift: 0.25
+          length: 1.0
+        - name: d4_vorticity2d
+      probabilities: [0.75, 0.25]
+
+  - severity: train_radius
+    severity_scale: 1.0
+    methods: [split_semi_aug_orbit]
+    seeds: [23, 31, 47]
+    checkpoint: runs/ablations/2d_split_semi_supervised_low_label_aug_orbit/fraction_0.01/semi_aug_orbit_lambda_0.05_unlabeled_steps_4/seed_{seed}/checkpoints/best.pt
+    out_dir: runs/ablations/2d_low_label_ood_severity/scale_1.0/split_semi_aug_orbit/seed_{seed}
+    split: test
+    orbit_samples: 4
+    batch_size: 16
+    symmetry:
+      transforms:
+        - name: translation2d
+          max_shift: 0.25
+          length: 1.0
+        - name: d4_vorticity2d
+      probabilities: [0.75, 0.25]
+
+  - severity: 1.5x
+    severity_scale: 1.5
+    methods: [update_aug]
+    seeds: [23, 31, 47]
+    checkpoint: runs/ablations/2d_update_matched_low_label_control/fraction_0.01/aug_steps_4/seed_{seed}/checkpoints/best.pt
+    out_dir: runs/ablations/2d_low_label_ood_severity/scale_1.5/update_aug/seed_{seed}
+    split: test
+    orbit_samples: 4
+    batch_size: 16
+    symmetry:
+      transforms:
+        - name: translation2d
+          max_shift: 0.375
+          length: 1.0
+        - name: d4_vorticity2d
+      probabilities: [0.75, 0.25]
+
+  - severity: 1.5x
+    severity_scale: 1.5
+    methods: [update_aug_orbit]
+    seeds: [23, 31, 47]
+    checkpoint: runs/ablations/2d_update_matched_low_label_control/fraction_0.01/aug_orbit_lambda_0.05_steps_4/seed_{seed}/checkpoints/best.pt
+    out_dir: runs/ablations/2d_low_label_ood_severity/scale_1.5/update_aug_orbit/seed_{seed}
+    split: test
+    orbit_samples: 4
+    batch_size: 16
+    symmetry:
+      transforms:
+        - name: translation2d
+          max_shift: 0.375
+          length: 1.0
+        - name: d4_vorticity2d
+      probabilities: [0.75, 0.25]
+
+  - severity: 1.5x
+    severity_scale: 1.5
+    methods: [mixed_semi_aug_orbit]
+    seeds: [23, 31, 47]
+    checkpoint: runs/ablations/2d_semi_supervised_low_label_aug_orbit/fraction_0.01/semi_aug_orbit_lambda_0.05_steps_4/seed_{seed}/checkpoints/best.pt
+    out_dir: runs/ablations/2d_low_label_ood_severity/scale_1.5/mixed_semi_aug_orbit/seed_{seed}
+    split: test
+    orbit_samples: 4
+    batch_size: 16
+    symmetry:
+      transforms:
+        - name: translation2d
+          max_shift: 0.375
+          length: 1.0
+        - name: d4_vorticity2d
+      probabilities: [0.75, 0.25]
+
+  - severity: 1.5x
+    severity_scale: 1.5
+    methods: [split_semi_aug_orbit]
+    seeds: [23, 31, 47]
+    checkpoint: runs/ablations/2d_split_semi_supervised_low_label_aug_orbit/fraction_0.01/semi_aug_orbit_lambda_0.05_unlabeled_steps_4/seed_{seed}/checkpoints/best.pt
+    out_dir: runs/ablations/2d_low_label_ood_severity/scale_1.5/split_semi_aug_orbit/seed_{seed}
+    split: test
+    orbit_samples: 4
+    batch_size: 16
+    symmetry:
+      transforms:
+        - name: translation2d
+          max_shift: 0.375
+          length: 1.0
+        - name: d4_vorticity2d
+      probabilities: [0.75, 0.25]
+
+  - severity: 2x
+    severity_scale: 2.0
+    methods: [update_aug]
+    seeds: [23, 31, 47]
+    checkpoint: runs/ablations/2d_update_matched_low_label_control/fraction_0.01/aug_steps_4/seed_{seed}/checkpoints/best.pt
+    out_dir: runs/ablations/2d_low_label_ood_severity/scale_2.0/update_aug/seed_{seed}
+    split: test
+    orbit_samples: 4
+    batch_size: 16
+    symmetry:
+      transforms:
+        - name: translation2d
+          max_shift: 0.5
+          length: 1.0
+        - name: d4_vorticity2d
+      probabilities: [0.75, 0.25]
+
+  - severity: 2x
+    severity_scale: 2.0
+    methods: [update_aug_orbit]
+    seeds: [23, 31, 47]
+    checkpoint: runs/ablations/2d_update_matched_low_label_control/fraction_0.01/aug_orbit_lambda_0.05_steps_4/seed_{seed}/checkpoints/best.pt
+    out_dir: runs/ablations/2d_low_label_ood_severity/scale_2.0/update_aug_orbit/seed_{seed}
+    split: test
+    orbit_samples: 4
+    batch_size: 16
+    symmetry:
+      transforms:
+        - name: translation2d
+          max_shift: 0.5
+          length: 1.0
+        - name: d4_vorticity2d
+      probabilities: [0.75, 0.25]
+
+  - severity: 2x
+    severity_scale: 2.0
+    methods: [mixed_semi_aug_orbit]
+    seeds: [23, 31, 47]
+    checkpoint: runs/ablations/2d_semi_supervised_low_label_aug_orbit/fraction_0.01/semi_aug_orbit_lambda_0.05_steps_4/seed_{seed}/checkpoints/best.pt
+    out_dir: runs/ablations/2d_low_label_ood_severity/scale_2.0/mixed_semi_aug_orbit/seed_{seed}
+    split: test
+    orbit_samples: 4
+    batch_size: 16
+    symmetry:
+      transforms:
+        - name: translation2d
+          max_shift: 0.5
+          length: 1.0
+        - name: d4_vorticity2d
+      probabilities: [0.75, 0.25]
+
+  - severity: 2x
+    severity_scale: 2.0
+    methods: [split_semi_aug_orbit]
+    seeds: [23, 31, 47]
+    checkpoint: runs/ablations/2d_split_semi_supervised_low_label_aug_orbit/fraction_0.01/semi_aug_orbit_lambda_0.05_unlabeled_steps_4/seed_{seed}/checkpoints/best.pt
+    out_dir: runs/ablations/2d_low_label_ood_severity/scale_2.0/split_semi_aug_orbit/seed_{seed}
+    split: test
+    orbit_samples: 4
+    batch_size: 16
+    symmetry:
+      transforms:
+        - name: translation2d
+          max_shift: 0.5
+          length: 1.0
+        - name: d4_vorticity2d
+      probabilities: [0.75, 0.25]
+
+  - severity: 3x
+    severity_scale: 3.0
+    methods: [update_aug]
+    seeds: [23, 31, 47]
+    checkpoint: runs/ablations/2d_update_matched_low_label_control/fraction_0.01/aug_steps_4/seed_{seed}/checkpoints/best.pt
+    out_dir: runs/ablations/2d_low_label_ood_severity/scale_3.0/update_aug/seed_{seed}
+    split: test
+    orbit_samples: 4
+    batch_size: 16
+    symmetry:
+      transforms:
+        - name: translation2d
+          max_shift: 0.75
+          length: 1.0
+        - name: d4_vorticity2d
+      probabilities: [0.75, 0.25]
+
+  - severity: 3x
+    severity_scale: 3.0
+    methods: [update_aug_orbit]
+    seeds: [23, 31, 47]
+    checkpoint: runs/ablations/2d_update_matched_low_label_control/fraction_0.01/aug_orbit_lambda_0.05_steps_4/seed_{seed}/checkpoints/best.pt
+    out_dir: runs/ablations/2d_low_label_ood_severity/scale_3.0/update_aug_orbit/seed_{seed}
+    split: test
+    orbit_samples: 4
+    batch_size: 16
+    symmetry:
+      transforms:
+        - name: translation2d
+          max_shift: 0.75
+          length: 1.0
+        - name: d4_vorticity2d
+      probabilities: [0.75, 0.25]
+
+  - severity: 3x
+    severity_scale: 3.0
+    methods: [mixed_semi_aug_orbit]
+    seeds: [23, 31, 47]
+    checkpoint: runs/ablations/2d_semi_supervised_low_label_aug_orbit/fraction_0.01/semi_aug_orbit_lambda_0.05_steps_4/seed_{seed}/checkpoints/best.pt
+    out_dir: runs/ablations/2d_low_label_ood_severity/scale_3.0/mixed_semi_aug_orbit/seed_{seed}
+    split: test
+    orbit_samples: 4
+    batch_size: 16
+    symmetry:
+      transforms:
+        - name: translation2d
+          max_shift: 0.75
+          length: 1.0
+        - name: d4_vorticity2d
+      probabilities: [0.75, 0.25]
+
+  - severity: 3x
+    severity_scale: 3.0
+    methods: [split_semi_aug_orbit]
+    seeds: [23, 31, 47]
+    checkpoint: runs/ablations/2d_split_semi_supervised_low_label_aug_orbit/fraction_0.01/semi_aug_orbit_lambda_0.05_unlabeled_steps_4/seed_{seed}/checkpoints/best.pt
+    out_dir: runs/ablations/2d_low_label_ood_severity/scale_3.0/split_semi_aug_orbit/seed_{seed}
+    split: test
+    orbit_samples: 4
+    batch_size: 16
+    symmetry:
+      transforms:
+        - name: translation2d
+          max_shift: 0.75
+          length: 1.0
+        - name: d4_vorticity2d
+      probabilities: [0.75, 0.25]

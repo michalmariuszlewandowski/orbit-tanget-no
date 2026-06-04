@@ -15,7 +15,14 @@ import torch
 
 from otno.data.solvers1d import random_fourier_field_1d, solve_advection_1d, solve_burgers_1d
 from otno.data.solvers2d import random_fourier_field_2d, solve_navier_stokes_vorticity_2d
-from otno.symmetry.transforms import Burgers1DGalilean, D4Pseudoscalar2D, TransformSample, Translation1D, Translation2D
+from otno.symmetry.transforms import (
+    Burgers1DGalilean,
+    D4Pseudoscalar2D,
+    NavierStokes2DGalilean,
+    TransformSample,
+    Translation1D,
+    Translation2D,
+)
 from otno.utils import dump_json, ensure_dir, set_seed
 
 
@@ -77,6 +84,40 @@ def run_validation(seed: int = 123) -> dict[str, float]:
         sample_d4,
     )
     metrics["ns2d_d4_pseudoscalar_rel"] = _rel(left, right)
+    final_time_2d = 0.01
+    base_boost = torch.tensor([[0.03, -0.02], [-0.01, 0.04], [0.02, 0.01]])
+    boost_transform = NavierStokes2DGalilean(max_boost=0.1, final_time=final_time_2d)
+    boost_sample = TransformSample(
+        params={"boost": torch.tensor([[0.04, -0.03], [-0.02, 0.01], [0.01, 0.02]])},
+        epsilon=torch.ones(3),
+        name="navier_stokes2d_galilean",
+    )
+    boosted_input = torch.cat(
+        [
+            omega0,
+            base_boost[:, None, None, :].expand(3, 16, 16, 2),
+        ],
+        dim=-1,
+    )
+    transformed_input = boost_transform.apply_input(boosted_input, boost_sample)
+    left = solve_navier_stokes_vorticity_2d(
+        transformed_input[..., 0],
+        viscosity=1e-2,
+        final_time=final_time_2d,
+        dt=0.002,
+        ambient_velocity=transformed_input[:, 0, 0, 1:3],
+    )[..., None]
+    right = boost_transform.apply_output(
+        solve_navier_stokes_vorticity_2d(
+            boosted_input[..., 0],
+            viscosity=1e-2,
+            final_time=final_time_2d,
+            dt=0.002,
+            ambient_velocity=base_boost,
+        )[..., None],
+        boost_sample,
+    )
+    metrics["ns2d_galilean_rel"] = _rel(left, right)
     coarse = solve_navier_stokes_vorticity_2d(omega0[..., 0], viscosity=1e-2, final_time=0.01, dt=0.002)
     fine = solve_navier_stokes_vorticity_2d(omega0[..., 0], viscosity=1e-2, final_time=0.01, dt=0.001)
     metrics["ns2d_dt_halving_rel"] = _rel(coarse, fine)
@@ -99,6 +140,7 @@ def main() -> None:
         "burgers_dt_halving_rel": 5e-4,
         "ns2d_translation_rel": 1e-5,
         "ns2d_d4_pseudoscalar_rel": 1e-5,
+        "ns2d_galilean_rel": 5e-4,
         "ns2d_dt_halving_rel": 5e-4,
     }
     failures = {key: value for key, value in metrics.items() if value > thresholds[key]}

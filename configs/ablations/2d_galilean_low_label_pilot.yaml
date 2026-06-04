@@ -1,0 +1,22 @@
+experiments:
+  # Feasibility pilot for boosted 2D vorticity Galilean symmetry. This is a
+  # small n32 run; replicate or scale only if the identity tests pass and the
+  # one-seed signal is nontrivial.
+  - config: configs/pilot/2d_navier_stokes_galilean_small.yaml
+    seeds: [23]
+    overrides:
+      training.method: aug
+      training.data_fraction: 0.01
+      training.steps_per_epoch: 4
+      runtime.overwrite: false
+      runtime.run_dir: runs/ablations/2d_galilean_low_label_pilot/fraction_0.01/aug_steps_4
+
+  - config: configs/pilot/2d_navier_stokes_galilean_small.yaml
+    seeds: [23]
+    overrides:
+      training.method: aug_orbit
+      training.data_fraction: 0.01
+      training.steps_per_epoch: 4
+      training.lambda_orbit: 0.05
+      runtime.overwrite: false
+      runtime.run_dir: runs/ablations/2d_galilean_low_label_pilot/fraction_0.01/aug_orbit_lambda_0.05_steps_4
