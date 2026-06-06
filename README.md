@@ -1,6 +1,6 @@
 # Orbit-Tangent Neural Operators
 
-This repository is a paper-grade experimental scaffold for testing whether stochastic local orbit consistency is a viable ICLR 2027 contribution for symmetry-aware neural operators. It contains runnable pilots, baselines, validation scripts, reproducibility metadata, solver checks, and table-generation utilities. It does not contain completed paper results.
+This repository is a paper-grade experimental scaffold for testing whether stochastic local orbit consistency is a viable ICLR 2027 contribution for symmetry-aware neural operators. It contains runnable pilots, baselines, validation scripts, reproducibility metadata, solver checks, table-generation utilities, and cached N64 Galilean paper artifacts.
 
 The core hypothesis is that a pretrained or jointly trained neural operator can be made more robust along known PDE symmetry orbits by adding a cheap consistency objective
 
@@ -151,6 +151,16 @@ python scripts/summarize_results.py --runs runs --out runs/summary.csv
 python scripts/make_paper_tables.py --runs runs --out-prefix runs/paper_tables/main
 ```
 
+Regenerate the frozen N64 Galilean paper artifacts from completed run
+directories:
+
+```bash
+python scripts/reproduce_paper_artifacts.py
+```
+
+The final artifact map, claim summary, and scope decision are documented in
+`docs/final_paper_artifacts.md`.
+
 Evaluate a checkpoint:
 
 ```bash
@@ -196,6 +206,12 @@ Before any result is considered table-eligible, run:
 ```bash
 make quality
 python scripts/make_paper_tables.py --runs runs --out-prefix runs/paper_tables/main
+```
+
+For the current N64 Galilean paper result, run:
+
+```bash
+python scripts/reproduce_paper_artifacts.py
 ```
 
 A table-eligible run must contain `config.yaml`, `meta.json`, `rng_state_initial.pt`, `rng_state_final.pt`, `train_metrics.jsonl`, `val_metrics.jsonl`, `test_metrics.json`, and `checkpoints/best.pt`. The metadata records the dataset SHA-256 hash, config hash, seed, parameter count, model name, dataset kind, and environment snapshot.

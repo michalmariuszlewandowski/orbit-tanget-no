@@ -8,14 +8,16 @@ import matplotlib
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+from matplotlib.ticker import NullLocator
 import pandas as pd
 
 
 METHOD_LABELS = {
     "aug": "Augmentation, 6 steps",
-    "aug_orbit": "Augmentation + orbit, 4 steps",
+    "aug_orbit": "Augmentation + orbit (lambda=0.10), 4 steps",
     "aug_steps_6": "Augmentation, 6 steps",
-    "aug_orbit_steps_4": "Augmentation + orbit, 4 steps",
+    "aug_orbit_steps_4": "Augmentation + orbit (lambda=0.05), 4 steps",
+    "aug_orbit_lambda_0.1_steps_4": "Augmentation + orbit (lambda=0.10), 4 steps",
     "semi_aug_orbit": "Semi-supervised orbit",
 }
 
@@ -24,6 +26,7 @@ METHOD_STYLES = {
     "aug_orbit": {"color": "#f58518", "marker": "s", "offset": 1.06},
     "aug_steps_6": {"color": "#4c78a8", "marker": "o", "offset": 0.94},
     "aug_orbit_steps_4": {"color": "#f58518", "marker": "s", "offset": 1.06},
+    "aug_orbit_lambda_0.1_steps_4": {"color": "#f58518", "marker": "s", "offset": 1.06},
     "semi_aug_orbit": {"color": "#54a24b", "marker": "^", "offset": 1.00},
 }
 
@@ -108,6 +111,8 @@ def plot_label_efficiency(runs_csv: Path, out_prefix: Path) -> None:
     methods = ["aug", "aug_orbit"]
     df = df[df["method"].isin(methods)].copy()
     agg = _std_aggregate(df, ["data_fraction", "method"], metrics)
+    fractions = sorted(float(value) for value in df["data_fraction"].unique())
+    tick_labels = [f"{100.0 * value:g}%" for value in fractions]
 
     fig, axes = plt.subplots(1, 2, figsize=(8.0, 3.05), constrained_layout=True)
     for ax, metric in zip(axes, metrics):
@@ -120,8 +125,9 @@ def plot_label_efficiency(runs_csv: Path, out_prefix: Path) -> None:
             metric=metric,
         )
         ax.set_xscale("log")
-        ax.set_xticks([0.005, 0.01, 0.02, 0.05])
-        ax.set_xticklabels(["0.5%", "1%", "2%", "5%"])
+        ax.set_xticks(fractions)
+        ax.set_xticklabels(tick_labels)
+        ax.xaxis.set_minor_locator(NullLocator())
         ax.set_xlabel("Labeled training fraction")
     axes[0].set_title("Symmetry-induced OOD error")
     axes[1].set_title("Equivariance defect")
@@ -141,7 +147,12 @@ def plot_ood_severity(runs_csv: Path, out_prefix: Path) -> None:
     if missing:
         raise SystemExit(f"{runs_csv} missing columns: {', '.join(missing)}")
 
-    methods = ["aug_steps_6", "aug_orbit_steps_4"]
+    orbit_method = (
+        "aug_orbit_lambda_0.1_steps_4"
+        if "aug_orbit_lambda_0.1_steps_4" in set(df["method"])
+        else "aug_orbit_steps_4"
+    )
+    methods = ["aug_steps_6", orbit_method]
     df = df[df["method"].isin(methods)].copy()
     df["severity_order"] = df["severity"].map({name: i for i, name in enumerate(SEVERITY_ORDER)})
     df = df.sort_values(["severity_order", "method", "seed"])
@@ -192,7 +203,12 @@ def plot_semisupervised_ood_severity(
     if missing:
         raise SystemExit(f"semi-supervised severity inputs missing columns: {', '.join(missing)}")
 
-    methods = ["aug_steps_6", "aug_orbit_steps_4", "semi_aug_orbit"]
+    orbit_method = (
+        "aug_orbit_lambda_0.1_steps_4"
+        if "aug_orbit_lambda_0.1_steps_4" in set(df["method"])
+        else "aug_orbit_steps_4"
+    )
+    methods = ["aug_steps_6", orbit_method, "semi_aug_orbit"]
     df = df[df["method"].isin(methods)].copy()
     df["severity_order"] = df["severity"].map({name: i for i, name in enumerate(SEVERITY_ORDER)})
     df = df.sort_values(["severity_order", "method", "seed"])
@@ -235,11 +251,11 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Plot paper-facing N64 Galilean figures.")
     parser.add_argument(
         "--label-runs-csv",
-        default="runs/paper_tables/2d_galilean_n64_label_efficiency_compute_matched.runs.csv",
+        default="runs/paper_tables/2d_galilean_n64_label_efficiency_lambda_0p1.runs.csv",
     )
     parser.add_argument(
         "--severity-runs-csv",
-        default="runs/paper_tables/2d_galilean_n64_label_efficiency_2pct_ood_severity.runs.csv",
+        default="runs/paper_tables/2d_galilean_n64_2pct_ood_severity_lambda_0p1.runs.csv",
     )
     parser.add_argument(
         "--semi-severity-runs-csv",
@@ -259,9 +275,9 @@ def main() -> None:
     )
 
     out_dir = Path(args.out_dir)
-    label_prefix = out_dir / "2d_galilean_n64_label_efficiency_compute_matched"
-    severity_prefix = out_dir / "2d_galilean_n64_2pct_ood_severity"
-    semi_severity_prefix = out_dir / "2d_galilean_n64_2pct_semi_supervised_ood_severity"
+    label_prefix = out_dir / "2d_galilean_n64_label_efficiency_lambda_0p1"
+    severity_prefix = out_dir / "2d_galilean_n64_2pct_ood_severity_lambda_0p1"
+    semi_severity_prefix = out_dir / "2d_galilean_n64_2pct_semi_supervised_ood_severity_lambda_0p1"
     plot_label_efficiency(Path(args.label_runs_csv), label_prefix)
     plot_ood_severity(Path(args.severity_runs_csv), severity_prefix)
     print(f"wrote {label_prefix.with_suffix('.png')}")

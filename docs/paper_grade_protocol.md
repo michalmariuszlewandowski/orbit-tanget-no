@@ -40,6 +40,16 @@ python scripts/make_paper_tables.py --runs runs --out-prefix runs/paper_tables/m
 
 The command writes raw run rows, grouped aggregates, and a LaTeX draft table.
 
+For the frozen N64 Galilean paper artifacts, use the cached reproducer instead:
+
+```bash
+python scripts/reproduce_paper_artifacts.py
+```
+
+This regenerates the final lambda=0.10 tables, figures, reproducibility
+manifest, and claim-summary CSV from completed local run directories. The
+artifact map is maintained in `docs/final_paper_artifacts.md`.
+
 ## Exact-symmetry runs
 
 Exact translation and Galilean experiments use `model.add_grid: false` in the main configs. Absolute coordinate channels are evaluated separately in `configs/ablations/grid_ablation.yaml` because they give the model an origin and can increase equivariance defect.
