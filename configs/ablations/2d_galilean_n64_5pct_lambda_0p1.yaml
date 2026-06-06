@@ -1,0 +1,12 @@
+experiments:
+  # Check whether the stronger orbit weight from the 2%-label headline result
+  # also improves the 5%-label N64 boosted-Galilean point.
+  - config: configs/pilot/2d_navier_stokes_galilean.yaml
+    seeds: [23, 31, 47]
+    overrides:
+      training.method: aug_orbit
+      training.data_fraction: 0.05
+      training.steps_per_epoch: 4
+      training.lambda_orbit: 0.1
+      runtime.overwrite: false
+      runtime.run_dir: runs/ablations/2d_galilean_n64_5pct_lambda_0p1/fraction_0.05/aug_orbit_lambda_0.1_steps_4
