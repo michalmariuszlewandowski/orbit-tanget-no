@@ -1,0 +1,13 @@
+experiments:
+  # Compute-matched control for the N64 boosted-Galilean headline setting.
+  # This gives plain supervised Lie augmentation more supervised updates than
+  # the paper-ladder aug_orbit row, testing whether the orbit gain is only a
+  # training-budget effect.
+  - config: configs/pilot/2d_navier_stokes_galilean.yaml
+    seeds: [23, 31, 47]
+    overrides:
+      training.method: aug
+      training.data_fraction: 0.05
+      training.steps_per_epoch: 6
+      runtime.overwrite: false
+      runtime.run_dir: runs/ablations/2d_galilean_n64_compute_matched/fraction_0.05/aug_steps_6

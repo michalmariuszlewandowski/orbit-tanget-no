@@ -82,6 +82,15 @@ def _aggregate(rows: list[dict[str, Any]]) -> pd.DataFrame:
     )
 
 
+def _symmetry_value(symmetry: dict[str, Any], key: str) -> Any:
+    if key in symmetry:
+        return symmetry.get(key)
+    for transform in symmetry.get("transforms", []):
+        if isinstance(transform, dict) and key in transform:
+            return transform.get(key)
+    return None
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Evaluate checkpoints under OOD symmetry severity sweeps.")
     parser.add_argument("--matrix", required=True, help="Evaluation matrix YAML file")
@@ -109,7 +118,9 @@ def main() -> None:
                 raise FileNotFoundError(f"Missing checkpoint: {checkpoint}")
             out_dir.mkdir(parents=True, exist_ok=True)
             ckpt = torch.load(checkpoint, map_location=device, weights_only=False)
-            cfg = ckpt["config"]
+            cfg = ckpt.get("config", ckpt.get("base_config"))
+            if cfg is None:
+                raise KeyError(f"Checkpoint missing config/base_config: {checkpoint}")
             model = build_model(cfg).to(device)
             model.load_state_dict(ckpt["model"])
             split = str(job.get("split", "test"))
@@ -133,8 +144,8 @@ def main() -> None:
             "seed": job.get("seed"),
             "severity": job.get("severity"),
             "severity_scale": job.get("severity_scale"),
-            "max_shift": job.get("symmetry", {}).get("transforms", [{}])[0].get("max_shift"),
-            "max_boost": job.get("symmetry", {}).get("transforms", [{}, {}])[1].get("max_boost"),
+            "max_shift": _symmetry_value(job.get("symmetry", {}), "max_shift"),
+            "max_boost": _symmetry_value(job.get("symmetry", {}), "max_boost"),
             **metrics,
         }
         rows.append(row)

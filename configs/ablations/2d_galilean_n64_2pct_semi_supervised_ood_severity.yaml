@@ -1,0 +1,85 @@
+evaluations:
+  - severity: boost_0.10
+    severity_scale: 0.40
+    methods: [semi_aug_orbit]
+    seeds: [23, 31, 47]
+    checkpoint: runs/ablations/2d_galilean_n64_2pct_semi_supervised_joint/fraction_0.02/semi_aug_orbit_lambda_0.05_steps_4/seed_{seed}/checkpoints/best.pt
+    out_dir: runs/ablations/2d_galilean_n64_2pct_semi_supervised_ood_severity/fraction_0.02/boost_0.10/semi_aug_orbit/seed_{seed}
+    split: test
+    orbit_samples: 4
+    batch_size: 16
+    symmetry:
+      name: navier_stokes2d_galilean
+      max_boost: 0.10
+      final_time: 0.5
+      length: 1.0
+      boost_x_channel: 1
+      boost_y_channel: 2
+
+  - severity: boost_0.20
+    severity_scale: 0.80
+    methods: [semi_aug_orbit]
+    seeds: [23, 31, 47]
+    checkpoint: runs/ablations/2d_galilean_n64_2pct_semi_supervised_joint/fraction_0.02/semi_aug_orbit_lambda_0.05_steps_4/seed_{seed}/checkpoints/best.pt
+    out_dir: runs/ablations/2d_galilean_n64_2pct_semi_supervised_ood_severity/fraction_0.02/boost_0.20/semi_aug_orbit/seed_{seed}
+    split: test
+    orbit_samples: 4
+    batch_size: 16
+    symmetry:
+      name: navier_stokes2d_galilean
+      max_boost: 0.20
+      final_time: 0.5
+      length: 1.0
+      boost_x_channel: 1
+      boost_y_channel: 2
+
+  - severity: train_radius
+    severity_scale: 1.00
+    methods: [semi_aug_orbit]
+    seeds: [23, 31, 47]
+    checkpoint: runs/ablations/2d_galilean_n64_2pct_semi_supervised_joint/fraction_0.02/semi_aug_orbit_lambda_0.05_steps_4/seed_{seed}/checkpoints/best.pt
+    out_dir: runs/ablations/2d_galilean_n64_2pct_semi_supervised_ood_severity/fraction_0.02/boost_0.25/semi_aug_orbit/seed_{seed}
+    split: test
+    orbit_samples: 4
+    batch_size: 16
+    symmetry:
+      name: navier_stokes2d_galilean
+      max_boost: 0.25
+      final_time: 0.5
+      length: 1.0
+      boost_x_channel: 1
+      boost_y_channel: 2
+
+  - severity: boost_0.35
+    severity_scale: 1.40
+    methods: [semi_aug_orbit]
+    seeds: [23, 31, 47]
+    checkpoint: runs/ablations/2d_galilean_n64_2pct_semi_supervised_joint/fraction_0.02/semi_aug_orbit_lambda_0.05_steps_4/seed_{seed}/checkpoints/best.pt
+    out_dir: runs/ablations/2d_galilean_n64_2pct_semi_supervised_ood_severity/fraction_0.02/boost_0.35/semi_aug_orbit/seed_{seed}
+    split: test
+    orbit_samples: 4
+    batch_size: 16
+    symmetry:
+      name: navier_stokes2d_galilean
+      max_boost: 0.35
+      final_time: 0.5
+      length: 1.0
+      boost_x_channel: 1
+      boost_y_channel: 2
+
+  - severity: boost_0.50
+    severity_scale: 2.00
+    methods: [semi_aug_orbit]
+    seeds: [23, 31, 47]
+    checkpoint: runs/ablations/2d_galilean_n64_2pct_semi_supervised_joint/fraction_0.02/semi_aug_orbit_lambda_0.05_steps_4/seed_{seed}/checkpoints/best.pt
+    out_dir: runs/ablations/2d_galilean_n64_2pct_semi_supervised_ood_severity/fraction_0.02/boost_0.50/semi_aug_orbit/seed_{seed}
+    split: test
+    orbit_samples: 4
+    batch_size: 16
+    symmetry:
+      name: navier_stokes2d_galilean
+      max_boost: 0.50
+      final_time: 0.5
+      length: 1.0
+      boost_x_channel: 1
+      boost_y_channel: 2

@@ -1,0 +1,98 @@
+experiments:
+  # Full N64 boosted-Galilean label-efficiency curve for the reviewer-facing
+  # comparison: plain augmentation gets extra supervised updates, while
+  # aug_orbit uses the existing paper-ladder budget.
+  #
+  # New rows:
+  #   - aug_steps_6 at 0.5%, 1%, and 2%
+  #   - aug_orbit_steps_4 at 0.5%
+  #
+  # Existing rows are included so the matrix documents the whole curve and
+  # skips completed checkpoints.
+  - config: configs/pilot/2d_navier_stokes_galilean.yaml
+    seeds: [23, 31, 47]
+    overrides:
+      training.method: aug
+      training.data_fraction: 0.005
+      training.steps_per_epoch: 6
+      runtime.overwrite: false
+      runtime.run_dir: runs/ablations/2d_galilean_n64_label_efficiency_compute_matched/fraction_0.005/aug_steps_6
+
+  - config: configs/pilot/2d_navier_stokes_galilean.yaml
+    seeds: [23, 31, 47]
+    overrides:
+      training.method: aug_orbit
+      training.data_fraction: 0.005
+      training.steps_per_epoch: 4
+      training.lambda_orbit: 0.05
+      runtime.overwrite: false
+      runtime.run_dir: runs/ablations/2d_galilean_n64_label_efficiency_compute_matched/fraction_0.005/aug_orbit_lambda_0.05_steps_4
+
+  - config: configs/pilot/2d_navier_stokes_galilean.yaml
+    seeds: [23, 31, 47]
+    overrides:
+      training.method: aug
+      training.data_fraction: 0.01
+      training.steps_per_epoch: 6
+      runtime.overwrite: false
+      runtime.run_dir: runs/ablations/2d_galilean_n64_label_efficiency_compute_matched/fraction_0.01/aug_steps_6
+
+  # 1% aug_orbit_steps_4 already exists, split between the one-seed pilot and
+  # the two-seed replication.
+  - config: configs/pilot/2d_navier_stokes_galilean.yaml
+    seeds: [23]
+    overrides:
+      training.method: aug_orbit
+      training.data_fraction: 0.01
+      training.steps_per_epoch: 4
+      training.lambda_orbit: 0.05
+      runtime.overwrite: false
+      runtime.run_dir: runs/ablations/2d_galilean_n64_low_label_pilot/fraction_0.01/aug_orbit_lambda_0.05_steps_4
+
+  - config: configs/pilot/2d_navier_stokes_galilean.yaml
+    seeds: [31, 47]
+    overrides:
+      training.method: aug_orbit
+      training.data_fraction: 0.01
+      training.steps_per_epoch: 4
+      training.lambda_orbit: 0.05
+      runtime.overwrite: false
+      runtime.run_dir: runs/ablations/2d_galilean_n64_low_label_seed_replication/fraction_0.01/aug_orbit_lambda_0.05_steps_4
+
+  - config: configs/pilot/2d_navier_stokes_galilean.yaml
+    seeds: [23, 31, 47]
+    overrides:
+      training.method: aug
+      training.data_fraction: 0.02
+      training.steps_per_epoch: 6
+      runtime.overwrite: false
+      runtime.run_dir: runs/ablations/2d_galilean_n64_label_efficiency_compute_matched/fraction_0.02/aug_steps_6
+
+  - config: configs/pilot/2d_navier_stokes_galilean.yaml
+    seeds: [23, 31, 47]
+    overrides:
+      training.method: aug_orbit
+      training.data_fraction: 0.02
+      training.steps_per_epoch: 4
+      training.lambda_orbit: 0.05
+      runtime.overwrite: false
+      runtime.run_dir: runs/ablations/2d_galilean_n64_paper_ladder/fraction_0.02/aug_orbit_lambda_0.05_steps_4
+
+  - config: configs/pilot/2d_navier_stokes_galilean.yaml
+    seeds: [23, 31, 47]
+    overrides:
+      training.method: aug
+      training.data_fraction: 0.05
+      training.steps_per_epoch: 6
+      runtime.overwrite: false
+      runtime.run_dir: runs/ablations/2d_galilean_n64_compute_matched/fraction_0.05/aug_steps_6
+
+  - config: configs/pilot/2d_navier_stokes_galilean.yaml
+    seeds: [23, 31, 47]
+    overrides:
+      training.method: aug_orbit
+      training.data_fraction: 0.05
+      training.steps_per_epoch: 4
+      training.lambda_orbit: 0.05
+      runtime.overwrite: false
+      runtime.run_dir: runs/ablations/2d_galilean_n64_paper_ladder/fraction_0.05/aug_orbit_lambda_0.05_steps_4

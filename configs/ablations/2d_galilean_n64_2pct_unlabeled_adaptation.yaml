@@ -1,0 +1,24 @@
+adaptations:
+  # Unlabeled target-input orbit adaptation from the 2% compute-matched
+  # augmentation checkpoints. Labels in the split are used only for before/after
+  # evaluation by the adaptation script.
+  - config: configs/pilot/2d_navier_stokes_unlabeled_adapt.yaml
+    seeds: [23, 31, 47]
+    overrides:
+      dataset.path: data/2d_ns_vorticity_galilean_n64.pt
+      dataset.split: test
+      adaptation.checkpoint: runs/ablations/2d_galilean_n64_label_efficiency_compute_matched/fraction_0.02/aug_steps_6/seed_{seed}/checkpoints/best.pt
+      adaptation.source_method: aug_steps_6
+      adaptation.trainable: projector
+      adaptation.epochs: 20
+      adaptation.batch_size: 16
+      adaptation.lr: 0.00001
+      adaptation.weight_decay: 0.0
+      adaptation.beta_l2_initial: 0.01
+      adaptation.orbit_eta: 0.000001
+      adaptation.eval_orbit_samples: 4
+      adaptation.grad_clip: 0.1
+      adaptation.latency_repeats: 20
+      adaptation.latency_warmup: 5
+      runtime.overwrite: false
+      runtime.run_dir: runs/adaptation/2d_galilean_n64_2pct/aug_steps_6/projector_lr_1e-5_beta_0.01_epochs_20/seed_{seed}

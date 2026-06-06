@@ -1,0 +1,33 @@
+experiments:
+  # Robustness sweep for the headline 2%-label N64 boosted-Galilean result.
+  # Lambda 0.05 is the existing main setting and should skip from the completed
+  # paper-ladder checkpoints; 0.01 and 0.1 test sensitivity around it.
+  - config: configs/pilot/2d_navier_stokes_galilean.yaml
+    seeds: [23, 31, 47]
+    overrides:
+      training.method: aug_orbit
+      training.data_fraction: 0.02
+      training.steps_per_epoch: 4
+      training.lambda_orbit: 0.01
+      runtime.overwrite: false
+      runtime.run_dir: runs/ablations/2d_galilean_n64_2pct_lambda_robustness/fraction_0.02/aug_orbit_lambda_0.01_steps_4
+
+  - config: configs/pilot/2d_navier_stokes_galilean.yaml
+    seeds: [23, 31, 47]
+    overrides:
+      training.method: aug_orbit
+      training.data_fraction: 0.02
+      training.steps_per_epoch: 4
+      training.lambda_orbit: 0.05
+      runtime.overwrite: false
+      runtime.run_dir: runs/ablations/2d_galilean_n64_paper_ladder/fraction_0.02/aug_orbit_lambda_0.05_steps_4
+
+  - config: configs/pilot/2d_navier_stokes_galilean.yaml
+    seeds: [23, 31, 47]
+    overrides:
+      training.method: aug_orbit
+      training.data_fraction: 0.02
+      training.steps_per_epoch: 4
+      training.lambda_orbit: 0.1
+      runtime.overwrite: false
+      runtime.run_dir: runs/ablations/2d_galilean_n64_2pct_lambda_robustness/fraction_0.02/aug_orbit_lambda_0.1_steps_4
