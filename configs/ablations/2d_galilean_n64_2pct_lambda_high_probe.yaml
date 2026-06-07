@@ -1,0 +1,24 @@
+experiments:
+  # Cheap high-lambda probe for the 2%-label N64 Galilean Aug+Orbit setting.
+  # The existing sweep stops at lambda_orbit=0.10, which is the best completed
+  # value. These one-seed rows check whether larger weights saturate or degrade
+  # before spending compute on matched seed expansion.
+  - config: configs/pilot/2d_navier_stokes_galilean.yaml
+    seeds: [23]
+    overrides:
+      training.method: aug_orbit
+      training.data_fraction: 0.02
+      training.steps_per_epoch: 4
+      training.lambda_orbit: 0.20
+      runtime.overwrite: false
+      runtime.run_dir: runs/ablations/2d_galilean_n64_2pct_lambda_high_probe/fraction_0.02/aug_orbit_lambda_0.2_steps_4
+
+  - config: configs/pilot/2d_navier_stokes_galilean.yaml
+    seeds: [23, 31, 47]
+    overrides:
+      training.method: aug_orbit
+      training.data_fraction: 0.02
+      training.steps_per_epoch: 4
+      training.lambda_orbit: 0.30
+      runtime.overwrite: false
+      runtime.run_dir: runs/ablations/2d_galilean_n64_2pct_lambda_high_probe/fraction_0.02/aug_orbit_lambda_0.3_steps_4

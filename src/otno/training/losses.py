@@ -86,6 +86,7 @@ def orbit_consistency_loss(
     base_pred: torch.Tensor | None = None,
     normalize_by_epsilon: bool = True,
     eta: float = 1e-6,
+    target_mode: str = "physical",
 ) -> tuple[torch.Tensor, dict[str, float]]:
     if sample is None:
         sample = transform.sample(a.shape[0], a.device, a.dtype)
@@ -93,8 +94,19 @@ def orbit_consistency_loss(
         base_pred = model(a)
     a_t = transform.apply_input(a, sample)
     pred_from_transformed_input = model(a_t)
-    transformed_pred = transform.apply_output(base_pred, sample)
+    if target_mode in {"no_output", "no_output_transform", "input_only", "identity_output"}:
+        transformed_pred = base_pred
+    else:
+        transformed_pred = transform.apply_output(base_pred, sample)
     mask = transform.output_mask(pred_from_transformed_input, sample)
+    if target_mode in {"shuffle", "shuffled", "shuffle_output", "shuffled_output"}:
+        transformed_pred = torch.roll(transformed_pred, shifts=1, dims=0)
+        if mask is not None:
+            mask = torch.roll(mask, shifts=1, dims=0)
+    elif target_mode in {"physical", "correct", "no_output", "no_output_transform", "input_only", "identity_output"}:
+        pass
+    else:
+        raise ValueError(f"Unknown orbit consistency target_mode={target_mode!r}")
     per_sample = mean_squared_per_sample(pred_from_transformed_input - transformed_pred, mask=mask)
     if normalize_by_epsilon:
         per_sample = per_sample / (sample.epsilon.pow(2) + eta)

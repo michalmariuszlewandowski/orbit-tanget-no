@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import sys
 import time
 from pathlib import Path
 from typing import Any
@@ -143,12 +144,41 @@ def train_from_config(config: dict[str, Any]) -> dict[str, Any]:
     lambda_aug = float(training_cfg.get("lambda_aug", 1.0))
     normalize_by_epsilon = bool(training_cfg.get("normalize_by_epsilon", True))
     eta = float(training_cfg.get("orbit_eta", 1e-6))
+    orbit_control = str(training_cfg.get("orbit_control", "physical")).lower()
     eval_every = int(training_cfg.get("eval_every", 5))
     grad_clip = training_cfg.get("grad_clip", None)
     unlabeled_orbit_steps_per_epoch = int(training_cfg.get("unlabeled_orbit_steps_per_epoch", 0))
-    aug_methods = {"aug", "augmentation", "aug_orbit", "orbit_aug", "semi_aug_orbit", "semisup_aug_orbit", "semi_supervised_aug_orbit"}
-    orbit_methods = {"orbit", "orb", "aug_orbit", "orbit_aug", "semi_aug_orbit", "semisup_aug_orbit", "semi_supervised_aug_orbit"}
+    aug_methods = {
+        "aug",
+        "augmentation",
+        "aug_orbit",
+        "orbit_aug",
+        "aug_orbit_shuffle",
+        "aug_orbit_shuffled",
+        "aug_orbit_no_output",
+        "aug_orbit_input_only",
+        "semi_aug_orbit",
+        "semisup_aug_orbit",
+        "semi_supervised_aug_orbit",
+    }
+    orbit_methods = {
+        "orbit",
+        "orb",
+        "aug_orbit",
+        "orbit_aug",
+        "aug_orbit_shuffle",
+        "aug_orbit_shuffled",
+        "aug_orbit_no_output",
+        "aug_orbit_input_only",
+        "semi_aug_orbit",
+        "semisup_aug_orbit",
+        "semi_supervised_aug_orbit",
+    }
     semi_orbit_methods = {"semi_aug_orbit", "semisup_aug_orbit", "semi_supervised_aug_orbit"}
+    if method in {"aug_orbit_shuffle", "aug_orbit_shuffled"} and orbit_control == "physical":
+        orbit_control = "shuffle_output"
+    if method in {"aug_orbit_no_output", "aug_orbit_input_only"} and orbit_control == "physical":
+        orbit_control = "no_output_transform"
 
     model = build_model(config).to(device)
     transform = build_transform(config.get("symmetry"))
@@ -160,6 +190,7 @@ def train_from_config(config: dict[str, Any]) -> dict[str, Any]:
         "parameters": count_parameters(model),
         "parameters_total": sum(p.numel() for p in model.parameters()),
         "method": method,
+        "orbit_control": orbit_control,
         "model_name": str(config.get("model", {}).get("name", "fno1d")),
         "dataset_kind": str(config.get("dataset", {}).get("kind", "")),
         "dataset_path": str(dataset_path),
@@ -226,11 +257,18 @@ def train_from_config(config: dict[str, Any]) -> dict[str, Any]:
     if stop_after_epochs is not None:
         target_epoch = min(epochs, start_epoch + int(stop_after_epochs) - 1)
 
+    train_wall_start = time.perf_counter()
     for epoch in range(start_epoch, target_epoch + 1):
+        epoch_wall_start = time.perf_counter()
         model.train()
         supervised_steps = orbit_steps_per_epoch if orbit_steps_per_epoch is not None and not split_unlabeled_orbit else steps_per_epoch
         steps_this_epoch = supervised_steps + (unlabeled_orbit_steps_per_epoch if split_unlabeled_orbit else 0)
-        progress = tqdm(total=steps_this_epoch, desc=f"epoch {epoch}/{epochs}", leave=False)
+        progress = tqdm(
+            total=steps_this_epoch,
+            desc=f"epoch {epoch}/{epochs}",
+            leave=False,
+            disable=not sys.stderr.isatty(),
+        )
         train_iter = iter(train_loader)
         orbit_iter = iter(orbit_loader) if orbit_loader is not None else None
         epoch_loss = 0.0
@@ -290,6 +328,7 @@ def train_from_config(config: dict[str, Any]) -> dict[str, Any]:
                     base_pred=orbit_base_pred,
                     normalize_by_epsilon=normalize_by_epsilon,
                     eta=eta,
+                    target_mode=orbit_control,
                 )
                 loss = loss + lambda_orbit * orb_loss
                 logs.update(orb_stats)
@@ -318,6 +357,7 @@ def train_from_config(config: dict[str, Any]) -> dict[str, Any]:
                     base_pred=orbit_base_pred,
                     normalize_by_epsilon=normalize_by_epsilon,
                     eta=eta,
+                    target_mode=orbit_control,
                 )
                 loss = lambda_orbit * orb_loss
                 logs = {f"unlabeled_{key}": value for key, value in orb_stats.items()}
@@ -332,6 +372,7 @@ def train_from_config(config: dict[str, Any]) -> dict[str, Any]:
             "lr": scheduler.get_last_lr()[0],
             "train_supervised_steps": supervised_steps,
             "train_unlabeled_orbit_steps": unlabeled_orbit_steps_per_epoch if split_unlabeled_orbit else 0,
+            "train_epoch_seconds": time.perf_counter() - epoch_wall_start,
             **{f"train_{k}": v / max(1, num_batches) for k, v in epoch_logs.items()},
         }
         append_jsonl(train_record, run_dir / "train_metrics.jsonl")
@@ -363,6 +404,13 @@ def train_from_config(config: dict[str, Any]) -> dict[str, Any]:
                     },
                     best_path,
                 )
+            print(
+                f"epoch {epoch}/{epochs} "
+                f"train_loss={train_record['train_loss']:.6g} "
+                f"val_relative_l2={val_key:.6g} "
+                f"best_val={best_val:.6g}",
+                flush=True,
+            )
 
         _torch_save_atomic(
             {
@@ -384,6 +432,7 @@ def train_from_config(config: dict[str, Any]) -> dict[str, Any]:
             "completed_epoch": target_epoch,
             "target_epochs": epochs,
             "best_val_relative_l2": best_val,
+            "train_wall_seconds": time.perf_counter() - train_wall_start,
             **meta,
         }
         dump_json(results, run_dir / "partial_metrics.json")
@@ -409,6 +458,7 @@ def train_from_config(config: dict[str, Any]) -> dict[str, Any]:
         warmup=int(training_cfg.get("latency_warmup", 5)),
     )
     results = {"best_val_relative_l2": best_val, **test_metrics, **latency, **meta}
+    results["train_wall_seconds"] = time.perf_counter() - train_wall_start
     dump_json(results, run_dir / "test_metrics.json")
     torch.save({"torch_cpu": torch.get_rng_state()}, run_dir / "rng_state_final.pt")
     _torch_save_atomic(

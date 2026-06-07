@@ -1,0 +1,211 @@
+\section{New Results}
+\label{sec:new-results}
+
+\paragraph{Purpose.} This section summarizes the additional N64 Galilean experiments run after the main result tables were assembled. The goal was to stress-test the claim that local orbit consistency lowers symmetry-induced OOD error and equivariance defect without changing inference, and to check whether the effect persists beyond the most data-starved regime.
+
+\paragraph{Solver-level Galilean closure.} We first validated the full coded N64 Galilean problem family at the solver level. For cached test inputs \(a\) and exact targets \(S(a)\), we sampled boosts at the training radius and at the two largest OOD radii used in the severity sweep, then explicitly solved the transformed problem \(S(T_g a)\). We then compared this to the transformed cached target \(T_gS(a)\) using \(\|S(T_g a)-T_gS(a)\|_2/\|T_gS(a)\|_2\). This is stricter than a model equivariance check: it verifies that the data generator, ambient velocity channels, time horizon, boundary conditions, and output transform are mutually consistent.
+
+\begin{table}[t]
+\centering
+\small
+\caption{Solver-level Galilean closure for the N64 2D Navier--Stokes dataset. The residual is \(\|S(T_g a)-T_gS(a)\|_2/\|T_gS(a)\|_2\) at the training boost radius and the two largest OOD severity radii.}
+\label{tab:new-n64-solver-closure}
+\begin{tabular}{lrrrrr}
+\toprule
+Setting & Samples & Max boost & Mean \(\pm\) std & P95 & Max \\
+\midrule
+N64 Galilean train radius & 32 & 0.25 & \(3.63\times10^{-7}\pm4.09\times10^{-8}\) & \(4.48\times10^{-7}\) & \(4.77\times10^{-7}\) \\
+N64 Galilean OOD radius & 32 & 0.35 & \(3.98\times10^{-7}\pm6.59\times10^{-8}\) & \(5.18\times10^{-7}\) & \(5.83\times10^{-7}\) \\
+N64 Galilean OOD radius & 32 & 0.50 & \(4.62\times10^{-7}\pm8.73\times10^{-8}\) & \(5.94\times10^{-7}\) & \(6.22\times10^{-7}\) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The residual is near floating-point/interpolation error even at maximum boost \(0.50\), so the experimental symmetry is closed under the coded solver to the precision relevant for the learned-model metrics. This strengthens the main interpretation: when the FNO has high orbit OOD error or high equivariance defect, including in the OOD severity curve, the defect is coming from the learned operator, not from an inconsistent Galilean data generator.
+
+\paragraph{Ten-percent label sanity check.} We trained a compute-matched 10\% label setting with the same periodic N64 2D Navier--Stokes Galilean dataset and the same FNO2d backbone used in the headline experiments. The comparison is between supervised Lie augmentation with six update steps per epoch and augmentation plus orbit consistency with four update steps per epoch and \(\lambda_{\mathrm{orb}}=0.10\). Across three seeds, augmentation plus orbit consistency improves in-distribution relative \(L^2\), orbit OOD relative \(L^2\), and equivariance defect; the inference latency remains within run-to-run noise because the deployed architecture is unchanged.
+
+\begin{table}[t]
+\centering
+\small
+\caption{N64 Galilean 10\% label sanity check over three seeds. Lower is better for relative \(L^2\), orbit OOD relative \(L^2\), and equivariance defect.}
+\label{tab:new-n64-10pct}
+\begin{tabular}{lrrrr}
+\toprule
+Method & Relative \(L^2\) & Orbit OOD \(L^2\) & Eq. defect & Latency ms/sample \\
+\midrule
+FNO + aug. & \(0.1694\pm0.0121\) & \(0.1996\pm0.0091\) & \(0.1596\pm0.0076\) & \(14.37\pm3.71\) \\
+FNO + aug. + orbit & \(\mathbf{0.1510\pm0.0049}\) & \(\mathbf{0.1760\pm0.0027}\) & \(\mathbf{0.1221\pm0.0004}\) & \(14.61\pm1.54\) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The 10\% label result reduces the main reviewer concern that the method only helps when the supervised model is severely starved. Relative to compute-matched augmentation, orbit consistency gives a 10.9\% reduction in in-distribution error, an 11.8\% reduction in orbit OOD error, and a 23.5\% reduction in equivariance defect. This is a smaller OOD gain than at 2\% labels, but it has the right sign on all paper-facing metrics.
+
+\paragraph{Updated label-efficiency picture.} Combining the new 10\% run with the existing 1\%, 2\%, and 5\% results gives a stronger label-efficiency story. Orbit consistency improves orbit OOD error and equivariance defect at every completed label fraction.
+
+\begin{table}[t]
+\centering
+\small
+\caption{Relative improvement of augmentation plus orbit consistency over compute-matched augmentation across label fractions. The 2\% row uses five seeds; the other rows use three seeds.}
+\label{tab:new-label-efficiency}
+\begin{tabular}{rrrr}
+\toprule
+Labels & OOD reduction & Defect reduction & Seeds \\
+\midrule
+1\% & 13.7\% & 21.3\% & 3 \\
+2\% & 25.1\% & 29.8\% & 5 \\
+5\% & 22.3\% & 33.2\% & 3 \\
+10\% & 11.8\% & 23.5\% & 3 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The strongest gains remain in the low-label regime, especially at 2\% and 5\%, but the 10\% row shows that the effect does not disappear once the supervised baseline is substantially better. This supports the narrower claim we want for the paper: orbit consistency is a training-time regularizer that improves symmetry robustness and label efficiency, not merely a rescue mechanism for failed baselines.
+
+\paragraph{Extended orbit-weight sweep.} We extended the 2\% N64 Galilean \(\lambda_{\mathrm{orb}}\) sweep beyond the previous largest tested value, \(\lambda_{\mathrm{orb}}=0.10\). A one-seed probe at \(\lambda_{\mathrm{orb}}=0.20\) improved over the seed-23 \(\lambda_{\mathrm{orb}}=0.10\) run, so we expanded \(\lambda_{\mathrm{orb}}=0.30\) to three matched seeds. The higher weight improves all three paper-facing error metrics on these seeds, but it should be treated as a new promising setting rather than an immediately final headline until it is either expanded to five seeds or bracketed by a larger degrading value.
+
+\begin{table}[t]
+\centering
+\small
+\caption{Extended \(\lambda_{\mathrm{orb}}\) sweep at 2\% labels on N64 Galilean. Rows with five seeds are completed headline artifacts; high-\(\lambda\) rows are new probes.}
+\label{tab:new-lambda-extended}
+\begin{tabular}{rrrrr}
+\toprule
+\(\lambda_{\mathrm{orb}}\) & ID \(L^2\) & OOD \(L^2\) & Eq. defect & Seeds \\
+\midrule
+0.01 & \(0.5505\pm0.0392\) & \(0.5768\pm0.0378\) & \(0.3955\pm0.0235\) & 3 \\
+0.05 & \(0.4240\pm0.0441\) & \(0.4518\pm0.0397\) & \(0.3161\pm0.0247\) & 5 \\
+0.10 & \(0.3676\pm0.0360\) & \(0.3950\pm0.0334\) & \(0.2677\pm0.0174\) & 5 \\
+0.20 & \(0.3140\) & \(0.3368\) & \(0.2094\) & 1 \\
+0.30 & \(\mathbf{0.3096\pm0.0086}\) & \(\mathbf{0.3326\pm0.0073}\) & \(\mathbf{0.1942\pm0.0070}\) & 3 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table*}[t]
+\centering
+\small
+\caption{Absolute N64 Galilean label-efficiency metrics. This table complements percentage reductions with the underlying values.}
+\label{tab:new-label-efficiency-absolute}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{llrrrrr}
+\toprule
+Labels & Method & ID \(L^2\) & OOD \(L^2\) & Eq. defect & Latency ms/sample & Seeds \\
+\midrule
+1\% & FNO + aug. & \(0.7341\pm0.0848\) & \(0.7421\pm0.0838\) & \(0.5080\pm0.0456\) & \(12.76\pm0.12\) & 3 \\
+1\% & FNO + aug. + orbit & \(0.6285\pm0.0510\) & \(0.6406\pm0.0508\) & \(0.3999\pm0.0197\) & \(16.98\pm1.96\) & 3 \\
+2\% & FNO + aug. & \(0.5009\pm0.0590\) & \(0.5276\pm0.0525\) & \(0.3816\pm0.0322\) & \(18.76\pm7.34\) & 5 \\
+2\% & FNO + aug. + orbit & \(0.3676\pm0.0360\) & \(0.3950\pm0.0334\) & \(0.2677\pm0.0174\) & \(16.87\pm3.19\) & 5 \\
+5\% & FNO + aug. & \(0.2950\pm0.0061\) & \(0.3237\pm0.0013\) & \(0.2427\pm0.0014\) & \(11.46\pm0.50\) & 3 \\
+5\% & FNO + aug. + orbit & \(0.2260\pm0.0119\) & \(0.2515\pm0.0112\) & \(0.1621\pm0.0078\) & \(12.54\pm0.68\) & 3 \\
+10\% & FNO + aug. & \(0.1694\pm0.0121\) & \(0.1996\pm0.0091\) & \(0.1596\pm0.0076\) & \(14.37\pm3.71\) & 3 \\
+10\% & FNO + aug. + orbit & \(0.1510\pm0.0049\) & \(0.1760\pm0.0027\) & \(0.1221\pm0.0004\) & \(14.61\pm1.54\) & 3 \\
+\bottomrule
+\end{tabular}
+}
+\end{table*}
+
+\paragraph{Paired statistical reporting.} Because seeds are matched across the central comparisons, we also computed paired seed differences with two-sided 95\% \(t\)-intervals. The 2\% N64 result is clearly separated from zero on all three metrics. The new 10\% sanity check is also separated from zero despite having only three seeds: for orbit OOD relative \(L^2\), the paired delta is \(-0.0235\) with 95\% CI \([-0.0393,-0.0078]\), and for equivariance defect it is \(-0.0375\) with 95\% CI \([-0.0555,-0.0196]\). In the 1D Burgers setting, the absolute OOD improvement is small and its paired interval crosses zero, while the defect reduction remains separated from zero. This matches the qualitative story that Burgers augmentation already nearly solves the symmetry.
+
+\begin{table*}[t]
+\centering
+\small
+\caption{Paired seed differences for central comparisons. Delta is augmentation plus orbit minus augmentation, so negative values indicate improvement.}
+\label{tab:new-paired-comparisons}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{llrrrr}
+\toprule
+Setting & Metric & Seeds & Aug. mean & Aug. + orbit mean & Paired delta [95\% CI] \\
+\midrule
+N64 Galilean 2\% labels & ID \(L^2\) & 5 & \(0.5009\) & \(0.3676\) & \(-0.1332\,[-0.1731,-0.0933]\) \\
+N64 Galilean 2\% labels & OOD \(L^2\) & 5 & \(0.5276\) & \(0.3950\) & \(-0.1326\,[-0.1700,-0.0953]\) \\
+N64 Galilean 2\% labels & Eq. defect & 5 & \(0.3816\) & \(0.2677\) & \(-0.1139\,[-0.1397,-0.0881]\) \\
+N64 Galilean 10\% labels & ID \(L^2\) & 3 & \(0.1694\) & \(0.1510\) & \(-0.0185\,[-0.0364,-0.0005]\) \\
+N64 Galilean 10\% labels & OOD \(L^2\) & 3 & \(0.1996\) & \(0.1760\) & \(-0.0235\,[-0.0393,-0.0078]\) \\
+N64 Galilean 10\% labels & Eq. defect & 3 & \(0.1596\) & \(0.1221\) & \(-0.0375\,[-0.0555,-0.0196]\) \\
+1D Burgers & ID \(L^2\) & 3 & \(2.51\times10^{-3}\) & \(2.65\times10^{-3}\) & \(1.43\times10^{-4}\,[-2.13\times10^{-4},4.99\times10^{-4}]\) \\
+1D Burgers & OOD \(L^2\) & 3 & \(4.05\times10^{-3}\) & \(3.81\times10^{-3}\) & \(-2.42\times10^{-4}\,[-7.01\times10^{-4},2.16\times10^{-4}]\) \\
+1D Burgers & Eq. defect & 3 & \(2.65\times10^{-3}\) & \(2.28\times10^{-3}\) & \(-3.70\times10^{-4}\,[-7.02\times10^{-4},-3.84\times10^{-5}]\) \\
+\bottomrule
+\end{tabular}
+}
+\end{table*}
+
+\paragraph{Wrong-symmetry controls.} We trained matched negative controls at 2\% labels with the same supervised augmentation, optimizer budget, FNO2d backbone, and \(\lambda_{\mathrm{orb}}=0.10\) as augmentation plus orbit consistency. The mild control removes the physical output action and trains \(\mathcal G_\theta(T_g a)\) to match \(\mathcal G_\theta(a)\). The stronger control shuffles the orbit target across the minibatch: the model still sees transformed inputs, but the consistency target is no longer the physically corresponding \(T_g\mathcal G_\theta(a)\). Together these test whether the gains come from the Galilean output action itself or merely from adding a second-view consistency penalty.
+
+\begin{table}[t]
+\centering
+\small
+\caption{Wrong-symmetry controls at 2\% labels over matched seeds. The no-output row removes the physical output action; the shuffled-orbit row pairs each transformed prediction with the wrong orbit target in the minibatch.}
+\label{tab:new-wrong-symmetry-control}
+\begin{tabular}{lrrrr}
+\toprule
+Method & ID \(L^2\) & OOD \(L^2\) & Eq. defect & Seeds \\
+\midrule
+FNO + aug. & \(0.5181\pm0.0377\) & \(0.5415\pm0.0370\) & \(0.3867\pm0.0237\) & 3 \\
+FNO + aug. + orbit & \(0.3674\pm0.0136\) & \(0.3915\pm0.0151\) & \(0.2630\pm0.0087\) & 3 \\
+FNO + aug. + no output transform & \(0.8827\pm0.0194\) & \(0.8994\pm0.0191\) & \(0.6236\pm0.0238\) & 3 \\
+FNO + aug. + shuffled orbit & \(0.9654\pm0.0034\) & \(0.9677\pm0.0036\) & \(0.5631\pm0.0318\) & 3 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Both controls fail badly: each is worse than supervised augmentation and far worse than physical Aug+Orbit on every metric. The no-output control is especially diagnostic because it keeps the target paired to the same input while removing only the output-side Galilean action. This rules out the simplest alternative explanation that the improvement comes from generic two-view consistency, additional forward passes, or regularization noise. The sign of the controls is useful for the paper: orbit consistency helps only when the orbit target corresponds to the coded Galilean symmetry.
+
+\paragraph{Training compute accounting.} The compute-matched comparison is now explicit in the paper artifacts. In the 2\% headline setting, the plain FNO row uses 600 optimizer steps, 600 model forward evaluations, and 600 backward passes. The orbit-only row uses 600 optimizer steps, 1200 model forward evaluations, and 600 backward passes. The supervised augmentation baseline uses 900 optimizer steps, 1800 model forward evaluations, and 900 backward passes. The augmentation-plus-orbit row uses 600 optimizer steps, 1800 model forward evaluations, and 600 backward passes because each update evaluates the original, augmented, and orbit-transformed inputs. Thus the central augmentation comparison is matched in estimated model forward evaluations, and all rows retain the same inference architecture. The wall-clock accounting tells the same story: normalized to supervised augmentation, the relative train times are \(0.71\times\) for FNO, \(0.91\times\) for FNO plus orbit, \(1.00\times\) for FNO plus augmentation, and \(1.02\times\) for FNO plus augmentation plus orbit.
+
+\paragraph{OOD severity curve.} The completed 2\% OOD severity curve evaluates maximum Galilean boosts \(0.10\), \(0.20\), \(0.25\), \(0.35\), and \(0.50\), where \(0.25\) is the training boost radius. Augmentation plus orbit consistency remains better than compute-matched augmentation at every tested severity. Orbit OOD error reductions are 26.4\%, 25.8\%, 25.3\%, 23.6\%, and 20.3\%, respectively. The corresponding equivariance-defect reductions are 33.6\%, 31.3\%, 30.2\%, 27.8\%, and 23.6\%. This is important because it turns the main claim from a single-radius result into a monotone stress test: the advantage shrinks under larger shifts, but it does not reverse.
+
+\paragraph{Defect as a predictor of OOD behavior.} We added a correlation analysis between equivariance defect and orbit OOD relative \(L^2\) across cached N64 Galilean seeds, label fractions, orbit weights, and boost severities. Across 90 observations, the Pearson correlation is \(r=0.851\) and the Spearman correlation is \(\rho=0.838\). After residualizing source, method, label fraction, maximum boost, and \(\lambda_{\mathrm{orb}}\), the partial Pearson correlation remains \(r=0.779\). This supports using equivariance defect as a meaningful diagnostic rather than an auxiliary metric disconnected from predictive performance.
+
+\paragraph{Privileged relative-boost calibration.} We also evaluated a privileged Galilean calibration at 2\% labels. In the OOD severity protocol, each cached test input \(a\) is transformed by a sampled relative boost \(\delta\), giving \(T_\delta a\). The calibration uses this sampled \(\delta\) and the paired prediction \(\mathcal G_\theta(a)\), then compares \(T_\delta\mathcal G_\theta(a)\) to the transformed target. It is therefore not a deployable single-input baseline, even though the absolute ambient velocity \(c\) is present in the input channels: the privileged quantity here is the sampled relative transform and the paired source prediction. The calibration remains useful because it measures how much of the direct OOD error is attributable to motion along the evaluated orbit. At maximum boost \(0.50\), direct OOD relative \(L^2\) is \(0.6158\pm0.0384\) for augmentation and \(0.4910\pm0.0216\) for augmentation plus orbit consistency. The privileged calibration values are \(0.5009\pm0.0590\) and \(0.3676\pm0.0360\), respectively.
+
+\paragraph{Observable analytic canonicalization.} Because the Galilean frame coordinate is available in the input representation, we additionally evaluated the corresponding analytic canonicalization baseline. In the boosted N64 Galilean dataset, the input channels are \((\omega_0,c_x,c_y)\), with \(c_x\) and \(c_y\) constant over the grid. The baseline reads \(c\) from a single test input, sets the boost channels to zero, runs the same trained FNO once, and shifts the output by \(cT\). This is a real baseline when the frame is reliably observed, but it changes the inference map by adding explicit pre/postprocessing. It is stronger than direct Aug+Orbit under large boosts, while Aug+Orbit remains the best unchanged-inference-map method.
+
+\begin{table*}[t]
+\centering
+\small
+\caption{Observable analytic canonicalization at 2\% labels. The baseline reads the boost channels from each OOD input, evaluates the model at zero boost, and restores the output frame.}
+\label{tab:new-observable-canonicalization}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{rrrrr}
+\toprule
+Max boost & Aug. direct OOD & Aug. obs. canon. & Aug. + orbit direct OOD & Aug. + orbit obs. canon. \\
+\midrule
+0.10 & \(0.5050\pm0.0574\) & \(0.4658\pm0.0784\) & \(0.3715\pm0.0349\) & \(\mathbf{0.3253\pm0.0564}\) \\
+0.20 & \(0.5176\pm0.0543\) & \(0.4658\pm0.0784\) & \(0.3840\pm0.0331\) & \(\mathbf{0.3253\pm0.0564}\) \\
+0.25 & \(0.5277\pm0.0523\) & \(0.4658\pm0.0784\) & \(0.3943\pm0.0318\) & \(\mathbf{0.3253\pm0.0564}\) \\
+0.35 & \(0.5555\pm0.0476\) & \(0.4658\pm0.0784\) & \(0.4242\pm0.0285\) & \(\mathbf{0.3253\pm0.0564}\) \\
+0.50 & \(0.6158\pm0.0384\) & \(0.4658\pm0.0784\) & \(0.4910\pm0.0216\) & \(\mathbf{0.3253\pm0.0564}\) \\
+\bottomrule
+\end{tabular}
+}
+\end{table*}
+
+\paragraph{Post-hoc unlabeled target adaptation.} We implemented the proposed target-input adaptation experiment with larger Galilean boosts \(0.35\) and \(0.50\). Starting from trained 2\% checkpoints, the adaptation updates only the projection head for five epochs on unlabeled target inputs, using a prediction-preservation orbit loss. A random-orbit-preservation control runs the same number of optimizer steps. The result is controlled but modest: orbit-preserving adaptation reduces OOD error by roughly \(0.2\%\) to \(0.6\%\) depending on the source checkpoint and target severity, with negligible in-distribution drift. The effect is too small for the main result, but it is useful reviewer-facing evidence that the adaptation protocol is implemented, guarded against generic test-time optimization, and does not silently damage the source-domain map.
+
+\begin{table*}[t]
+\centering
+\small
+\caption{Unlabeled target-input adaptation at 2\% labels. Rows show projection-head adaptation with orbit preservation for five epochs. Negative OOD delta means lower post-adaptation OOD error; ID drift is the signed change in in-distribution relative \(L^2\).}
+\label{tab:new-target-adaptation}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{llrrrr}
+\toprule
+Source checkpoint & Target boost & Pre OOD \(L^2\) & Post OOD \(L^2\) & OOD delta & ID drift \\
+\midrule
+FNO + aug. & 0.35 & 0.5688 & 0.5664 & \(-0.43\%\) & \(-0.0013\) \\
+FNO + aug. & 0.50 & 0.6281 & 0.6246 & \(-0.56\%\) & \(-0.0013\) \\
+FNO + aug. + orbit & 0.35 & 0.4200 & 0.4191 & \(-0.21\%\) & \(0.0004\) \\
+FNO + aug. + orbit & 0.50 & 0.4870 & 0.4847 & \(-0.47\%\) & \(0.0004\) \\
+\bottomrule
+\end{tabular}
+}
+\end{table*}
+
+\paragraph{Semi-supervised joint orbit training.} We also tested a semi-supervised joint objective in which the supervised 2\% labeled split is augmented with orbit-consistency updates on the full unlabeled training split. This variant strongly reduces equivariance defect, from \(0.3816\pm0.0322\) for augmentation to \(0.2463\pm0.0217\), a 35.4\% reduction, and slightly improves orbit OOD error relative to augmentation, from \(0.5276\pm0.0525\) to \(0.5086\pm0.0490\). However, it is weaker than the fully supervised augmentation-plus-orbit row in predictive error. We therefore view this as an appendix result: unlabeled orbit data can regularize symmetry, but the best current paper result remains supervised augmentation plus orbit consistency.
+
+\paragraph{Second-PDE evidence.} The 1D Burgers experiments provide a compact second-setting sanity check. In that setting, supervised augmentation nearly solves the symmetry shift by itself, so the incremental OOD gain from orbit consistency is small. Nevertheless, augmentation plus orbit consistency lowers orbit OOD relative \(L^2\) from \(0.00405\) to \(0.00381\) and equivariance defect from \(0.00265\) to \(0.00228\). This is not a new headline benchmark, but it supports the claim that the method behaves consistently when the coded symmetry identities are exact.
+
+\paragraph{Implication for the paper.} The new results strengthen the submission most by hardening the N64 Galilean story rather than by broadening scope. The core message should remain narrow: with the same FNO2d inference map, stochastic local orbit consistency improves symmetry-induced OOD error and equivariance defect, with the strongest benefits in low-label regimes and positive evidence through 10\% labels. The adaptation and semi-supervised runs should be presented as secondary evidence; they are valuable for reviewer questions about unlabeled data, but they are not stronger than the main supervised Aug+Orbit result.

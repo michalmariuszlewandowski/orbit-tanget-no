@@ -22,6 +22,7 @@ from otno.reporting import collect_run_rows
 METRIC_COLS = [
     "relative_l2",
     "orbit_ood_relative_l2",
+    "oracle_canonical_ood_relative_l2",
     "equivariance_defect_relative",
     "epsilon_mean",
     "latency_ms_per_sample",
@@ -147,6 +148,43 @@ TRAINING_SPECS = {
             "lambda_orbit": 0.10,
         },
     ],
+    "ten_percent_sanity": [
+        {
+            "prefix": "runs/ablations/2d_galilean_n64_10pct_lambda_0p1/"
+            "fraction_0.10/aug_steps_6",
+            "method": "aug",
+            "data_fraction": 0.10,
+            "steps_per_epoch": 6,
+        },
+        {
+            "prefix": "runs/ablations/2d_galilean_n64_10pct_lambda_0p1/"
+            "fraction_0.10/aug_orbit_lambda_0.1_steps_4",
+            "method": "aug_orbit",
+            "data_fraction": 0.10,
+            "steps_per_epoch": 4,
+            "lambda_orbit": 0.10,
+        },
+    ],
+    "wrong_symmetry": [
+        {
+            "prefix": "runs/ablations/2d_galilean_n64_2pct_wrong_symmetry/"
+            "fraction_0.02/aug_orbit_shuffle_lambda_0.1_steps_4",
+            "method": "aug_orbit_shuffled",
+            "data_fraction": 0.02,
+            "steps_per_epoch": 4,
+            "lambda_orbit": 0.10,
+        },
+    ],
+    "no_output_control": [
+        {
+            "prefix": "runs/ablations/2d_galilean_n64_2pct_no_output_control/"
+            "fraction_0.02/aug_orbit_no_output_lambda_0.1_steps_4",
+            "method": "aug_orbit_no_output",
+            "data_fraction": 0.02,
+            "steps_per_epoch": 4,
+            "lambda_orbit": 0.10,
+        },
+    ],
 }
 
 TABLE_OUTPUTS = {
@@ -162,6 +200,18 @@ TABLE_OUTPUTS = {
         "out_prefix": "2d_galilean_n64_2pct_lambda_robustness",
         "group_cols": ["method", "data_fraction", "steps_per_epoch", "lambda_orbit"],
     },
+    "ten_percent_sanity": {
+        "out_prefix": "2d_galilean_n64_10pct_lambda_0p1",
+        "group_cols": ["data_fraction", "method", "steps_per_epoch", "lambda_orbit"],
+    },
+    "wrong_symmetry": {
+        "out_prefix": "2d_galilean_n64_2pct_wrong_symmetry",
+        "group_cols": ["data_fraction", "method", "orbit_control", "steps_per_epoch", "lambda_orbit"],
+    },
+    "no_output_control": {
+        "out_prefix": "2d_galilean_n64_2pct_no_output_control",
+        "group_cols": ["data_fraction", "method", "orbit_control", "steps_per_epoch", "lambda_orbit"],
+    },
 }
 
 SEVERITY_MATRICES = [
@@ -174,6 +224,8 @@ SEVERITY_MATRICES = [
         "methods": {"aug_orbit_lambda_0.1_steps_4"},
     },
 ]
+
+ORACLE_MATRIX = "configs/ablations/2d_galilean_n64_2pct_oracle_canonicalization.yaml"
 
 
 def _norm_path(value: str | Path) -> str:
@@ -323,6 +375,33 @@ def _collect_severity_rows() -> pd.DataFrame:
     return df.sort_values(["severity_scale", "method", "seed"])
 
 
+def _collect_oracle_rows() -> pd.DataFrame:
+    rows: list[dict[str, Any]] = []
+    for job in _iter_severity_jobs(ROOT / ORACLE_MATRIX):
+        out_dir = ROOT / str(job["out_dir"])
+        metrics_path = out_dir / "severity_metrics.json"
+        if not metrics_path.exists():
+            raise SystemExit(f"Missing oracle canonicalization metrics: {metrics_path}")
+        metrics = _read_json(metrics_path)
+        symmetry = job.get("symmetry", {})
+        rows.append(
+            {
+                "checkpoint": _norm_path(job["checkpoint"]),
+                "run_dir": _norm_path(out_dir.relative_to(ROOT)),
+                "method": job.get("method"),
+                "seed": job.get("seed"),
+                "severity": job.get("severity"),
+                "severity_scale": job.get("severity_scale"),
+                "max_shift": _symmetry_value(symmetry, "max_shift"),
+                "max_boost": _symmetry_value(symmetry, "max_boost"),
+                "paper_table": "oracle_canonicalization",
+                **metrics,
+            }
+        )
+    df = pd.DataFrame(rows)
+    return df.sort_values(["severity_scale", "method", "seed"])
+
+
 def _manifest_for_training(df: pd.DataFrame) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
     seen: set[str] = set()
@@ -373,7 +452,7 @@ def _manifest_for_severity(df: pd.DataFrame) -> list[dict[str, Any]]:
         rows.append(
             {
                 "artifact_type": "severity_eval",
-                "paper_table": "ood_severity",
+                "paper_table": record.get("paper_table", "ood_severity"),
                 "method": record.get("method"),
                 "data_fraction": 0.02,
                 "lambda_orbit": 0.10 if record.get("method") == "aug_orbit_lambda_0.1_steps_4" else None,
@@ -503,6 +582,52 @@ def _regenerate_figures(*, table_dir: Path, figures_dir: Path) -> None:
     subprocess.run(cmd, check=True)
 
 
+def _regenerate_diagnostics(*, table_dir: Path, figures_dir: Path) -> None:
+    cmd = [
+        sys.executable,
+        str(ROOT / "scripts" / "make_paper_diagnostics.py"),
+        "--headline-csv",
+        str(table_dir / "2d_galilean_n64_2pct_headline_lambda_0p1.runs.csv"),
+        "--label-csv",
+        str(table_dir / "2d_galilean_n64_label_efficiency_lambda_0p1.runs.csv"),
+        "--lambda-csv",
+        str(table_dir / "2d_galilean_n64_2pct_lambda_robustness.runs.csv"),
+        "--severity-csv",
+        str(table_dir / "2d_galilean_n64_2pct_ood_severity_lambda_0p1.runs.csv"),
+        "--table-dir",
+        str(table_dir),
+        "--figures-dir",
+        str(figures_dir),
+        "--root",
+        str(ROOT),
+    ]
+    subprocess.run(cmd, check=True)
+
+
+def _regenerate_reviewer_tables(*, table_dir: Path) -> None:
+    cmd = [
+        sys.executable,
+        str(ROOT / "scripts" / "make_reviewer_tables.py"),
+        "--table-dir",
+        str(table_dir),
+        "--out-prefix",
+        str(table_dir / "2d_galilean_n64_reviewer"),
+    ]
+    subprocess.run(cmd, check=True)
+
+
+def _regenerate_solver_closure(*, table_dir: Path) -> None:
+    cmd = [
+        sys.executable,
+        str(ROOT / "scripts" / "make_solver_closure_tables.py"),
+        "--max-boosts",
+        "0.25,0.35,0.50",
+        "--out-prefix",
+        str(table_dir / "2d_galilean_n64_solver_closure"),
+    ]
+    subprocess.run(cmd, check=True)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(
         description="Regenerate cached paper-facing N64 Galilean artifacts."
@@ -511,6 +636,7 @@ def main() -> None:
     parser.add_argument("--out-dir", default="runs/paper_tables")
     parser.add_argument("--figures-dir", default="runs/figures")
     parser.add_argument("--skip-figures", action="store_true")
+    parser.add_argument("--skip-solver-closure", action="store_true")
     args = parser.parse_args()
 
     out_dir = Path(args.out_dir)
@@ -535,10 +661,17 @@ def main() -> None:
         out_dir / "2d_galilean_n64_2pct_ood_severity_lambda_0p1",
         ["severity", "severity_scale", "max_boost", "method"],
     )
+    oracle_rows = _collect_oracle_rows()
+    aggregates["oracle_canonicalization"] = _write_table(
+        oracle_rows,
+        out_dir / "2d_galilean_n64_2pct_oracle_canonicalization",
+        ["severity", "severity_scale", "max_boost", "method"],
+    )
 
     manifest_rows = []
     manifest_rows.extend(_manifest_for_training(pd.concat(selected_training, ignore_index=True)))
     manifest_rows.extend(_manifest_for_severity(severity_rows))
+    manifest_rows.extend(_manifest_for_severity(oracle_rows))
     manifest = pd.DataFrame(manifest_rows).sort_values(
         ["artifact_type", "paper_table", "data_fraction", "method", "severity", "seed"],
         na_position="last",
@@ -559,6 +692,10 @@ def main() -> None:
         severity=aggregates["severity"],
         out_path=out_dir / "2d_galilean_n64_claim_summary.csv",
     )
+    _regenerate_diagnostics(table_dir=out_dir, figures_dir=Path(args.figures_dir))
+    _regenerate_reviewer_tables(table_dir=out_dir)
+    if not args.skip_solver_closure:
+        _regenerate_solver_closure(table_dir=out_dir)
     if not args.skip_figures:
         _regenerate_figures(table_dir=out_dir, figures_dir=Path(args.figures_dir))
 

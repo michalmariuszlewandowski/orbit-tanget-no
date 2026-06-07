@@ -71,6 +71,7 @@ def _aggregate(rows: list[dict[str, Any]]) -> pd.DataFrame:
     value_cols = [
         "relative_l2",
         "orbit_ood_relative_l2",
+        "oracle_canonical_ood_relative_l2",
         "equivariance_defect_relative",
         "epsilon_mean",
     ]
@@ -97,6 +98,7 @@ def main() -> None:
     parser.add_argument("--out-prefix", default="runs/paper_tables/ood_severity")
     parser.add_argument("--device", default="auto")
     parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument("--overwrite", action="store_true", help="Recompute metrics even when outputs exist.")
     args = parser.parse_args()
 
     out_prefix = Path(args.out_prefix)
@@ -107,7 +109,7 @@ def main() -> None:
         checkpoint = ROOT / str(job["checkpoint"])
         out_dir = ROOT / str(job["out_dir"])
         out_path = out_dir / "severity_metrics.json"
-        overwrite = bool(job.get("overwrite", False))
+        overwrite = bool(args.overwrite or job.get("overwrite", False))
         print(f"eval {checkpoint} -> {out_path}", flush=True)
         if args.dry_run:
             continue

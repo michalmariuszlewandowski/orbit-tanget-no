@@ -41,12 +41,19 @@ def _row(path: Path, root: Path) -> dict[str, Any]:
         "run_dir": str(path.parent.relative_to(ROOT)),
         "checkpoint": result.get("checkpoint"),
         "source_method": adaptation.get("source_method"),
+        "target_severity": adaptation.get("target_severity"),
+        "loss_mode": result.get("loss_mode", adaptation.get("loss_mode")),
         "seed": config.get("seed"),
         "trainable": result.get("trainable", adaptation.get("trainable")),
         "epochs": adaptation.get("epochs"),
         "lr": adaptation.get("lr"),
         "beta_l2_initial": adaptation.get("beta_l2_initial"),
+        "gamma_prediction_preservation": adaptation.get("gamma_prediction_preservation"),
         "orbit_eta": adaptation.get("orbit_eta"),
+        "id_relative_l2_degradation": result.get("id_relative_l2_degradation"),
+        "id_relative_l2_degradation_pct": result.get("id_relative_l2_degradation_pct"),
+        "target_orbit_ood_delta_pct": result.get("target_orbit_ood_delta_pct"),
+        "target_defect_delta_pct": result.get("target_defect_delta_pct"),
     }
     row.update(_flatten("before", result.get("before", {})))
     row.update(_flatten("after", result.get("after", {})))
@@ -75,7 +82,7 @@ def main() -> None:
     parser.add_argument("--out-prefix", default="runs/paper_tables/adaptation")
     parser.add_argument(
         "--group-cols",
-        default="source_method,trainable,beta_l2_initial,epochs",
+        default="source_method,target_severity,loss_mode,trainable,epochs",
         help="Comma-separated grouping columns for aggregate outputs.",
     )
     args = parser.parse_args()
@@ -104,6 +111,10 @@ def main() -> None:
         "before_equivariance_defect_relative",
         "after_equivariance_defect_relative",
         "defect_delta_pct",
+        "id_relative_l2_degradation",
+        "id_relative_l2_degradation_pct",
+        "target_orbit_ood_delta_pct",
+        "target_defect_delta_pct",
     ]
     if df.empty:
         aggregate = pd.DataFrame()

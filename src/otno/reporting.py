@@ -64,6 +64,7 @@ def aggregate_runs(df: pd.DataFrame, *, group_cols: list[str] | None = None) -> 
         for col in [
             "relative_l2",
             "orbit_ood_relative_l2",
+            "oracle_canonical_ood_relative_l2",
             "equivariance_defect_relative",
             "latency_ms_per_sample",
             "latency_ms_per_batch",

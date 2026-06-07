@@ -1,0 +1,15 @@
+\begin{table}[t]
+\centering
+\small
+\caption{Solver-level Galilean closure for the N64 2D Navier--Stokes dataset. The residual is $\|S(T_g a)-T_gS(a)\|_2/\|T_gS(a)\|_2$ at the training boost radius.}
+\label{tab:n64-solver-closure}
+\begin{tabular}{lrrrrr}
+\toprule
+Setting & Samples & Max boost & Mean $\pm$ std & P95 & Max \\
+\midrule
+N64 Galilean train radius & 32 & 0.25 & \(3.63e-07\pm4.09e-08\) & \(4.48e-07\) & \(4.77e-07\) \\
+N64 Galilean OOD radius & 32 & 0.35 & \(3.98e-07\pm6.59e-08\) & \(5.18e-07\) & \(5.83e-07\) \\
+N64 Galilean OOD radius & 32 & 0.50 & \(4.62e-07\pm8.73e-08\) & \(5.94e-07\) & \(6.22e-07\) \\
+\bottomrule
+\end{tabular}
+\end{table}

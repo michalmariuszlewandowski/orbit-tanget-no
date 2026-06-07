@@ -1,0 +1,4 @@
+scope,n,pearson_r,spearman_rho,partial_pearson_r,controls
+all,90,0.8514785172836982,0.8384985800716137,0.7794948915395788,source+method+data_fraction+max_boost+lambda_orbit
+training,40,0.9900859003442541,0.9898686679174485,0.9760826983009241,source+method+data_fraction+max_boost+lambda_orbit
+severity,50,0.7611005072906057,0.7540456182472989,0.515936496474589,source+method+data_fraction+max_boost+lambda_orbit

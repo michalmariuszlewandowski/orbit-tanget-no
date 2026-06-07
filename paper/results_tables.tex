@@ -1,0 +1,126 @@
+\begin{table*}[t]
+\centering
+\small
+\caption{N64 Galilean headline at 2\% labels over five seeds. All rows use the same FNO2d architecture with 2,668,609 parameters. Lower is better for relative \(L^2\), orbit OOD relative \(L^2\), and equivariance defect.}
+\label{tab:n64-headline}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{lrrrrr}
+\toprule
+Method & Steps/epoch & Relative \(L^2\) & Orbit OOD \(L^2\) & Eq. defect & Latency ms/sample \\
+\midrule
+FNO & 4 & \(0.9287\pm0.0228\) & \(0.9568\pm0.0223\) & \(0.6988\pm0.0173\) & \(16.53\pm2.13\) \\
+FNO + orbit & 4 & \(0.4646\pm0.0394\) & \(0.4952\pm0.0348\) & \(0.3359\pm0.0170\) & \(16.11\pm1.66\) \\
+FNO + aug. & 6 & \(0.5009\pm0.0590\) & \(0.5276\pm0.0525\) & \(0.3816\pm0.0322\) & \(18.76\pm7.34\) \\
+FNO + aug. + orbit & 4 & \(\mathbf{0.3676\pm0.0360}\) & \(\mathbf{0.3950\pm0.0334}\) & \(\mathbf{0.2677\pm0.0174}\) & \(16.87\pm3.19\) \\
+\bottomrule
+\end{tabular}
+}
+\end{table*}
+
+\begin{table*}[t]
+\centering
+\small
+\caption{Training compute accounting for the headline 2\% N64 Galilean runs. Forward/backward counts and transformed-sample counts are computed from the logged optimizer steps; wall-clock minutes are estimated from immutable RNG checkpoint timestamps for these legacy cached runs, and new runs now write \texttt{train\_wall\_seconds} directly. Relative train time is normalized to the compute-matched supervised augmentation baseline.}
+\label{tab:n64-compute}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{lrrrrrrrr}
+\toprule
+Method & Opt. steps & Model fwds. & Bwd. passes & Aug. labeled samples & Orbit samples & Train min. & Rel. train time & Latency ms/sample \\
+\midrule
+FNO & 600 & 600 & 600 & 0 & 0 & \(14.6\pm0.4\) & \(0.71\times\) & \(16.53\pm2.13\) \\
+FNO + orbit & 600 & 1200 & 600 & 0 & 9600 & \(18.7\pm0.6\) & \(0.91\times\) & \(16.11\pm1.66\) \\
+FNO + aug. & 900 & 1800 & 900 & 14400 & 0 & \(20.6\pm2.5\) & \(1.00\times\) & \(18.76\pm7.34\) \\
+FNO + aug. + orbit & 600 & 1800 & 600 & 9600 & 9600 & \(21.0\pm2.6\) & \(1.02\times\) & \(16.87\pm3.19\) \\
+\bottomrule
+\end{tabular}
+}
+\end{table*}
+
+\begin{table}[t]
+\centering
+\small
+\caption{Label-efficiency comparison for compute-matched augmentation versus augmentation plus orbit consistency with \(\lambda_{\mathrm{orb}}=0.10\).}
+\label{tab:n64-label-efficiency}
+\begin{tabular}{llrrr}
+\toprule
+Labels & Method & Orbit OOD \(L^2\) & Eq. defect & Seeds \\
+\midrule
+1\% & Aug. & \(0.7421\pm0.0838\) & \(0.5080\pm0.0456\) & 3 \\
+1\% & Aug. + orbit & \(\mathbf{0.6406\pm0.0508}\) & \(\mathbf{0.3999\pm0.0197}\) & 3 \\
+2\% & Aug. & \(0.5276\pm0.0525\) & \(0.3816\pm0.0322\) & 5 \\
+2\% & Aug. + orbit & \(\mathbf{0.3950\pm0.0334}\) & \(\mathbf{0.2677\pm0.0174}\) & 5 \\
+5\% & Aug. & \(0.3237\pm0.0013\) & \(0.2427\pm0.0014\) & 3 \\
+5\% & Aug. + orbit & \(\mathbf{0.2515\pm0.0112}\) & \(\mathbf{0.1621\pm0.0078}\) & 3 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table*}[t]
+\centering
+\small
+\caption{Privileged relative-boost calibration at 2\% labels. Direct OOD evaluates the model on the boosted input. The privileged calibration uses the sampled relative boost from the evaluation protocol and the paired in-distribution prediction, so it is not an observable-frame analytic baseline. Lower is better.}
+\label{tab:n64-privileged-calibration}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{rrrrr}
+\toprule
+Max boost & Aug. direct OOD & Aug. priv. calib. & Aug. + orbit direct OOD & Aug. + orbit priv. calib. \\
+\midrule
+0.10 & \(0.5050\pm0.0574\) & \(0.5009\pm0.0590\) & \(\mathbf{0.3715\pm0.0349}\) & \(0.3676\pm0.0360\) \\
+0.20 & \(0.5176\pm0.0543\) & \(0.5009\pm0.0590\) & \(\mathbf{0.3840\pm0.0331}\) & \(0.3676\pm0.0360\) \\
+0.25 & \(0.5277\pm0.0523\) & \(0.5009\pm0.0590\) & \(\mathbf{0.3943\pm0.0318}\) & \(0.3676\pm0.0360\) \\
+0.35 & \(0.5555\pm0.0476\) & \(0.5009\pm0.0590\) & \(\mathbf{0.4242\pm0.0285}\) & \(0.3676\pm0.0360\) \\
+0.50 & \(0.6158\pm0.0384\) & \(0.5009\pm0.0590\) & \(\mathbf{0.4910\pm0.0216}\) & \(0.3676\pm0.0360\) \\
+\bottomrule
+\end{tabular}
+}
+\end{table*}
+
+\begin{table}[t]
+\centering
+\small
+\caption{Correlation between equivariance defect and orbit OOD relative \(L^2\) across cached N64 Galilean seeds, label fractions, orbit weights, and boost severities. Partial Pearson \(r\) residualizes source, method, label fraction, maximum boost, and \(\lambda_{\mathrm{orb}}\).}
+\label{tab:n64-defect-correlation}
+\begin{tabular}{lrrrr}
+\toprule
+Scope & Obs. & Pearson \(r\) & Spearman \(\rho\) & Partial \(r\) \\
+\midrule
+All & 90 & 0.851 & 0.838 & 0.779 \\
+Train/lambda/label & 40 & 0.990 & 0.990 & 0.976 \\
+OOD severity & 50 & 0.761 & 0.754 & 0.516 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[t]
+\centering
+\small
+\caption{Orbit-weight ablation at 2\% labels. The final setting \(\lambda_{\mathrm{orb}}=0.10\) gives the best completed N64 Galilean result.}
+\label{tab:n64-lambda}
+\begin{tabular}{rrrr}
+\toprule
+\(\lambda_{\mathrm{orb}}\) & Orbit OOD \(L^2\) & Eq. defect & Seeds \\
+\midrule
+0.01 & \(0.5768\pm0.0378\) & \(0.3955\pm0.0235\) & 3 \\
+0.05 & \(0.4518\pm0.0397\) & \(0.3161\pm0.0247\) & 5 \\
+0.10 & \(\mathbf{0.3950\pm0.0334}\) & \(\mathbf{0.2677\pm0.0174}\) & 5 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[t]
+\centering
+\small
+\caption{Relative reductions of augmentation plus orbit consistency over compute-matched augmentation across Galilean OOD severities at 2\% labels.}
+\label{tab:n64-severity-reductions}
+\begin{tabular}{rrr}
+\toprule
+Max boost & OOD reduction & Defect reduction \\
+\midrule
+0.10 & 26.4\% & 33.6\% \\
+0.20 & 25.8\% & 31.3\% \\
+0.25 & 25.3\% & 30.2\% \\
+0.35 & 23.6\% & 27.8\% \\
+0.50 & 20.3\% & 23.6\% \\
+\bottomrule
+\end{tabular}
+\end{table}

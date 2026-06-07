@@ -1,48 +1,16 @@
 \section{Method}
 \label{sec:method}
 
-We train a neural operator $\mathcal G_\theta:\mathcal A\to\mathcal U$ with supervised regression and stochastic local orbit consistency. Each minibatch contains input--solution pairs $(a,u)$. The supervised term is
+We train a neural operator \(\mathcal G_\theta:\mathcal A\to\mathcal U\) with ordinary supervised regression and a stochastic local orbit-consistency objective. Each minibatch contains input--solution pairs \((a,u)\). The supervised term is
 \begin{equation}
-\mathcal L_{\mathrm{sup}}(\theta)=
-\mathbb E_{(a,u)}
-\left[
-\frac{\|\mathcal G_\theta(a)-u\|_{\mathcal U}^2}{\|u\|_{\mathcal U}^2+\delta}
-\right].
+\mathcal L_{\mathrm{sup}}(\theta)=\mathbb E_{(a,u)}\left[\frac{\|\mathcal G_\theta(a)-u\|_{\mathcal U}^2}{\|u\|_{\mathcal U}^2+\delta}\right].
 \end{equation}
-Given a transform sample $g=\exp(\epsilon X_i)$, the local orbit-consistency term is
+For a sampled Lie-algebra generator \(X_i\), scalar step \(\epsilon\), and finite transform \(g=\exp(\epsilon X_i)\), the local orbit-consistency term is
 \begin{equation}
-\mathcal L_{\mathrm{orb}}(\theta)=
-\mathbb E_{a,i,\epsilon}
-\left[
-\frac{
-\|\mathcal G_\theta(T_g^{\mathcal A}a)-T_g^{\mathcal U}\mathcal G_\theta(a)\|_{\mathcal U}^2
-}{\epsilon^2+\eta}
-\right].
+\mathcal L_{\mathrm{orb}}(\theta)=\mathbb E_{a,i,\epsilon}\left[\frac{\|\mathcal G_\theta(T_g^{\mathcal A}a)-T_g^{\mathcal U}\mathcal G_\theta(a)\|_{\mathcal U}^2}{\epsilon^2+\eta}\right].
 \end{equation}
-The full objective is
-\begin{equation}
-\min_\theta\;\mathcal L_{\mathrm{sup}}(\theta)+\lambda\mathcal L_{\mathrm{orb}}(\theta).
-\end{equation}
-For supervised symmetry augmentation, we also evaluate
-\begin{equation}
-\mathcal L_{\mathrm{aug}}(\theta)=
-\mathbb E_{(a,u),g}
-\left[
-\frac{\|\mathcal G_\theta(T_g^{\mathcal A}a)-T_g^{\mathcal U}u\|_{\mathcal U}^2}{\|T_g^{\mathcal U}u\|_{\mathcal U}^2+\delta}
-\right],
-\end{equation}
-and report both augmentation-only and augmentation-plus-orbit variants.
+The full objective is \(\min_\theta \mathcal L_{\mathrm{sup}}(\theta)+\lambda\mathcal L_{\mathrm{orb}}(\theta)\). For supervised Lie augmentation, we also evaluate \(\mathcal L_{\mathrm{aug}}(\theta)=\mathbb E_{(a,u),g}[\|\mathcal G_\theta(T_g^{\mathcal A}a)-T_g^{\mathcal U}u\|_{\mathcal U}^2/(\|T_g^{\mathcal U}u\|_{\mathcal U}^2+\delta)]\), and report both augmentation-only and augmentation-plus-orbit variants.
 
-The method is architecture-agnostic. In our experiments, $\mathcal G_\theta$ is an FNO backbone. Transformations are applied to the input fields on the physical grid, the transformed prediction is compared with the transformed original prediction, and gradients are backpropagated through both model evaluations. Integer periodic translations are tensor rolls; non-integer periodic translations are spectral shifts; finite square symmetries are exact tensor rotations and flips. For 1D Burgers, the Galilean action on the solution map $u_0\mapsto u_T$ is
-\begin{equation}
-T_c^{\mathcal A}u_0(x)=u_0(x)+c,
-\qquad
-T_c^{\mathcal U}u_T(x)=u_T(x-cT)+c.
-\end{equation}
+The method is architecture-agnostic. In our experiments, \(\mathcal G_\theta\) is an FNO backbone. Transformations are applied to physical-grid input fields; the prediction on the transformed input is compared with the transformed original prediction; gradients pass through both model evaluations. Integer periodic translations are tensor rolls, non-integer periodic translations are spectral shifts, and finite square symmetries are exact tensor rotations and flips. For 1D Burgers, the Galilean action on the solution map \(u_0\mapsto u_T\) is \(T_c^{\mathcal A}u_0(x)=u_0(x)+c\) and \(T_c^{\mathcal U}u_T(x)=u_T(x-cT)+c\).
 
-The same loss supports unlabeled adaptation. Given a pretrained operator $\mathcal G_{\theta_0}$ and target inputs $a\sim\mathcal D_{\mathrm{target}}$, we minimize
-\begin{equation}
-\min_{\theta\in\Theta_{\mathrm{adapt}}}
-\mathcal L_{\mathrm{orb}}^{\mathrm{target}}(\theta)+\beta\|\theta-\theta_0\|_2^2,
-\end{equation}
-where $\Theta_{\mathrm{adapt}}$ may contain all parameters, the last operator block, or the projection head. This adaptation objective requires no PDE solves and no target labels.
+The same loss supports unlabeled adaptation. Given a pretrained operator \(\mathcal G_{\theta_0}\) and target inputs \(a\sim\mathcal D_{\mathrm{target}}\), we minimize \(\mathcal L_{\mathrm{orb}}^{\mathrm{target}}(\theta)+\beta\|\theta-\theta_0\|_2^2\) over a chosen adaptation set \(\Theta_{\mathrm{adapt}}\), such as all parameters, the last operator block, or the projection head. This adaptation objective requires no PDE solves and no target labels.

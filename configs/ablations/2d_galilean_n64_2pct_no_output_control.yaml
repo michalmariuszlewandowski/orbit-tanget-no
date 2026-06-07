@@ -1,0 +1,14 @@
+experiments:
+  # Milder wrong-symmetry control for the headline 2%-label N64 Galilean result.
+  # This keeps the transformed input view but removes the physical output action,
+  # training G(T_g a) to match G(a) rather than T_g G(a).
+  - config: configs/pilot/2d_navier_stokes_galilean.yaml
+    seeds: [23, 31, 47]
+    overrides:
+      training.method: aug_orbit_no_output
+      training.orbit_control: no_output_transform
+      training.data_fraction: 0.02
+      training.steps_per_epoch: 4
+      training.lambda_orbit: 0.10
+      runtime.overwrite: false
+      runtime.run_dir: runs/ablations/2d_galilean_n64_2pct_no_output_control/fraction_0.02/aug_orbit_no_output_lambda_0.1_steps_4

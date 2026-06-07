@@ -1,0 +1,21 @@
+experiments:
+  - config: configs/pilot/2d_navier_stokes_galilean.yaml
+    seeds: [23]
+    overrides:
+      training.method: aug_orbit
+      training.data_fraction: 0.10
+      training.steps_per_epoch: 4
+      training.lambda_orbit: 0.10
+      runtime.resume: true
+      runtime.overwrite: false
+      runtime.run_dir: runs/ablations/2d_galilean_n64_10pct_lambda_0p1/fraction_0.10/aug_orbit_lambda_0.1_steps_4
+
+  - config: configs/pilot/2d_navier_stokes_galilean.yaml
+    seeds: [31, 47]
+    overrides:
+      training.method: aug_orbit
+      training.data_fraction: 0.10
+      training.steps_per_epoch: 4
+      training.lambda_orbit: 0.10
+      runtime.overwrite: false
+      runtime.run_dir: runs/ablations/2d_galilean_n64_10pct_lambda_0p1/fraction_0.10/aug_orbit_lambda_0.1_steps_4

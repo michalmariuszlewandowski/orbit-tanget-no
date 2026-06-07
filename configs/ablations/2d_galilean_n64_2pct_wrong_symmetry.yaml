@@ -1,0 +1,14 @@
+experiments:
+  # Wrong-symmetry control for the headline 2%-label N64 Galilean result.
+  # This keeps the same supervised augmentation and orbit-loss compute as
+  # Aug+Orbit, but the orbit target is shuffled across the minibatch.
+  - config: configs/pilot/2d_navier_stokes_galilean.yaml
+    seeds: [23, 31, 47]
+    overrides:
+      training.method: aug_orbit_shuffled
+      training.orbit_control: shuffle_output
+      training.data_fraction: 0.02
+      training.steps_per_epoch: 4
+      training.lambda_orbit: 0.10
+      runtime.overwrite: false
+      runtime.run_dir: runs/ablations/2d_galilean_n64_2pct_wrong_symmetry/fraction_0.02/aug_orbit_shuffle_lambda_0.1_steps_4

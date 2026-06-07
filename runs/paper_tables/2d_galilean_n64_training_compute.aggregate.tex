@@ -1,0 +1,10 @@
+\begin{tabular}{lrrrrrrrrrrrrrrrrrrrrrrrrrrr}
+\toprule
+method_label & data_fraction & steps_per_epoch & optimizer_steps_mean & optimizer_steps_std & optimizer_steps_count & model_forward_passes_est_mean & model_forward_passes_est_std & model_forward_passes_est_count & backward_passes_est_mean & backward_passes_est_std & backward_passes_est_count & augmented_labeled_samples_est_mean & augmented_labeled_samples_est_std & augmented_labeled_samples_est_count & orbit_consistency_samples_est_mean & orbit_consistency_samples_est_std & orbit_consistency_samples_est_count & train_wall_minutes_est_mean & train_wall_minutes_est_std & train_wall_minutes_est_count & eval_seconds_mean & eval_seconds_std & eval_seconds_count & latency_ms_per_sample_mean & latency_ms_per_sample_std & latency_ms_per_sample_count & relative_train_time_vs_aug \\
+\midrule
+FNO & 0.020 & 4 & 600.000 & 0.000 & 5 & 600.000 & 0.000 & 5 & 600.000 & 0.000 & 5 & 0.000 & 0.000 & 5 & 0.000 & 0.000 & 5 & 14.555 & 0.398 & 5 & 22.728 & 2.061 & 5 & 16.530 & 2.132 & 5 & 0.708 \\
+FNO + aug. & 0.020 & 6 & 900.000 & 0.000 & 5 & 1800.000 & 0.000 & 5 & 900.000 & 0.000 & 5 & 14400.000 & 0.000 & 5 & 0.000 & 0.000 & 5 & 20.573 & 2.492 & 5 & 20.697 & 3.768 & 5 & 18.756 & 7.342 & 5 & 1.000 \\
+FNO + aug. + orbit & 0.020 & 4 & 600.000 & 0.000 & 5 & 1800.000 & 0.000 & 5 & 600.000 & 0.000 & 5 & 9600.000 & 0.000 & 5 & 9600.000 & 0.000 & 5 & 21.016 & 2.599 & 5 & 23.567 & 3.882 & 5 & 16.872 & 3.185 & 5 & 1.022 \\
+FNO + orbit & 0.020 & 4 & 600.000 & 0.000 & 5 & 1200.000 & 0.000 & 5 & 600.000 & 0.000 & 5 & 0.000 & 0.000 & 5 & 9600.000 & 0.000 & 5 & 18.701 & 0.580 & 5 & 23.084 & 1.699 & 5 & 16.113 & 1.665 & 5 & 0.909 \\
+\bottomrule
+\end{tabular}

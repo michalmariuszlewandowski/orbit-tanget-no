@@ -39,6 +39,10 @@ _ALLOWED_METHODS = {
     "orb",
     "aug_orbit",
     "orbit_aug",
+    "aug_orbit_shuffle",
+    "aug_orbit_shuffled",
+    "aug_orbit_no_output",
+    "aug_orbit_input_only",
     "semi_aug_orbit",
     "semisup_aug_orbit",
     "semi_supervised_aug_orbit",
@@ -236,9 +240,34 @@ def validate_config(config: dict[str, Any], *, require_dataset: bool = True) -> 
         raise ValueError("training.orbit_data_fraction must lie in (0, 1]")
     for key in ("lr", "weight_decay", "lambda_orbit", "lambda_aug", "orbit_eta"):
         _check_nonnegative_float(training, "training", key)
+    orbit_control = str(training.get("orbit_control", "physical")).lower()
+    if orbit_control not in {
+        "physical",
+        "correct",
+        "shuffle",
+        "shuffled",
+        "shuffle_output",
+        "shuffled_output",
+        "no_output",
+        "no_output_transform",
+        "input_only",
+        "identity_output",
+    }:
+        raise ValueError(f"Unknown training.orbit_control={orbit_control!r}")
 
     symmetry = config.get("symmetry")
-    if method in {"aug", "augmentation", "orbit", "orb", "aug_orbit", "orbit_aug"} and not symmetry:
+    if method in {
+        "aug",
+        "augmentation",
+        "orbit",
+        "orb",
+        "aug_orbit",
+        "orbit_aug",
+        "aug_orbit_shuffle",
+        "aug_orbit_shuffled",
+        "aug_orbit_no_output",
+        "aug_orbit_input_only",
+    } and not symmetry:
         raise ValueError(f"training.method={method!r} requires a symmetry section")
     if symmetry:
         if symmetry.get("enabled", True) is False:

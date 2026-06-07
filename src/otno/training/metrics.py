@@ -82,6 +82,7 @@ def evaluate_model(
                     pred_equiv = transform.apply_output(pred, sample)
                     mask = transform.output_mask(u_t, sample)
                     _add_stats("orbit_ood_relative_l2", relative_l2_per_sample(pred_t, u_t, mask=mask), sums, sumsqs, counts)
+                    _add_stats("oracle_canonical_ood_relative_l2", relative_l2_per_sample(pred_equiv, u_t, mask=mask), sums, sumsqs, counts)
                     _add_stats("equivariance_defect_relative", relative_defect_per_sample(pred_t, pred_equiv, mask=mask), sums, sumsqs, counts)
                     _add_stats("epsilon", sample.epsilon, sums, sumsqs, counts)
     elapsed = time.perf_counter() - start

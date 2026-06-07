@@ -1,0 +1,16 @@
+\begin{table}[t]
+\centering
+\small
+\caption{Wrong-symmetry control at 2\% labels over matched seeds. The no-output row removes the physical output action, while the shuffled-orbit row pairs each transformed prediction with the wrong orbit target in the minibatch.}
+\label{tab:n64-wrong-symmetry-control}
+\begin{tabular}{lrrrr}
+\toprule
+Method & ID L2 & OOD L2 & Eq. defect & Seeds \\
+\midrule
+FNO + aug. & \(0.5181\pm0.0377\) & \(0.5415\pm0.0370\) & \(0.3867\pm0.0237\) & 3 \\
+FNO + aug. + orbit & \(0.3674\pm0.0136\) & \(0.3915\pm0.0151\) & \(0.2630\pm8.69e-03\) & 3 \\
+FNO + aug. + shuffled orbit & \(0.9654\pm3.36e-03\) & \(0.9677\pm3.61e-03\) & \(0.5631\pm0.0318\) & 3 \\
+FNO + aug. + no output transform & \(0.8827\pm0.0194\) & \(0.8994\pm0.0191\) & \(0.6236\pm0.0238\) & 3 \\
+\bottomrule
+\end{tabular}
+\end{table}
