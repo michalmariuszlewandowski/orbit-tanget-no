@@ -63,12 +63,12 @@ Labels & OOD reduction & Defect reduction & Seeds \\
 
 The strongest gains remain in the low-label regime, especially at 2\% and 5\%, but the 10\% row shows that the effect does not disappear once the supervised baseline is substantially better. This supports the narrower claim we want for the paper: orbit consistency is a training-time regularizer that improves symmetry robustness and label efficiency, not merely a rescue mechanism for failed baselines.
 
-\paragraph{Extended orbit-weight sweep.} We extended the 2\% N64 Galilean \(\lambda_{\mathrm{orb}}\) sweep beyond the previous largest tested value, \(\lambda_{\mathrm{orb}}=0.10\). A one-seed probe at \(\lambda_{\mathrm{orb}}=0.20\) improved over the seed-23 \(\lambda_{\mathrm{orb}}=0.10\) run, so we expanded \(\lambda_{\mathrm{orb}}=0.30\) to three matched seeds. The higher weight improves all three paper-facing error metrics on these seeds, but it should be treated as a new promising setting rather than an immediately final headline until it is either expanded to five seeds or bracketed by a larger degrading value.
+\paragraph{Extended orbit-weight sweep.} We extended the 2\% N64 Galilean \(\lambda_{\mathrm{orb}}\) sweep beyond the previous largest tested value, \(\lambda_{\mathrm{orb}}=0.10\). A one-seed probe at \(\lambda_{\mathrm{orb}}=0.20\) improved over the seed-23 \(\lambda_{\mathrm{orb}}=0.10\) run, so we expanded \(\lambda_{\mathrm{orb}}=0.30\) to five matched seeds. The higher weight improves all three paper-facing error metrics relative to the completed \(\lambda_{\mathrm{orb}}=0.10\) row, although the added seeds widen the across-seed spread and the one-seed \(\lambda_{\mathrm{orb}}=0.20\) probe remains numerically lower on ID and orbit OOD error. Relative to the same five FNO+aug. seeds, the paired \(\lambda_{\mathrm{orb}}=0.30\) deltas are \(-0.1860\) for ID \(L^2\), \(-0.1860\) for orbit OOD \(L^2\), and \(-0.1772\) for equivariance defect, with two-sided 95\% \(t\)-intervals reported in Table~\ref{tab:new-paired-comparisons}. We therefore treat \(\lambda_{\mathrm{orb}}=0.30\) as a promising high-weight setting rather than replacing the current headline until it is bracketed by a larger degrading value.
 
 \begin{table}[t]
 \centering
 \small
-\caption{Extended \(\lambda_{\mathrm{orb}}\) sweep at 2\% labels on N64 Galilean. Rows with five seeds are completed headline artifacts; high-\(\lambda\) rows are new probes.}
+\caption{Extended \(\lambda_{\mathrm{orb}}\) sweep at 2\% labels on N64 Galilean. Entries are mean \(\pm\) across-seed sample standard deviation, not confidence intervals. Rows with five seeds are completed headline artifacts; high-\(\lambda\) rows are new probes.}
 \label{tab:new-lambda-extended}
 \begin{tabular}{rrrrr}
 \toprule
@@ -78,7 +78,7 @@ The strongest gains remain in the low-label regime, especially at 2\% and 5\%, b
 0.05 & \(0.4240\pm0.0441\) & \(0.4518\pm0.0397\) & \(0.3161\pm0.0247\) & 5 \\
 0.10 & \(0.3676\pm0.0360\) & \(0.3950\pm0.0334\) & \(0.2677\pm0.0174\) & 5 \\
 0.20 & \(0.3140\) & \(0.3368\) & \(0.2094\) & 1 \\
-0.30 & \(\mathbf{0.3096\pm0.0086}\) & \(\mathbf{0.3326\pm0.0073}\) & \(\mathbf{0.1942\pm0.0070}\) & 3 \\
+0.30 & \(0.3149\pm0.0298\) & \(0.3416\pm0.0289\) & \(\mathbf{0.2044\pm0.0160}\) & 5 \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -106,7 +106,7 @@ Labels & Method & ID \(L^2\) & OOD \(L^2\) & Eq. defect & Latency ms/sample & Se
 }
 \end{table*}
 
-\paragraph{Paired statistical reporting.} Because seeds are matched across the central comparisons, we also computed paired seed differences with two-sided 95\% \(t\)-intervals. The 2\% N64 result is clearly separated from zero on all three metrics. The new 10\% sanity check is also separated from zero despite having only three seeds: for orbit OOD relative \(L^2\), the paired delta is \(-0.0235\) with 95\% CI \([-0.0393,-0.0078]\), and for equivariance defect it is \(-0.0375\) with 95\% CI \([-0.0555,-0.0196]\). In the 1D Burgers setting, the absolute OOD improvement is small and its paired interval crosses zero, while the defect reduction remains separated from zero. This matches the qualitative story that Burgers augmentation already nearly solves the symmetry.
+\paragraph{Paired statistical reporting.} Because seeds are matched across the central comparisons, we also computed paired seed differences with two-sided 95\% \(t\)-intervals. The 2\% N64 result is clearly separated from zero on all three metrics for both the current \(\lambda_{\mathrm{orb}}=0.10\) headline row and the new \(\lambda_{\mathrm{orb}}=0.30\) high-weight row. These intervals are computed from seed-matched deltas, \(M_i(\mathrm{Aug+Orbit})-M_i(\mathrm{Aug})\), rather than from aggregate means and standard deviations. The new 10\% sanity check is also separated from zero despite having only three seeds: for orbit OOD relative \(L^2\), the paired delta is \(-0.0235\) with 95\% CI \([-0.0393,-0.0078]\), and for equivariance defect it is \(-0.0375\) with 95\% CI \([-0.0555,-0.0196]\). In the 1D Burgers setting, the absolute OOD improvement is small and its paired interval crosses zero, while the defect reduction remains separated from zero. This matches the qualitative story that Burgers augmentation already nearly solves the symmetry.
 
 \begin{table*}[t]
 \centering
@@ -121,6 +121,9 @@ Setting & Metric & Seeds & Aug. mean & Aug. + orbit mean & Paired delta [95\% CI
 N64 Galilean 2\% labels & ID \(L^2\) & 5 & \(0.5009\) & \(0.3676\) & \(-0.1332\,[-0.1731,-0.0933]\) \\
 N64 Galilean 2\% labels & OOD \(L^2\) & 5 & \(0.5276\) & \(0.3950\) & \(-0.1326\,[-0.1700,-0.0953]\) \\
 N64 Galilean 2\% labels & Eq. defect & 5 & \(0.3816\) & \(0.2677\) & \(-0.1139\,[-0.1397,-0.0881]\) \\
+N64 Galilean 2\% labels, \(\lambda_{\mathrm{orb}}=0.30\) & ID \(L^2\) & 5 & \(0.5009\) & \(0.3149\) & \(-0.1860\,[-0.2393,-0.1327]\) \\
+N64 Galilean 2\% labels, \(\lambda_{\mathrm{orb}}=0.30\) & OOD \(L^2\) & 5 & \(0.5276\) & \(0.3416\) & \(-0.1860\,[-0.2375,-0.1345]\) \\
+N64 Galilean 2\% labels, \(\lambda_{\mathrm{orb}}=0.30\) & Eq. defect & 5 & \(0.3816\) & \(0.2044\) & \(-0.1772\,[-0.2169,-0.1374]\) \\
 N64 Galilean 10\% labels & ID \(L^2\) & 3 & \(0.1694\) & \(0.1510\) & \(-0.0185\,[-0.0364,-0.0005]\) \\
 N64 Galilean 10\% labels & OOD \(L^2\) & 3 & \(0.1996\) & \(0.1760\) & \(-0.0235\,[-0.0393,-0.0078]\) \\
 N64 Galilean 10\% labels & Eq. defect & 3 & \(0.1596\) & \(0.1221\) & \(-0.0375\,[-0.0555,-0.0196]\) \\
@@ -208,4 +211,28 @@ FNO + aug. + orbit & 0.50 & 0.4870 & 0.4847 & \(-0.47\%\) & \(0.0004\) \\
 
 \paragraph{Second-PDE evidence.} The 1D Burgers experiments provide a compact second-setting sanity check. In that setting, supervised augmentation nearly solves the symmetry shift by itself, so the incremental OOD gain from orbit consistency is small. Nevertheless, augmentation plus orbit consistency lowers orbit OOD relative \(L^2\) from \(0.00405\) to \(0.00381\) and equivariance defect from \(0.00265\) to \(0.00228\). This is not a new headline benchmark, but it supports the claim that the method behaves consistently when the coded symmetry identities are exact.
 
-\paragraph{Implication for the paper.} The new results strengthen the submission most by hardening the N64 Galilean story rather than by broadening scope. The core message should remain narrow: with the same FNO2d inference map, stochastic local orbit consistency improves symmetry-induced OOD error and equivariance defect, with the strongest benefits in low-label regimes and positive evidence through 10\% labels. The adaptation and semi-supervised runs should be presented as secondary evidence; they are valuable for reviewer questions about unlabeled data, but they are not stronger than the main supervised Aug+Orbit result.
+\paragraph{Atomistic vector-output check.} To test whether the orbit-consistency mechanism transfers beyond scalar PDE fields, we added a deliberately lightweight rMD17 ethanol force-prediction experiment. The molecule is ethanol, with 9 atoms per conformation. The model is a fixed-molecule MLP with 57,755 parameters: it flattens per-atom inputs \((x,y,z,Z/10)\), uses hidden width 128 and depth 4, and outputs three Cartesian force channels per atom. It is therefore not an equivariant molecular architecture. The symmetry samples a random axis from a normalized 3D Gaussian direction, an angle uniformly in \([-\pi/2,\pi/2]\), and a translation vector with each Cartesian component uniformly in \([-1,1]\). Coordinates are centered once when the rMD17 tensor dataset is built; therefore, if \(X\) denotes raw coordinates and \(C(X)\) denotes per-conformation centering, the input action is \(C(X)Q^\top+\mathbf{1}t^\top\). Equivalently, on the stored model input \(X_c=C(X)\), the runtime action is \(X_cQ^\top+\mathbf{1}t^\top\). The output action rotates forces by \(Q^\top\) and ignores translations. The orbit-OOD evaluation uses the same transform distribution as training rather than a wider held-out transform radius; this is a mechanism and equivariance check, not a severity sweep. This isolates the mechanism question: does a physically correct orbit target improve force prediction and force equivariance, and do wrong-action controls fail?
+
+\begin{table*}[t]
+\centering
+\small
+\caption{rMD17 ethanol force-prediction mechanism check at 500 labeled conformations. Entries are mean \(\pm\) sample standard deviation over matched seeds.}
+\label{tab:new-rmd17-ethanol-500}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{lrrrrrr}
+\toprule
+Method & Force MAE & OOD force MAE & Eq. defect & ID \(L^2\) & OOD \(L^2\) & Seeds \\
+\midrule
+MLP & \(20.2503\pm0.0196\) & \(20.3762\pm0.0138\) & \(0.7400\pm0.0169\) & \(0.9972\pm0.0011\) & \(1.0014\pm0.0012\) & 3 \\
+MLP + aug. & \(20.1483\pm0.0071\) & \(20.2196\pm0.0174\) & \(0.5394\pm0.0031\) & \(0.9923\pm0.0003\) & \(0.9934\pm0.0004\) & 3 \\
+MLP + aug. + no output & \(20.1034\pm0.0056\) & \(20.1861\pm0.0256\) & \(0.5877\pm0.0090\) & \(0.9906\pm0.0005\) & \(0.9921\pm0.0007\) & 3 \\
+MLP + aug. + shuffled orbit & \(20.1554\pm0.0136\) & \(20.2252\pm0.0185\) & \(0.6824\pm0.0120\) & \(0.9938\pm0.0008\) & \(0.9943\pm0.0007\) & 3 \\
+MLP + aug. + LOCO & \(\mathbf{19.4633\pm0.1725}\) & \(\mathbf{19.5615\pm0.1646}\) & \(\mathbf{0.2357\pm0.0021}\) & \(\mathbf{0.9566\pm0.0089}\) & \(\mathbf{0.9586\pm0.0086}\) & 3 \\
+\bottomrule
+\end{tabular}
+}
+\end{table*}
+
+The rMD17 result is not meant to compete with specialized equivariant molecular networks. Its value is diagnostic: relative to supervised rotation augmentation at 500 labels, physical Aug+Orbit reduces force MAE by 3.4\%, orbit-OOD force MAE by 3.3\%, ID relative \(L^2\) by 3.6\%, orbit-OOD relative \(L^2\) by 3.5\%, and force equivariance defect by 56.3\%. The paired Aug+Orbit minus augmentation deltas over the three matched seeds are \(-0.685\) for force MAE with 95\% CI \([-1.103,-0.267]\), \(-0.658\) for orbit-OOD force MAE with 95\% CI \([-1.067,-0.249]\), \(-0.0358\) for ID relative \(L^2\) with 95\% CI \([-0.0576,-0.0139]\), \(-0.0348\) for orbit-OOD relative \(L^2\) with 95\% CI \([-0.0555,-0.0141]\), and \(-0.304\) for force equivariance defect with 95\% CI \([-0.308,-0.299]\). The no-output and shuffled-orbit controls do not reproduce the defect reduction, and correct Aug+Orbit has lower defect than both controls on every matched seed. A 1000-label sanity check with only augmentation versus Aug+Orbit gives the same qualitative conclusion with smaller predictive gains: force MAE is \(18.4899\pm0.0401\) for augmentation and \(18.4143\pm0.0140\) for Aug+Orbit, orbit-OOD force MAE is \(18.6387\pm0.0463\) versus \(18.4801\pm0.0085\), and force equivariance defect is \(0.4556\pm0.0074\) versus \(0.0983\pm0.0032\). The corresponding paired deltas are \(-0.0756\) for force MAE with 95\% CI \([-0.1406,-0.0106]\), \(-0.1586\) for orbit-OOD force MAE with 95\% CI \([-0.2527,-0.0646]\), and \(-0.3572\) for defect with 95\% CI \([-0.3677,-0.3467]\). This supports portability of the orbit-consistency target to vector outputs while keeping the main paper claim focused on the PDE setting.
+
+\paragraph{Implication for the paper.} The new results strengthen the submission most by hardening the N64 Galilean story rather than by broadening scope. The core message should remain narrow: with the same FNO2d inference map, stochastic local orbit consistency improves symmetry-induced OOD error and equivariance defect, with the strongest benefits in low-label regimes and positive evidence through 10\% labels. The rMD17 check should be presented as appendix evidence for mechanism portability to atomistic vector outputs, not as a molecular-architecture benchmark. The adaptation and semi-supervised runs should likewise be presented as secondary evidence; they are valuable for reviewer questions about unlabeled data, but they are not stronger than the main supervised Aug+Orbit result.

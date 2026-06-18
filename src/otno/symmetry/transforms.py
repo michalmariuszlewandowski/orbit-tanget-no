@@ -205,6 +205,112 @@ class NavierStokes2DGalilean(BaseTransform):
         return periodic_shift_2d(u, shift, length=self.length)
 
 
+def _random_axis_angle_rotation(
+    batch_size: int,
+    device: torch.device,
+    dtype: torch.dtype,
+    max_angle: float,
+) -> tuple[torch.Tensor, torch.Tensor]:
+    axis = torch.randn(batch_size, 3, device=device, dtype=dtype)
+    axis = axis / axis.norm(dim=-1, keepdim=True).clamp_min(1e-8)
+    angle = (2 * torch.rand(batch_size, device=device, dtype=dtype) - 1) * float(max_angle)
+    x, y, z = axis[:, 0], axis[:, 1], axis[:, 2]
+    c = torch.cos(angle)
+    s = torch.sin(angle)
+    one_c = 1 - c
+    rotation = torch.stack(
+        [
+            c + x * x * one_c,
+            x * y * one_c - z * s,
+            x * z * one_c + y * s,
+            y * x * one_c + z * s,
+            c + y * y * one_c,
+            y * z * one_c - x * s,
+            z * x * one_c - y * s,
+            z * y * one_c + x * s,
+            c + z * z * one_c,
+        ],
+        dim=-1,
+    ).reshape(batch_size, 3, 3)
+    return rotation, angle.abs()
+
+
+class MolecularRigidMotion(BaseTransform):
+    """SE(3)-style rigid motions for fixed-molecule force prediction.
+
+    Inputs are ``[batch, atoms, channels]`` with Cartesian coordinates in
+    channels ``coord_start:coord_start+3``. Outputs are force vectors with
+    Cartesian channels ``force_start:force_start+3``. Row-vector convention is
+    used, so applying rotation \(Q\) means ``x @ Q.T`` and ``f @ Q.T``.
+    """
+
+    name = "molecular_rigid_motion"
+
+    def __init__(
+        self,
+        max_angle: float = 0.5,
+        max_translation: float = 0.5,
+        coord_start: int = 0,
+        force_start: int = 0,
+        rotate: bool = True,
+        translate: bool = True,
+    ):
+        self.max_angle = float(max_angle)
+        self.max_translation = float(max_translation)
+        self.coord_start = int(coord_start)
+        self.force_start = int(force_start)
+        self.rotate = bool(rotate)
+        self.translate = bool(translate)
+
+    def sample(self, batch_size: int, device: torch.device, dtype: torch.dtype = torch.float32) -> TransformSample:
+        if self.rotate:
+            rotation, angle = _random_axis_angle_rotation(batch_size, device, dtype, self.max_angle)
+        else:
+            rotation = torch.eye(3, device=device, dtype=dtype).expand(batch_size, 3, 3)
+            angle = torch.zeros(batch_size, device=device, dtype=dtype)
+        if self.translate:
+            translation = (
+                2 * torch.rand(batch_size, 3, device=device, dtype=dtype) - 1
+            ) * self.max_translation
+            translation_norm = translation.norm(dim=-1)
+        else:
+            translation = torch.zeros(batch_size, 3, device=device, dtype=dtype)
+            translation_norm = torch.zeros(batch_size, device=device, dtype=dtype)
+        eps = torch.sqrt(angle.pow(2) + translation_norm.pow(2)).clamp_min(1e-6)
+        return TransformSample(
+            {"rotation": rotation, "translation": translation, "angle": angle},
+            eps,
+            self.name,
+        )
+
+    def apply_input(self, a: torch.Tensor, sample: TransformSample) -> torch.Tensor:
+        end = self.coord_start + 3
+        if a.ndim != 3 or a.shape[-1] < end:
+            raise ValueError(
+                "MolecularRigidMotion expects inputs [batch, atoms, channels] "
+                f"with coordinate channels through {end}, got {tuple(a.shape)}"
+            )
+        y = a.clone()
+        coords = y[..., self.coord_start : end]
+        rotation = sample.params["rotation"].to(device=a.device, dtype=a.dtype)
+        translation = sample.params["translation"].to(device=a.device, dtype=a.dtype)
+        y[..., self.coord_start : end] = torch.bmm(coords, rotation.transpose(1, 2)) + translation[:, None, :]
+        return y
+
+    def apply_output(self, u: torch.Tensor, sample: TransformSample) -> torch.Tensor:
+        end = self.force_start + 3
+        if u.ndim != 3 or u.shape[-1] < end:
+            raise ValueError(
+                "MolecularRigidMotion expects outputs [batch, atoms, channels] "
+                f"with force channels through {end}, got {tuple(u.shape)}"
+            )
+        y = u.clone()
+        forces = y[..., self.force_start : end]
+        rotation = sample.params["rotation"].to(device=u.device, dtype=u.dtype)
+        y[..., self.force_start : end] = torch.bmm(forces, rotation.transpose(1, 2))
+        return y
+
+
 class D4Scalar2D(BaseTransform):
     """Discrete dihedral transforms on a square for scalar 2D fields.
 

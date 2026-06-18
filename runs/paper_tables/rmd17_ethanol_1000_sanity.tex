@@ -1,0 +1,16 @@
+\begin{table*}[t]
+\centering
+\small
+\caption{rMD17 ethanol 1000-label sanity check. Entries are mean plus/minus sample standard deviation over matched seeds.}
+\label{tab:new-rmd17-ethanol-1000}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{lrrrrrr}
+\toprule
+Method & Force MAE & OOD force MAE & Eq. defect & ID $L^2$ & OOD $L^2$ & Seeds \\
+\midrule
+MLP + aug. & \(18.4899\pm0.0401\) & \(18.6387\pm0.0463\) & \(0.4556\pm0.0074\) & \(0.9199\pm0.0022\) & \(0.9239\pm0.0026\) & 3 \\
+MLP + aug. + LOCO & \(18.4143\pm0.0140\) & \(18.4801\pm0.0085\) & \(0.0983\pm0.0032\) & \(0.9159\pm0.0006\) & \(0.9165\pm0.0006\) & 3 \\
+\bottomrule
+\end{tabular}
+}
+\end{table*}

@@ -1,0 +1,12 @@
+experiments:
+  # Matched 2%-label PACE-style comparison. This trains the observed-frame
+  # Galilean canonicalization wrapper with the same FNO2d backbone size as the
+  # headline runs. It changes the inference map by adding pre/postprocessing, so
+  # report its latency separately from unchanged-FNO LOCO rows.
+  - config: configs/baselines/2d_navier_stokes_galilean_observable_canonical.yaml
+    seeds: [23, 31, 47, 59, 71]
+    overrides:
+      training.data_fraction: 0.02
+      training.steps_per_epoch: 4
+      runtime.overwrite: false
+      runtime.run_dir: runs/ablations/2d_galilean_n64_pace_style_comparison/fraction_0.02/observable_canonical_steps_4

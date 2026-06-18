@@ -14,7 +14,7 @@ experiments:
       runtime.run_dir: runs/ablations/2d_galilean_n64_2pct_lambda_high_probe/fraction_0.02/aug_orbit_lambda_0.2_steps_4
 
   - config: configs/pilot/2d_navier_stokes_galilean.yaml
-    seeds: [23, 31, 47]
+    seeds: [23, 31, 47, 59, 71]
     overrides:
       training.method: aug_orbit
       training.data_fraction: 0.02

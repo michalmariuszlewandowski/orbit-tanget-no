@@ -37,6 +37,10 @@ def _fmt_pm(mean: float, std: float) -> str:
     return rf"\({_fmt(mean)}\pm{_fmt(std)}\)"
 
 
+def _tex_text(value: object) -> str:
+    return str(value).replace("%", r"\%")
+
+
 def _paired_rows(
     path: Path,
     *,
@@ -45,26 +49,80 @@ def _paired_rows(
     candidate: str,
 ) -> list[dict[str, object]]:
     df = pd.read_csv(path)
+    return _paired_rows_from_frames(
+        df[df["method"] == reference],
+        df[df["method"] == candidate],
+        setting=setting,
+        reference_label=reference,
+        candidate_label=candidate,
+    )
+
+
+def _apply_filters(df: pd.DataFrame, filters: dict[str, object]) -> pd.DataFrame:
+    out = df.copy()
+    for col, value in filters.items():
+        if col not in out.columns:
+            raise SystemExit(f"Missing filter column {col!r}")
+        if isinstance(value, float):
+            values = pd.to_numeric(out[col], errors="coerce")
+            out = out[(values - value).abs() < 1e-9]
+        else:
+            out = out[out[col] == value]
+    return out
+
+
+def _paired_rows_from_tables(
+    reference_path: Path,
+    candidate_path: Path,
+    *,
+    setting: str,
+    reference_label: str,
+    candidate_label: str,
+    reference_filters: dict[str, object],
+    candidate_filters: dict[str, object],
+) -> list[dict[str, object]]:
+    reference_df = _apply_filters(pd.read_csv(reference_path), reference_filters)
+    candidate_df = _apply_filters(pd.read_csv(candidate_path), candidate_filters)
+    return _paired_rows_from_frames(
+        reference_df,
+        candidate_df,
+        setting=setting,
+        reference_label=reference_label,
+        candidate_label=candidate_label,
+    )
+
+
+def _paired_rows_from_frames(
+    reference_df: pd.DataFrame,
+    candidate_df: pd.DataFrame,
+    *,
+    setting: str,
+    reference_label: str,
+    candidate_label: str,
+) -> list[dict[str, object]]:
     rows: list[dict[str, object]] = []
     for metric, label in METRICS:
-        pivot = df.pivot_table(index="seed", columns="method", values=metric, aggfunc="first")
-        pivot = pivot[[reference, candidate]].dropna()
-        diff = pivot[candidate] - pivot[reference]
+        reference = reference_df[["seed", metric]].dropna().rename(columns={metric: "reference"})
+        candidate = candidate_df[["seed", metric]].dropna().rename(columns={metric: "candidate"})
+        pivot = reference.merge(candidate, on="seed", how="inner").sort_values("seed")
+        if pivot.empty:
+            raise SystemExit(f"No paired seeds found for {setting} / {metric}")
+        diff = pivot["candidate"] - pivot["reference"]
         n = int(diff.shape[0])
         mean = float(diff.mean())
         std = float(diff.std(ddof=1)) if n > 1 else 0.0
         sem = std / (n**0.5) if n > 0 else 0.0
         tcrit = T_CRIT_95.get(n - 1, 1.96)
         half_width = tcrit * sem
-        ref_mean = float(pivot[reference].mean())
-        cand_mean = float(pivot[candidate].mean())
+        ref_mean = float(pivot["reference"].mean())
+        cand_mean = float(pivot["candidate"].mean())
         reduction = 100.0 * (ref_mean - cand_mean) / ref_mean
         rows.append(
             {
                 "setting": setting,
                 "metric": label,
-                "reference_method": reference,
-                "candidate_method": candidate,
+                "reference_method": reference_label,
+                "candidate_method": candidate_label,
                 "seed_count": n,
                 "reference_mean": ref_mean,
                 "candidate_mean": cand_mean,
@@ -85,6 +143,17 @@ def write_paired_table(out_prefix: Path, table_dir: Path) -> pd.DataFrame:
             setting="N64 Galilean 2% labels",
             reference="aug",
             candidate="aug_orbit",
+        )
+    )
+    rows.extend(
+        _paired_rows_from_tables(
+            table_dir / "2d_galilean_n64_label_efficiency_lambda_0p1.runs.csv",
+            table_dir / "2d_galilean_n64_2pct_lambda_extended.runs.csv",
+            setting="N64 Galilean 2% labels, lambda=0.30",
+            reference_label="aug",
+            candidate_label="aug_orbit_lambda_0.30",
+            reference_filters={"method": "aug", "data_fraction": 0.02},
+            candidate_filters={"method": "aug_orbit", "lambda_orbit": 0.30},
         )
     )
     rows.extend(
@@ -120,8 +189,9 @@ def write_paired_table(out_prefix: Path, table_dir: Path) -> pd.DataFrame:
             "\\midrule\n"
         )
         for row in rows:
+            setting = _tex_text(row["setting"])
             f.write(
-                f"{row['setting']} & {row['metric']} & {row['seed_count']} & "
+                f"{setting} & {row['metric']} & {row['seed_count']} & "
                 f"\\({_fmt(row['reference_mean'])}\\) & \\({_fmt(row['candidate_mean'])}\\) & "
                 f"\\({_fmt(row['paired_delta_mean'])}\\,[{_fmt(row['paired_delta_ci95_low'])},"
                 f"{_fmt(row['paired_delta_ci95_high'])}]\\) \\\\\n"

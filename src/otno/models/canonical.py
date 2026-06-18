@@ -6,14 +6,19 @@ from dataclasses import dataclass
 import torch
 from torch import nn
 
-from otno.models.fno import FNO1d
-from otno.symmetry.transforms import periodic_shift_1d
+from otno.models.fno import FNO1d, FNO2d
+from otno.symmetry.transforms import periodic_shift_1d, periodic_shift_2d
 
 
 @dataclass
 class CanonicalState1D:
     translation_shift: torch.Tensor | None = None
     galilean_mean: torch.Tensor | None = None
+
+
+@dataclass
+class CanonicalState2D:
+    galilean_boost: torch.Tensor | None = None
 
 
 def estimate_first_mode_shift_1d(
@@ -41,6 +46,30 @@ def estimate_first_mode_shift_1d(
     amplitude = coeff.abs()
     # Near-zero modes produce unstable phases. Fall back to zero shift for those cases.
     return torch.where(amplitude > eps, shift, torch.zeros_like(shift))
+
+
+def observed_galilean_boost_2d(
+    x: torch.Tensor,
+    *,
+    boost_x_channel: int = 1,
+    boost_y_channel: int = 2,
+    reduction: str = "mean",
+) -> torch.Tensor:
+    """Read a constant Galilean frame coordinate from 2D boost channels."""
+    if x.ndim != 4:
+        raise ValueError(f"Expected [batch, h, w, channels], got {tuple(x.shape)}")
+    channels = max(boost_x_channel, boost_y_channel) + 1
+    if x.shape[-1] < channels:
+        raise ValueError(f"Expected at least {channels} channels, got {tuple(x.shape)}")
+    if reduction == "corner":
+        boost_x = x[:, 0, 0, boost_x_channel]
+        boost_y = x[:, 0, 0, boost_y_channel]
+    elif reduction == "mean":
+        boost_x = x[..., boost_x_channel].mean(dim=(1, 2))
+        boost_y = x[..., boost_y_channel].mean(dim=(1, 2))
+    else:
+        raise ValueError(f"Unknown boost reduction: {reduction!r}")
+    return torch.stack([boost_x, boost_y], dim=-1)
 
 
 class CanonicalFNO1d(nn.Module):
@@ -114,6 +143,70 @@ class CanonicalFNO1d(nn.Module):
             z = z.clone()
             z[..., self.canonical_channel] = z[..., self.canonical_channel] + mean[:, None]
         return z
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        z, state = self._canonicalize(x)
+        y = self.base(z)
+        return self._decanonicalize(y, state)
+
+
+class ObservableGalileanCanonicalFNO2d(nn.Module):
+    """FNO2d wrapped by observed-frame Galilean canonicalization.
+
+    This is a PACE-style comparison baseline for the boosted vorticity dataset:
+    it reads the constant ambient velocity channels from a single input, sets the
+    input frame to zero, applies a standard FNO2d, then restores the terminal
+    frame by the analytically induced shift ``boost * final_time``.
+    """
+
+    def __init__(
+        self,
+        *,
+        in_channels: int = 3,
+        out_channels: int = 1,
+        width: int = 64,
+        modes1: int = 12,
+        modes2: int = 12,
+        depth: int = 4,
+        add_grid: bool = True,
+        boost_x_channel: int = 1,
+        boost_y_channel: int = 2,
+        length: float = 1.0,
+        final_time: float = 0.5,
+        boost_reduction: str = "mean",
+    ):
+        super().__init__()
+        self.base = FNO2d(
+            in_channels=in_channels,
+            out_channels=out_channels,
+            width=width,
+            modes1=modes1,
+            modes2=modes2,
+            depth=depth,
+            add_grid=add_grid,
+        )
+        self.boost_x_channel = int(boost_x_channel)
+        self.boost_y_channel = int(boost_y_channel)
+        self.length = float(length)
+        self.final_time = float(final_time)
+        self.boost_reduction = str(boost_reduction)
+
+    def _canonicalize(self, x: torch.Tensor) -> tuple[torch.Tensor, CanonicalState2D]:
+        boost = observed_galilean_boost_2d(
+            x,
+            boost_x_channel=self.boost_x_channel,
+            boost_y_channel=self.boost_y_channel,
+            reduction=self.boost_reduction,
+        )
+        z = x.clone()
+        z[..., self.boost_x_channel] = 0.0
+        z[..., self.boost_y_channel] = 0.0
+        return z, CanonicalState2D(galilean_boost=boost)
+
+    def _decanonicalize(self, y: torch.Tensor, state: CanonicalState2D) -> torch.Tensor:
+        if state.galilean_boost is None:
+            return y
+        return periodic_shift_2d(y, state.galilean_boost * self.final_time, length=self.length)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         z, state = self._canonicalize(x)

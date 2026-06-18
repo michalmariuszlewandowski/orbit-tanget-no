@@ -6,6 +6,7 @@ from otno.symmetry.transforms import (
     Burgers1DGalilean,
     D4Pseudoscalar2D,
     D4Scalar2D,
+    MolecularRigidMotion,
     NavierStokes2DGalilean,
     Translation1D,
     TransformSample,
@@ -63,6 +64,26 @@ def test_navier_stokes_2d_galilean_boost_channels_and_output_shape():
     assert torch.allclose(y_in[:, :, :, 0], x[:, :, :, 0])
     assert torch.allclose(y_in[0, :, :, 1], torch.full((8, 8), 0.1))
     assert torch.allclose(y_in[0, :, :, 2], torch.full((8, 8), -0.2))
+
+
+def test_molecular_rigid_motion_rotates_coords_and_forces_but_not_species():
+    transform = MolecularRigidMotion(max_angle=0.1, max_translation=0.1)
+    x = torch.tensor([[[1.0, 0.0, 0.0, 0.6], [0.0, 1.0, 0.0, 0.1]]])
+    forces = torch.tensor([[[2.0, 0.0, 0.0], [0.0, 3.0, 0.0]]])
+    rotation = torch.tensor([[[0.0, -1.0, 0.0], [1.0, 0.0, 0.0], [0.0, 0.0, 1.0]]])
+    translation = torch.tensor([[1.0, 2.0, 3.0]])
+    sample = TransformSample(
+        params={"rotation": rotation, "translation": translation},
+        epsilon=torch.ones(1),
+        name="molecular_rigid_motion",
+    )
+    y = transform.apply_input(x, sample)
+    f = transform.apply_output(forces, sample)
+    assert torch.allclose(y[..., 3], x[..., 3])
+    assert torch.allclose(y[0, 0, :3], torch.tensor([1.0, 3.0, 3.0]))
+    assert torch.allclose(y[0, 1, :3], torch.tensor([0.0, 2.0, 3.0]))
+    assert torch.allclose(f[0, 0], torch.tensor([0.0, 2.0, 0.0]))
+    assert torch.allclose(f[0, 1], torch.tensor([-3.0, 0.0, 0.0]))
 
 
 def test_d4_scalar2d_shape_and_manual_sample():

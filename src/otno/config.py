@@ -11,6 +11,10 @@ _ALLOWED_DATASETS = {
     "1d_advection",
     "burgers1d",
     "1d_burgers",
+    "rmd17",
+    "rmd17_force",
+    "rmd17_forces",
+    "md17_revised",
     "navier_stokes_vorticity2d",
     "navier_stokes_vorticity2d_boosted",
     "boosted_navier_stokes_vorticity2d",
@@ -30,6 +34,14 @@ _ALLOWED_MODELS = {
     "phase_canonical_fno1d",
     "galilean_canonical_fno1d",
     "burgers_galilean_canonical_fno1d",
+    "canonical_fno2d",
+    "canonical_fno_2d",
+    "observable_galilean_canonical_fno2d",
+    "galilean_canonical_fno2d",
+    "pace_style_fno2d",
+    "molecule_mlp",
+    "molecular_mlp",
+    "fixed_molecule_mlp",
 }
 _ALLOWED_METHODS = {
     "baseline",
@@ -63,6 +75,10 @@ _ALLOWED_TRANSFORMS = {
     "d4",
     "d4_pseudoscalar2d",
     "d4_vorticity2d",
+    "molecular_rigid_motion",
+    "molecule_rigid_motion",
+    "se3_molecular",
+    "rmd17_rigid_motion",
 }
 
 
@@ -212,7 +228,21 @@ def validate_config(config: dict[str, Any], *, require_dataset: bool = True) -> 
     name = str(model.get("name", "fno1d")).lower()
     if name not in _ALLOWED_MODELS:
         raise ValueError(f"Unknown model.name={name!r}")
-    for key in ("in_channels", "out_channels", "width", "depth", "modes", "modes1", "modes2", "translation_mode"):
+    for key in (
+        "in_channels",
+        "out_channels",
+        "width",
+        "hidden",
+        "depth",
+        "modes",
+        "modes1",
+        "modes2",
+        "translation_mode",
+        "boost_x_channel",
+        "boost_y_channel",
+        "n_atoms",
+        "atoms",
+    ):
         _check_positive_int(model, "model", key)
 
     training = config.get("training", {})
@@ -276,7 +306,7 @@ def validate_config(config: dict[str, Any], *, require_dataset: bool = True) -> 
             tname = str(transform.get("name", "translation1d")).lower()
             if tname not in _ALLOWED_TRANSFORMS:
                 raise ValueError(f"Unknown symmetry transform={tname!r}")
-            for key in ("max_shift", "max_boost", "length"):
+            for key in ("max_shift", "max_boost", "length", "max_angle", "max_translation"):
                 _check_positive_float(transform, "symmetry", key)
             for key in ("final_time",):
                 _check_nonnegative_float(transform, "symmetry", key)

@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-from .canonical import CanonicalFNO1d
+from .canonical import CanonicalFNO1d, ObservableGalileanCanonicalFNO2d
 from .fno import FNO1d, FNO2d
+from .molecular import MoleculeMLP
 
 
 def _canonicalizers(value) -> list[str]:
@@ -38,6 +39,27 @@ def build_model(config: dict):
             length=float(model_cfg.get("length", 1.0)),
             final_time=float(model_cfg.get("final_time", 0.5)),
         )
+    if name in {
+        "canonical_fno2d",
+        "canonical_fno_2d",
+        "observable_galilean_canonical_fno2d",
+        "galilean_canonical_fno2d",
+        "pace_style_fno2d",
+    }:
+        return ObservableGalileanCanonicalFNO2d(
+            in_channels=int(model_cfg.get("in_channels", 3)),
+            out_channels=int(model_cfg.get("out_channels", 1)),
+            width=int(model_cfg.get("width", 64)),
+            modes1=int(model_cfg.get("modes1", model_cfg.get("modes", 12))),
+            modes2=int(model_cfg.get("modes2", model_cfg.get("modes", 12))),
+            depth=int(model_cfg.get("depth", 4)),
+            add_grid=bool(model_cfg.get("add_grid", True)),
+            boost_x_channel=int(model_cfg.get("boost_x_channel", 1)),
+            boost_y_channel=int(model_cfg.get("boost_y_channel", 2)),
+            length=float(model_cfg.get("length", 1.0)),
+            final_time=float(model_cfg.get("final_time", 0.5)),
+            boost_reduction=str(model_cfg.get("boost_reduction", "mean")),
+        )
     if name in {"fno2d", "fno_2d"}:
         return FNO2d(
             in_channels=int(model_cfg.get("in_channels", 1)),
@@ -48,7 +70,22 @@ def build_model(config: dict):
             depth=int(model_cfg.get("depth", 4)),
             add_grid=bool(model_cfg.get("add_grid", True)),
         )
+    if name in {"molecule_mlp", "molecular_mlp", "fixed_molecule_mlp"}:
+        return MoleculeMLP(
+            n_atoms=int(model_cfg.get("n_atoms", model_cfg.get("atoms", 1))),
+            in_channels=int(model_cfg.get("in_channels", 4)),
+            out_channels=int(model_cfg.get("out_channels", 3)),
+            hidden=int(model_cfg.get("hidden", model_cfg.get("width", 128))),
+            depth=int(model_cfg.get("depth", 4)),
+        )
     raise ValueError(f"Unknown model name: {name}")
 
 
-__all__ = ["FNO1d", "FNO2d", "CanonicalFNO1d", "build_model"]
+__all__ = [
+    "FNO1d",
+    "FNO2d",
+    "CanonicalFNO1d",
+    "ObservableGalileanCanonicalFNO2d",
+    "MoleculeMLP",
+    "build_model",
+]

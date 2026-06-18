@@ -148,6 +148,48 @@ TRAINING_SPECS = {
             "lambda_orbit": 0.10,
         },
     ],
+    "lambda_extended": [
+        {
+            "prefix": "runs/ablations/2d_galilean_n64_2pct_lambda_robustness/"
+            "fraction_0.02/aug_orbit_lambda_0.01_steps_4",
+            "method": "aug_orbit",
+            "data_fraction": 0.02,
+            "steps_per_epoch": 4,
+            "lambda_orbit": 0.01,
+        },
+        {
+            "prefix": "runs/ablations/2d_galilean_n64_paper_ladder/"
+            "fraction_0.02/aug_orbit_lambda_0.05_steps_4",
+            "method": "aug_orbit",
+            "data_fraction": 0.02,
+            "steps_per_epoch": 4,
+            "lambda_orbit": 0.05,
+        },
+        {
+            "prefix": "runs/ablations/2d_galilean_n64_2pct_lambda_robustness/"
+            "fraction_0.02/aug_orbit_lambda_0.1_steps_4",
+            "method": "aug_orbit",
+            "data_fraction": 0.02,
+            "steps_per_epoch": 4,
+            "lambda_orbit": 0.10,
+        },
+        {
+            "prefix": "runs/ablations/2d_galilean_n64_2pct_lambda_high_probe/"
+            "fraction_0.02/aug_orbit_lambda_0.2_steps_4",
+            "method": "aug_orbit",
+            "data_fraction": 0.02,
+            "steps_per_epoch": 4,
+            "lambda_orbit": 0.20,
+        },
+        {
+            "prefix": "runs/ablations/2d_galilean_n64_2pct_lambda_high_probe/"
+            "fraction_0.02/aug_orbit_lambda_0.3_steps_4",
+            "method": "aug_orbit",
+            "data_fraction": 0.02,
+            "steps_per_epoch": 4,
+            "lambda_orbit": 0.30,
+        },
+    ],
     "ten_percent_sanity": [
         {
             "prefix": "runs/ablations/2d_galilean_n64_10pct_lambda_0p1/"
@@ -198,6 +240,10 @@ TABLE_OUTPUTS = {
     },
     "lambda_robustness": {
         "out_prefix": "2d_galilean_n64_2pct_lambda_robustness",
+        "group_cols": ["method", "data_fraction", "steps_per_epoch", "lambda_orbit"],
+    },
+    "lambda_extended": {
+        "out_prefix": "2d_galilean_n64_2pct_lambda_extended",
         "group_cols": ["method", "data_fraction", "steps_per_epoch", "lambda_orbit"],
     },
     "ten_percent_sanity": {

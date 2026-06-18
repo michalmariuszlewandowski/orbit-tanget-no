@@ -9,7 +9,7 @@ import torch
 from torch.utils.data import DataLoader
 
 from otno.symmetry.transforms import BaseTransform
-from otno.training.losses import relative_defect_per_sample, relative_l2_per_sample
+from otno.training.losses import mean_absolute_per_sample, relative_defect_per_sample, relative_l2_per_sample
 
 
 def _rng_context(seed: int | None, device: torch.device):
@@ -71,6 +71,9 @@ def evaluate_model(
             u = batch["u"].to(device)
             pred = model(a)
             _add_stats("relative_l2", relative_l2_per_sample(pred, u), sums, sumsqs, counts)
+            _add_stats("mae", mean_absolute_per_sample(pred - u), sums, sumsqs, counts)
+            if u.ndim == 3 and u.shape[-1] == 3:
+                _add_stats("force_mae", mean_absolute_per_sample(pred - u), sums, sumsqs, counts)
             num_samples += a.shape[0]
             num_batches += 1
             if transform is not None and n_orbit_samples > 0:
@@ -82,8 +85,11 @@ def evaluate_model(
                     pred_equiv = transform.apply_output(pred, sample)
                     mask = transform.output_mask(u_t, sample)
                     _add_stats("orbit_ood_relative_l2", relative_l2_per_sample(pred_t, u_t, mask=mask), sums, sumsqs, counts)
+                    _add_stats("orbit_ood_mae", mean_absolute_per_sample(pred_t - u_t, mask=mask), sums, sumsqs, counts)
                     _add_stats("oracle_canonical_ood_relative_l2", relative_l2_per_sample(pred_equiv, u_t, mask=mask), sums, sumsqs, counts)
                     _add_stats("equivariance_defect_relative", relative_defect_per_sample(pred_t, pred_equiv, mask=mask), sums, sumsqs, counts)
+                    if u_t.ndim == 3 and u_t.shape[-1] == 3:
+                        _add_stats("orbit_ood_force_mae", mean_absolute_per_sample(pred_t - u_t, mask=mask), sums, sumsqs, counts)
                     _add_stats("epsilon", sample.epsilon, sums, sumsqs, counts)
     elapsed = time.perf_counter() - start
     metrics = _finalize(sums, sumsqs, counts)

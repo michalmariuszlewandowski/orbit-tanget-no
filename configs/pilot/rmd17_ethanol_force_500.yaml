@@ -1,0 +1,48 @@
+seed: 23
+dataset:
+  kind: rmd17_force
+  path: data/rmd17/rmd17_ethanol_force_500.pt
+  raw_dir: data/rmd17/raw
+  molecule: ethanol
+  download_if_missing: false
+  num_train: 500
+  num_val: 1000
+  num_test: 1000
+  split_seed: 2027
+  center_positions: true
+  charge_scale: 10.0
+model:
+  name: molecule_mlp
+  n_atoms: 9
+  in_channels: 4
+  out_channels: 3
+  hidden: 128
+  depth: 4
+symmetry:
+  name: molecular_rigid_motion
+  max_angle: 1.57079632679
+  max_translation: 1.0
+  coord_start: 0
+  force_start: 0
+training:
+  method: aug_orbit
+  epochs: 150
+  batch_size: 32
+  lr: 0.001
+  weight_decay: 0.0001
+  lambda_aug: 1.0
+  lambda_orbit: 0.01
+  normalize_by_epsilon: false
+  orbit_eta: 0.001
+  eval_every: 25
+  eval_orbit_samples: 4
+  grad_clip: 1.0
+  latency_repeats: 50
+  latency_warmup: 10
+  num_workers: 0
+runtime:
+  deterministic: false
+  device: auto
+  run_dir: runs/appendix/rmd17_ethanol/labels_500/aug_orbit_lambda_0.01
+  overwrite: false
+  resume: false

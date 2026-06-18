@@ -1,8 +1,9 @@
 from pathlib import Path
 
+import numpy as np
 
-from otno.data.generators import generate_dataset_from_config
 from otno.data.datasets import load_tensor_dataset
+from otno.data.generators import generate_dataset_from_config
 
 
 def test_generate_tiny_advection_dataset(tmp_path: Path):
@@ -57,6 +58,42 @@ def test_generate_tiny_boosted_navier_stokes_dataset(tmp_path: Path):
     assert item["a"].shape == (8, 8, 3)
     assert item["u"].shape == (8, 8, 1)
     assert meta["kind"] == "navier_stokes_vorticity2d_boosted"
+
+
+def test_generate_tiny_rmd17_force_dataset(tmp_path: Path):
+    source = tmp_path / "rmd17_ethanol.npz"
+    coords = np.arange(12 * 3 * 3, dtype=np.float32).reshape(12, 3, 3)
+    forces = np.ones_like(coords)
+    charges = np.array([6, 1, 8], dtype=np.int64)
+    np.savez(
+        source,
+        nuclear_charges=charges,
+        coords=coords,
+        forces=forces,
+        energies=np.arange(12, dtype=np.float32),
+        old_indices=np.arange(12, dtype=np.int64),
+    )
+    path = tmp_path / "rmd17_ethanol.pt"
+    cfg = {
+        "dataset": {
+            "kind": "rmd17_force",
+            "path": str(path),
+            "source_path": str(source),
+            "molecule": "ethanol",
+            "num_train": 5,
+            "num_val": 3,
+            "num_test": 2,
+            "split_seed": 123,
+        }
+    }
+    out = generate_dataset_from_config(cfg, path)
+    assert out.exists()
+    ds, meta = load_tensor_dataset(path, "train")
+    item = ds[0]
+    assert item["a"].shape == (3, 4)
+    assert item["u"].shape == (3, 3)
+    assert meta["kind"] == "rmd17_force"
+    assert meta["n_atoms"] == 3
 
 
 def test_existing_dataset_config_mismatch_raises(tmp_path: Path):

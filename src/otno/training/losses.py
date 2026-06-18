@@ -77,6 +77,15 @@ def mean_squared_per_sample(x: torch.Tensor, mask: torch.Tensor | None = None) -
     return flat.pow(2).mean(dim=-1)
 
 
+def mean_absolute_per_sample(x: torch.Tensor, mask: torch.Tensor | None = None) -> torch.Tensor:
+    if mask is not None:
+        m = _broadcast_mask(mask, x)
+        masked = x.abs() * m
+        denom = m.reshape(m.shape[0], -1).sum(dim=-1).clamp_min(1.0)
+        return masked.reshape(masked.shape[0], -1).sum(dim=-1) / denom
+    return _flatten_per_sample(x.abs()).mean(dim=-1)
+
+
 def orbit_consistency_loss(
     model: torch.nn.Module,
     a: torch.Tensor,

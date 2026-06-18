@@ -1,0 +1,199 @@
+\begin{thebibliography}{20}
+\providecommand{\natexlab}[1]{#1}
+\providecommand{\url}[1]{\texttt{#1}}
+\expandafter\ifx\csname urlstyle\endcsname\relax
+  \providecommand{\doi}[1]{doi: #1}\else
+  \providecommand{\doi}{doi: \begingroup \urlstyle{rm}\Url}\fi
+
+\bibitem[Akhound-Sadegh et~al.(2023)Akhound-Sadegh, Perreault-Levasseur,
+  Brandstetter, Welling, and Ravanbakhsh]{akhoundsadegh2023liepinn}
+Tara Akhound-Sadegh, Laurence Perreault-Levasseur, Johannes Brandstetter, Max
+  Welling, and Siamak Ravanbakhsh.
+\newblock Lie point symmetry and physics-informed networks.
+\newblock In \emph{Advances in Neural Information Processing Systems},
+  volume~36, 2023.
+\newblock URL
+  \url{https://proceedings.neurips.cc/paper_files/paper/2023/hash/8493c860bec41705f7743d5764301b94-Abstract-Conference.html}.
+
+\bibitem[Brandstetter et~al.(2022)Brandstetter, Welling, and
+  Worrall]{brandstetter2022lpsda}
+Johannes Brandstetter, Max Welling, and Daniel~E Worrall.
+\newblock Lie point symmetry data augmentation for neural {PDE} solvers.
+\newblock In Kamalika Chaudhuri, Stefanie Jegelka, Le~Song, Csaba Szepesvari,
+  Gang Niu, and Sivan Sabato, editors, \emph{Proceedings of the 39th
+  International Conference on Machine Learning}, volume 162 of
+  \emph{Proceedings of Machine Learning Research}, pages 2241--2256. PMLR,
+  17--23 Jul 2022.
+\newblock URL \url{https://proceedings.mlr.press/v162/brandstetter22a.html}.
+
+\bibitem[Chen et~al.(2024)Chen, Liu, Meng, Chen, Liu, and Li]{chen2024norm}
+Gengxiang Chen, Xu~Liu, Qinglu Meng, Lu~Chen, Changqing Liu, and Yingguang Li.
+\newblock Learning neural operators on riemannian manifolds.
+\newblock \emph{National Science Open}, 3:\penalty0 20240001, 2024.
+\newblock \doi{10.1360/nso/20240001}.
+\newblock URL \url{https://doi.org/10.1360/nso/20240001}.
+
+\bibitem[Cohen and Welling(2016)]{cohen2016gcnn}
+Taco Cohen and Max Welling.
+\newblock Group equivariant convolutional networks.
+\newblock In Maria~Florina Balcan and Kilian~Q. Weinberger, editors,
+  \emph{Proceedings of the 33rd International Conference on Machine Learning},
+  volume~48 of \emph{Proceedings of Machine Learning Research}, pages
+  2990--2999. PMLR, 2016.
+\newblock URL \url{https://proceedings.mlr.press/v48/cohenc16.html}.
+
+\bibitem[Cohen et~al.(2019)Cohen, Weiler, Kicanaoglu, and
+  Welling]{cohen2019gauge}
+Taco Cohen, Maurice Weiler, Berkay Kicanaoglu, and Max Welling.
+\newblock Gauge equivariant convolutional networks and the icosahedral {CNN}.
+\newblock In Kamalika Chaudhuri and Ruslan Salakhutdinov, editors,
+  \emph{Proceedings of the 36th International Conference on Machine Learning},
+  volume~97 of \emph{Proceedings of Machine Learning Research}, pages
+  1321--1330. PMLR, 2019.
+\newblock URL \url{https://proceedings.mlr.press/v97/cohen19d.html}.
+
+\bibitem[Helwig et~al.(2023)Helwig, Zhang, Fu, Kurtin, Wojtowytsch, and
+  Ji]{helwig2023gfno}
+Jacob Helwig, Xuan Zhang, Cong Fu, Jerry Kurtin, Stephan Wojtowytsch, and
+  Shuiwang Ji.
+\newblock Group equivariant {F}ourier neural operators for partial differential
+  equations.
+\newblock In Andreas Krause, Emma Brunskill, Kyunghyun Cho, Barbara Engelhardt,
+  Sivan Sabato, and Jonathan Scarlett, editors, \emph{Proceedings of the 40th
+  International Conference on Machine Learning}, volume 202 of
+  \emph{Proceedings of Machine Learning Research}, pages 12907--12930. PMLR,
+  23--29 Jul 2023.
+\newblock URL \url{https://proceedings.mlr.press/v202/helwig23a.html}.
+
+\bibitem[Kovachki et~al.(2023)Kovachki, Li, Liu, Azizzadenesheli, Bhattacharya,
+  Stuart, and Anandkumar]{kovachki2023neuraloperator}
+Nikola Kovachki, Zongyi Li, Burigede Liu, Kamyar Azizzadenesheli, Kaushik
+  Bhattacharya, Andrew Stuart, and Anima Anandkumar.
+\newblock Neural operator: Learning maps between function spaces with
+  applications to pdes.
+\newblock \emph{Journal of Machine Learning Research}, 24\penalty0
+  (89):\penalty0 1--97, 2023.
+\newblock URL \url{https://www.jmlr.org/papers/v24/21-1524.html}.
+
+\bibitem[Lanthaler et~al.(2023)Lanthaler, Molinaro, Hadorn, and
+  Mishra]{lanthaler2023discontinuous}
+Samuel Lanthaler, Roberto Molinaro, Patrik Hadorn, and Siddhartha Mishra.
+\newblock Nonlinear reconstruction for operator learning of pdes with
+  discontinuities.
+\newblock In \emph{International Conference on Learning Representations}, 2023.
+\newblock URL \url{https://openreview.net/forum?id=CrfhZAsJDsZ}.
+
+\bibitem[Li et~al.(2021)Li, Kovachki, Azizzadenesheli, Liu, Bhattacharya,
+  Stuart, and Anandkumar]{li2021fno}
+Zongyi Li, Nikola Kovachki, Kamyar Azizzadenesheli, Burigede Liu, Kaushik
+  Bhattacharya, Andrew Stuart, and Anima Anandkumar.
+\newblock Fourier neural operator for parametric partial differential
+  equations.
+\newblock In \emph{International Conference on Learning Representations}, 2021.
+\newblock URL \url{https://openreview.net/forum?id=c8P9NQVtmnO}.
+
+\bibitem[Li et~al.(2023{\natexlab{a}})Li, Huang, Liu, and
+  Anandkumar]{li2023geofno}
+Zongyi Li, Daniel~Zhengyu Huang, Burigede Liu, and Anima Anandkumar.
+\newblock Fourier neural operator with learned deformations for pdes on general
+  geometries.
+\newblock \emph{Journal of Machine Learning Research}, 24\penalty0
+  (388):\penalty0 1--26, 2023{\natexlab{a}}.
+\newblock URL \url{https://www.jmlr.org/papers/v24/23-0064.html}.
+
+\bibitem[Li et~al.(2023{\natexlab{b}})Li, Kovachki, Choy, Li, Kossaifi, Otta,
+  Nabian, Stadler, Hundt, Azizzadenesheli, and Anandkumar]{li2023gino}
+Zongyi Li, Nikola~Borislavov Kovachki, Chris Choy, Boyi Li, Jean Kossaifi,
+  Shourya Otta, Mohammad~Amin Nabian, Maximilian Stadler, Christian Hundt,
+  Kamyar Azizzadenesheli, and Anima Anandkumar.
+\newblock Geometry-informed neural operator for large-scale 3d pdes.
+\newblock In \emph{Advances in Neural Information Processing Systems},
+  volume~36, 2023{\natexlab{b}}.
+\newblock URL
+  \url{https://proceedings.neurips.cc/paper_files/paper/2023/hash/70518ea42831f02afc3a2828993935ad-Abstract-Conference.html}.
+
+\bibitem[Li et~al.(2024)Li, Zheng, Kovachki, Jin, Chen, Liu, Stuart,
+  Azizzadenesheli, and Anandkumar]{li2024pino}
+Zongyi Li, Hongkai Zheng, Nikola~Borislavov Kovachki, David Jin, Haoxuan Chen,
+  Burigede Liu, Andrew Stuart, Kamyar Azizzadenesheli, and Anima Anandkumar.
+\newblock Physics-informed neural operator for learning partial differential
+  equations.
+\newblock \emph{ACM/IMS Journal of Data Science}, 1\penalty0 (3):\penalty0
+  1--27, 2024.
+\newblock \doi{10.1145/3648506}.
+\newblock URL \url{https://doi.org/10.1145/3648506}.
+
+\bibitem[Lu et~al.(2021)Lu, Jin, Pang, Zhang, and Karniadakis]{lu2021deeponet}
+Lu~Lu, Pengzhan Jin, Guofei Pang, Zhongqiang Zhang, and George~Em Karniadakis.
+\newblock Learning nonlinear operators via {DeepONet} based on the universal
+  approximation theorem of operators.
+\newblock \emph{Nature Machine Intelligence}, 3\penalty0 (3):\penalty0
+  218--229, 2021.
+\newblock \doi{10.1038/s42256-021-00302-5}.
+\newblock URL \url{https://doi.org/10.1038/s42256-021-00302-5}.
+
+\bibitem[Ohana et~al.(2024)Ohana, McCabe, Meyer, Morel, Agocs, Beneitez,
+  Berger, Burkhart, Dalziel, Fielding, Fortunato, Goldberg, Hirashima, Jiang,
+  Kerswell, Maddu, Miller, Mukhopadhyay, Nixon, Shen, et~al.]{ohana2024well}
+Ruben Ohana, Michael McCabe, Lucas~Thibaut Meyer, Rudy Morel, Fruzsina~Julia
+  Agocs, Miguel Beneitez, Marsha Berger, Blakesley Burkhart, Stuart~B. Dalziel,
+  Drummond~Buschman Fielding, Daniel Fortunato, Jared~A. Goldberg, Keiya
+  Hirashima, Yan-Fei Jiang, Rich Kerswell, Suryanarayana Maddu, Jonah~M.
+  Miller, Payel Mukhopadhyay, Stefan~S. Nixon, Jeff Shen, et~al.
+\newblock The well: A large-scale collection of diverse physics simulations for
+  machine learning.
+\newblock In \emph{Advances in Neural Information Processing Systems, Datasets
+  and Benchmarks Track}, 2024.
+\newblock URL \url{https://openreview.net/forum?id=00Sx577BT3}.
+
+\bibitem[Shumaylov et~al.(2025)Shumaylov, Zaika, Rowbottom, Sherry, Weber, and
+  Sch{\"o}nlieb]{shumaylov2025lielac}
+Zakhar Shumaylov, Peter Zaika, James Rowbottom, Ferdia Sherry, Melanie Weber,
+  and Carola-Bibiane Sch{\"o}nlieb.
+\newblock Lie algebra canonicalization: Equivariant neural operators under
+  arbitrary lie groups.
+\newblock In \emph{International Conference on Learning Representations}, 2025.
+\newblock URL \url{https://openreview.net/forum?id=7PLpiVdnUC}.
+
+\bibitem[Simard et~al.(1991)Simard, Victorri, LeCun, and
+  Denker]{simard1991tangentprop}
+Patrice Simard, Bernard Victorri, Yann LeCun, and John Denker.
+\newblock Tangent prop: A formalism for specifying selected invariances in an
+  adaptive network.
+\newblock In \emph{Advances in Neural Information Processing Systems},
+  volume~4, 1991.
+\newblock URL
+  \url{https://proceedings.neurips.cc/paper/1991/hash/65658fde58ab3c2b6e5132a39fae7cb9-Abstract.html}.
+
+\bibitem[Takamoto et~al.(2022)Takamoto, Praditia, Leiteritz, MacKinlay,
+  Alesiani, Pfl{\"u}ger, and Niepert]{takamoto2022pdebench}
+Makoto Takamoto, Timothy Praditia, Raphael Leiteritz, Daniel MacKinlay,
+  Francesco Alesiani, Dirk Pfl{\"u}ger, and Mathias Niepert.
+\newblock {PDEBench}: An extensive benchmark for scientific machine learning.
+\newblock In \emph{Advances in Neural Information Processing Systems},
+  volume~35, 2022.
+\newblock URL
+  \url{https://proceedings.neurips.cc/paper_files/paper/2022/hash/0a9747136d411fb83f0cf81820d44afb-Abstract-Datasets_and_Benchmarks.html}.
+
+\bibitem[Wang et~al.(2025)Wang, Shumaylov, Zaika, Sherry, and
+  Sch{\"o}nlieb]{wang2025generalizedliepino}
+Amy~Xiang Wang, Zakhar Shumaylov, Peter Zaika, Ferdia Sherry, and
+  Carola-Bibiane Sch{\"o}nlieb.
+\newblock Generalized lie symmetries in physics-informed neural operators,
+  2025.
+\newblock URL \url{https://arxiv.org/abs/2502.00373}.
+
+\bibitem[Weiler and Cesa(2019)]{weiler2019e2cnn}
+Maurice Weiler and Gabriele Cesa.
+\newblock General {$E(2)$}-equivariant steerable {CNNs}.
+\newblock In \emph{Advances in Neural Information Processing Systems},
+  volume~32, 2019.
+\newblock URL \url{https://arxiv.org/abs/1911.08251}.
+
+\bibitem[Xu et~al.(2026)Xu, Mou, Zhang, and He]{xu2026pacefno}
+Jiaxiao Xu, Changhong Mou, Yeyu Zhang, and Fengxiang He.
+\newblock Physics-aligned canonical equivariant fourier neural operator under
+  symmetry-induced shifts, 2026.
+\newblock URL \url{https://arxiv.org/abs/2605.18606}.
+
+\end{thebibliography}

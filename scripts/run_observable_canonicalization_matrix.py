@@ -22,10 +22,12 @@ import yaml
 from torch.utils.data import DataLoader
 
 from otno.data.datasets import load_tensor_dataset
-from otno.models import build_model
+from otno.models import ObservableGalileanCanonicalFNO2d, build_model
+from otno.models.canonical import observed_galilean_boost_2d
 from otno.symmetry.registry import build_transform
 from otno.symmetry.transforms import NavierStokes2DGalilean, TransformSample
 from otno.training.losses import relative_defect_per_sample, relative_l2_per_sample
+from otno.training.metrics import measure_inference_latency
 from otno.utils import dump_json, get_device
 from run_ood_severity_matrix import _format_value, _jobs, _symmetry_value
 
@@ -57,12 +59,10 @@ def _finalize(sums: dict[str, float], sumsqs: dict[str, float], counts: dict[str
 
 
 def _observed_boost_sample(a: torch.Tensor, transform: NavierStokes2DGalilean) -> TransformSample:
-    boost = torch.stack(
-        [
-            a[:, 0, 0, transform.boost_x_channel],
-            a[:, 0, 0, transform.boost_y_channel],
-        ],
-        dim=-1,
+    boost = observed_galilean_boost_2d(
+        a,
+        boost_x_channel=transform.boost_x_channel,
+        boost_y_channel=transform.boost_y_channel,
     )
     eps = torch.linalg.norm(boost, dim=-1).clamp_min(1e-6)
     return TransformSample({"boost": boost}, eps, transform.name)
@@ -73,6 +73,29 @@ def _canonicalize_input(a: torch.Tensor, transform: NavierStokes2DGalilean) -> t
     z[..., transform.boost_x_channel] = 0.0
     z[..., transform.boost_y_channel] = 0.0
     return z
+
+
+def _observable_wrapper(
+    model: torch.nn.Module,
+    cfg: dict[str, Any],
+    transform: NavierStokes2DGalilean,
+) -> ObservableGalileanCanonicalFNO2d:
+    model_cfg = cfg.get("model", {})
+    wrapper = ObservableGalileanCanonicalFNO2d(
+        in_channels=int(model_cfg.get("in_channels", 3)),
+        out_channels=int(model_cfg.get("out_channels", 1)),
+        width=int(model_cfg.get("width", 64)),
+        modes1=int(model_cfg.get("modes1", model_cfg.get("modes", 12))),
+        modes2=int(model_cfg.get("modes2", model_cfg.get("modes", 12))),
+        depth=int(model_cfg.get("depth", 4)),
+        add_grid=bool(model_cfg.get("add_grid", True)),
+        boost_x_channel=transform.boost_x_channel,
+        boost_y_channel=transform.boost_y_channel,
+        length=transform.length,
+        final_time=transform.final_time,
+    )
+    wrapper.base = model
+    return wrapper
 
 
 @torch.no_grad()
@@ -162,6 +185,9 @@ def _aggregate(rows: list[dict[str, Any]]) -> pd.DataFrame:
         "observable_canonical_relative_l2",
         "epsilon_mean",
         "total_boost_norm_mean",
+        "direct_latency_ms_per_sample",
+        "observable_canonical_latency_ms_per_sample",
+        "observable_canonical_latency_overhead_pct",
     ]
     existing_values = [col for col in value_cols if col in df.columns]
     aggregate = (
@@ -232,6 +258,41 @@ def main() -> None:
                 n_orbit_samples=int(job.get("orbit_samples", 4)),
                 seed=int(job.get("eval_seed", int(job.get("seed", 0)) + 700_000)),
             )
+            first_batch = next(iter(loader))["a"].to(device)
+            training_cfg = cfg.get("training", {})
+            latency_repeats = int(job.get("latency_repeats", training_cfg.get("latency_repeats", 20)))
+            latency_warmup = int(job.get("latency_warmup", training_cfg.get("latency_warmup", 5)))
+            direct_latency = measure_inference_latency(
+                model,
+                first_batch,
+                repeats=latency_repeats,
+                warmup=latency_warmup,
+            )
+            canonical_latency = measure_inference_latency(
+                _observable_wrapper(model, cfg, transform),
+                first_batch,
+                repeats=latency_repeats,
+                warmup=latency_warmup,
+            )
+            metrics.update(
+                {
+                    f"direct_{key}": value
+                    for key, value in direct_latency.items()
+                    if key.startswith("latency_")
+                }
+            )
+            metrics.update(
+                {
+                    f"observable_canonical_{key}": value
+                    for key, value in canonical_latency.items()
+                    if key.startswith("latency_")
+                }
+            )
+            direct_ms = metrics["direct_latency_ms_per_sample"]
+            canonical_ms = metrics["observable_canonical_latency_ms_per_sample"]
+            metrics["observable_canonical_latency_overhead_pct"] = 100.0 * (
+                canonical_ms - direct_ms
+            ) / max(direct_ms, 1e-12)
             dump_json(metrics, out_path)
         row = {
             "checkpoint": str(checkpoint.relative_to(ROOT)),

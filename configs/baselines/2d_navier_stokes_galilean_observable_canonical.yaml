@@ -1,0 +1,64 @@
+# PACE-style observed Galilean canonicalization baseline for the N64 boosted
+# 2D Navier--Stokes setting. The model reads the explicit ambient-velocity
+# channels, predicts in the zero-boost frame, and restores the output shift.
+seed: 31
+
+dataset:
+  kind: navier_stokes_vorticity2d_boosted
+  path: data/2d_ns_vorticity_galilean_n64.pt
+  generate_if_missing: true
+  n: 64
+  num_train: 1024
+  num_val: 128
+  num_test: 256
+  final_time: 0.5
+  dt: 0.001
+  viscosity: 0.001
+  smoothness: 8.0
+  amplitude: 1.0
+  max_boost: 0.5
+  solver_batch_size: 8
+  dealias: true
+  seed: 31
+
+model:
+  name: observable_galilean_canonical_fno2d
+  in_channels: 3
+  out_channels: 1
+  width: 48
+  modes1: 12
+  modes2: 12
+  depth: 4
+  add_grid: false
+  boost_x_channel: 1
+  boost_y_channel: 2
+  boost_reduction: mean
+  final_time: 0.5
+  length: 1.0
+
+symmetry:
+  name: navier_stokes2d_galilean
+  max_boost: 0.25
+  final_time: 0.5
+  length: 1.0
+  boost_x_channel: 1
+  boost_y_channel: 2
+
+training:
+  method: baseline
+  epochs: 150
+  batch_size: 16
+  lr: 0.001
+  weight_decay: 0.0001
+  eval_every: 10
+  eval_orbit_samples: 4
+  data_fraction: 1.0
+  num_workers: 0
+  grad_clip: 1.0
+  latency_repeats: 20
+  latency_warmup: 5
+
+runtime:
+  deterministic: false
+  device: auto
+  run_dir: runs/baselines/2d_ns_galilean/observable_canonical

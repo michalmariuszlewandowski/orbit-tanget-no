@@ -80,3 +80,12 @@ def test_evaluate_model_seed_is_reproducible():
     b = evaluate_model(model, loader, device=torch.device("cpu"), transform=transform, n_orbit_samples=3, seed=101)
     assert a["epsilon_mean"] == b["epsilon_mean"]
     assert a["oracle_canonical_ood_relative_l2"] == b["oracle_canonical_ood_relative_l2"]
+
+
+def test_evaluate_model_reports_force_mae_for_molecular_outputs():
+    dataset = TensorDictDataset(torch.randn(6, 4, 3), torch.randn(6, 4, 3))
+    loader = DataLoader(dataset, batch_size=3)
+    model = ZeroModel()
+    metrics = evaluate_model(model, loader, device=torch.device("cpu"), transform=None)
+    assert "mae" in metrics
+    assert "force_mae" in metrics
