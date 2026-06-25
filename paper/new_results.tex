@@ -63,12 +63,12 @@ Labels & OOD reduction & Defect reduction & Seeds \\
 
 The strongest gains remain in the low-label regime, especially at 2\% and 5\%, but the 10\% row shows that the effect does not disappear once the supervised baseline is substantially better. This supports the narrower claim we want for the paper: orbit consistency is a training-time regularizer that improves symmetry robustness and label efficiency, not merely a rescue mechanism for failed baselines.
 
-\paragraph{Extended orbit-weight sweep.} We extended the 2\% N64 Galilean \(\lambda_{\mathrm{orb}}\) sweep beyond the previous largest tested value, \(\lambda_{\mathrm{orb}}=0.10\). A one-seed probe at \(\lambda_{\mathrm{orb}}=0.20\) improved over the seed-23 \(\lambda_{\mathrm{orb}}=0.10\) run, so we expanded \(\lambda_{\mathrm{orb}}=0.30\) to five matched seeds. The higher weight improves all three paper-facing error metrics relative to the completed \(\lambda_{\mathrm{orb}}=0.10\) row, although the added seeds widen the across-seed spread and the one-seed \(\lambda_{\mathrm{orb}}=0.20\) probe remains numerically lower on ID and orbit OOD error. Relative to the same five FNO+aug. seeds, the paired \(\lambda_{\mathrm{orb}}=0.30\) deltas are \(-0.1860\) for ID \(L^2\), \(-0.1860\) for orbit OOD \(L^2\), and \(-0.1772\) for equivariance defect, with two-sided 95\% \(t\)-intervals reported in Table~\ref{tab:new-paired-comparisons}. We therefore treat \(\lambda_{\mathrm{orb}}=0.30\) as a promising high-weight setting rather than replacing the current headline until it is bracketed by a larger degrading value.
+\paragraph{Extended orbit-weight sweep.} We extended the 2\% N64 Galilean \(\lambda_{\mathrm{orb}}\) sweep beyond the previous largest tested value, \(\lambda_{\mathrm{orb}}=0.10\). After the high-weight probes improved over the seed-23 \(\lambda_{\mathrm{orb}}=0.10\) run, we expanded \(\lambda_{\mathrm{orb}}=0.20\) and \(\lambda_{\mathrm{orb}}=0.30\) to five matched seeds. Both higher weights improve all three paper-facing error metrics relative to the completed \(\lambda_{\mathrm{orb}}=0.10\) row, and \(\lambda_{\mathrm{orb}}=0.30\) is strongest among the tested values. Relative to the same five FNO+aug. seeds, the paired \(\lambda_{\mathrm{orb}}=0.30\) deltas are \(-0.1860\) for ID \(L^2\), \(-0.1860\) for orbit OOD \(L^2\), and \(-0.1772\) for equivariance defect, with two-sided 95\% \(t\)-intervals reported in Table~\ref{tab:new-paired-comparisons}. We therefore treat \(\lambda_{\mathrm{orb}}=0.30\) as a promising high-weight setting rather than replacing the current headline until it is bracketed by a larger degrading value.
 
 \begin{table}[t]
 \centering
 \small
-\caption{Extended \(\lambda_{\mathrm{orb}}\) sweep at 2\% labels on N64 Galilean. Entries are mean \(\pm\) across-seed sample standard deviation, not confidence intervals. Rows with five seeds are completed headline artifacts; high-\(\lambda\) rows are new probes.}
+\caption{Extended \(\lambda_{\mathrm{orb}}\) sweep at 2\% labels on N64 Galilean. Entries are mean \(\pm\) across-seed sample standard deviation, not confidence intervals.}
 \label{tab:new-lambda-extended}
 \begin{tabular}{rrrrr}
 \toprule
@@ -77,8 +77,8 @@ The strongest gains remain in the low-label regime, especially at 2\% and 5\%, b
 0.01 & \(0.5505\pm0.0392\) & \(0.5768\pm0.0378\) & \(0.3955\pm0.0235\) & 3 \\
 0.05 & \(0.4240\pm0.0441\) & \(0.4518\pm0.0397\) & \(0.3161\pm0.0247\) & 5 \\
 0.10 & \(0.3676\pm0.0360\) & \(0.3950\pm0.0334\) & \(0.2677\pm0.0174\) & 5 \\
-0.20 & \(0.3140\) & \(0.3368\) & \(0.2094\) & 1 \\
-0.30 & \(0.3149\pm0.0298\) & \(0.3416\pm0.0289\) & \(\mathbf{0.2044\pm0.0160}\) & 5 \\
+0.20 & \(0.3291\pm0.0318\) & \(0.3564\pm0.0304\) & \(0.2268\pm0.0165\) & 5 \\
+0.30 & \(\mathbf{0.3149\pm0.0298}\) & \(\mathbf{0.3416\pm0.0289}\) & \(\mathbf{0.2044\pm0.0160}\) & 5 \\
 \bottomrule
 \end{tabular}
 \end{table}

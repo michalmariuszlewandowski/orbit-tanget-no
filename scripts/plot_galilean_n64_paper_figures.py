@@ -8,31 +8,37 @@ import matplotlib
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+from matplotlib.transforms import blended_transform_factory
 from matplotlib.ticker import NullLocator
 import pandas as pd
 
 
 METHOD_LABELS = {
-    "aug": "Augmentation, 6 steps",
-    "aug_orbit": "Augmentation + orbit (lambda=0.10), 4 steps",
-    "aug_steps_6": "Augmentation, 6 steps",
+    "aug": "Augmentation",
+    "aug_orbit": "Augmentation + orbit",
+    "aug_steps_6": "Aug, 6 updates/epoch",
     "aug_orbit_steps_4": "Augmentation + orbit (lambda=0.05), 4 steps",
-    "aug_orbit_lambda_0.1_steps_4": "Augmentation + orbit (lambda=0.10), 4 steps",
+    "aug_orbit_lambda_0.1_steps_4": r"Aug + orbit, $\lambda=0.10$, 4 updates/epoch",
     "semi_aug_orbit": "Semi-supervised orbit",
 }
 
 METHOD_STYLES = {
-    "aug": {"color": "#4c78a8", "marker": "o", "offset": 0.94},
-    "aug_orbit": {"color": "#f58518", "marker": "s", "offset": 1.06},
-    "aug_steps_6": {"color": "#4c78a8", "marker": "o", "offset": 0.94},
-    "aug_orbit_steps_4": {"color": "#f58518", "marker": "s", "offset": 1.06},
-    "aug_orbit_lambda_0.1_steps_4": {"color": "#f58518", "marker": "s", "offset": 1.06},
-    "semi_aug_orbit": {"color": "#54a24b", "marker": "^", "offset": 1.00},
+    "aug": {"color": "#4c78a8", "marker": "o", "linestyle": "-", "offset": 0.94},
+    "aug_orbit": {"color": "#f58518", "marker": "s", "linestyle": "--", "offset": 1.06},
+    "aug_steps_6": {"color": "#4c78a8", "marker": "o", "linestyle": "-", "offset": 0.94},
+    "aug_orbit_steps_4": {"color": "#f58518", "marker": "s", "linestyle": "--", "offset": 1.06},
+    "aug_orbit_lambda_0.1_steps_4": {
+        "color": "#f58518",
+        "marker": "s",
+        "linestyle": "--",
+        "offset": 1.06,
+    },
+    "semi_aug_orbit": {"color": "#54a24b", "marker": "^", "linestyle": "-.", "offset": 1.00},
 }
 
 METRIC_LABELS = {
-    "relative_l2": "Relative L2",
-    "orbit_ood_relative_l2": "Orbit OOD relative L2",
+    "relative_l2": r"Relative $L_2$",
+    "orbit_ood_relative_l2": r"Orbit OOD relative $L_2$",
     "equivariance_defect_relative": "Equivariance defect",
 }
 
@@ -54,6 +60,36 @@ def _format_axes(ax: plt.Axes) -> None:
     ax.grid(True, color="#dddddd", linewidth=0.75, alpha=0.85)
     ax.spines["top"].set_visible(False)
     ax.spines["right"].set_visible(False)
+
+
+def _annotate_train_radius(ax: plt.Axes, *, label_training_range: bool = False) -> None:
+    transform = blended_transform_factory(ax.transData, ax.transAxes)
+    xlim = ax.get_xlim()
+    ax.axvspan(0.0, 0.25, color="#ead28c", alpha=0.55, zorder=0)
+    ax.axvline(0.25, color="#4f4f4f", linestyle=":", linewidth=1.6, alpha=0.98)
+    ax.set_xlim(xlim)
+    if label_training_range:
+        ax.text(
+            0.105,
+            0.93,
+            "training range",
+            transform=transform,
+            color="#514936",
+            fontsize=9.5,
+            ha="left",
+            va="top",
+        )
+    ax.text(
+        0.252,
+        0.98,
+        r"$r_{\mathrm{train}}=0.25$",
+        transform=transform,
+        color="#333333",
+        fontsize=12,
+        fontweight="semibold",
+        ha="left",
+        va="top",
+    )
 
 
 def _plot_metric_curve(
@@ -80,7 +116,8 @@ def _plot_metric_curve(
             yerr=err,
             color=style["color"],
             marker=style["marker"],
-            markersize=5.2,
+            linestyle=style["linestyle"],
+            markersize=5.8,
             linewidth=2.0,
             capsize=3.2,
             label=METHOD_LABELS[method],
@@ -91,7 +128,8 @@ def _plot_metric_curve(
             point_x,
             raw_rows[metric].astype(float),
             color=style["color"],
-            s=17,
+            marker=style["marker"],
+            s=22,
             alpha=0.34,
             linewidths=0,
             zorder=2,
@@ -114,7 +152,7 @@ def plot_label_efficiency(runs_csv: Path, out_prefix: Path) -> None:
     fractions = sorted(float(value) for value in df["data_fraction"].unique())
     tick_labels = [f"{100.0 * value:g}%" for value in fractions]
 
-    fig, axes = plt.subplots(1, 2, figsize=(8.0, 3.05), constrained_layout=True)
+    fig, axes = plt.subplots(1, 2, figsize=(8.6, 3.35), constrained_layout=True)
     for ax, metric in zip(axes, metrics):
         _plot_metric_curve(
             ax,
@@ -132,7 +170,7 @@ def plot_label_efficiency(runs_csv: Path, out_prefix: Path) -> None:
     axes[0].set_title("Symmetry-induced OOD error")
     axes[1].set_title("Equivariance defect")
     axes[0].legend(frameon=False, loc="upper right")
-    fig.suptitle("N64 Galilean label efficiency", y=1.04, fontsize=12)
+    fig.suptitle("N64 Galilean label efficiency", y=1.04, fontsize=14)
     out_prefix.parent.mkdir(parents=True, exist_ok=True)
     for suffix in [".png", ".pdf"]:
         fig.savefig(out_prefix.with_suffix(suffix), bbox_inches="tight")
@@ -158,8 +196,22 @@ def plot_ood_severity(runs_csv: Path, out_prefix: Path) -> None:
     df = df.sort_values(["severity_order", "method", "seed"])
     agg = _std_aggregate(df, ["max_boost", "method"], metrics)
 
-    fig, axes = plt.subplots(1, 2, figsize=(8.0, 3.05), constrained_layout=True)
-    for ax, metric in zip(axes, metrics):
+    fig = plt.figure(figsize=(8.8, 4.0), constrained_layout=True)
+    grid = fig.add_gridspec(3, 2, height_ratios=[0.14, 0.16, 1.0])
+    title_ax = fig.add_subplot(grid[0, :])
+    legend_ax = fig.add_subplot(grid[1, :])
+    axes = [fig.add_subplot(grid[2, 0]), fig.add_subplot(grid[2, 1])]
+    for aux_ax in [title_ax, legend_ax]:
+        aux_ax.axis("off")
+    title_ax.text(
+        0.5,
+        0.55,
+        "N64 Galilean OOD severity, 2% labels",
+        ha="center",
+        va="center",
+        fontsize=14,
+    )
+    for idx, (ax, metric) in enumerate(zip(axes, metrics)):
         _plot_metric_curve(
             ax,
             df,
@@ -169,22 +221,19 @@ def plot_ood_severity(runs_csv: Path, out_prefix: Path) -> None:
             metric=metric,
         )
         ax.set_xlabel("Max Galilean boost")
-        ax.axvline(0.25, color="#8c8c8c", linestyle="--", linewidth=1.0, alpha=0.8)
-        ymin, ymax = ax.get_ylim()
-        ax.text(
-            0.258,
-            ymin + 0.62 * (ymax - ymin),
-            "train radius",
-            rotation=90,
-            va="top",
-            ha="left",
-            color="#5f5f5f",
-            fontsize=8,
-        )
+        _annotate_train_radius(ax, label_training_range=idx == 0)
     axes[0].set_title("Symmetry-induced OOD error")
     axes[1].set_title("Equivariance defect")
-    axes[0].legend(frameon=False, loc="upper left")
-    fig.suptitle("N64 Galilean OOD severity, 2% labels", y=1.04, fontsize=12)
+    handles, labels = axes[0].get_legend_handles_labels()
+    legend_ax.legend(
+        handles,
+        labels,
+        frameon=False,
+        loc="center",
+        ncol=2,
+        columnspacing=1.4,
+        handlelength=2.8,
+    )
     out_prefix.parent.mkdir(parents=True, exist_ok=True)
     for suffix in [".png", ".pdf"]:
         fig.savefig(out_prefix.with_suffix(suffix), bbox_inches="tight")
@@ -214,8 +263,8 @@ def plot_semisupervised_ood_severity(
     df = df.sort_values(["severity_order", "method", "seed"])
     agg = _std_aggregate(df, ["max_boost", "method"], metrics)
 
-    fig, axes = plt.subplots(1, 2, figsize=(8.25, 3.05), constrained_layout=True)
-    for ax, metric in zip(axes, metrics):
+    fig, axes = plt.subplots(1, 2, figsize=(8.8, 3.35), constrained_layout=True)
+    for idx, (ax, metric) in enumerate(zip(axes, metrics)):
         _plot_metric_curve(
             ax,
             df,
@@ -225,22 +274,11 @@ def plot_semisupervised_ood_severity(
             metric=metric,
         )
         ax.set_xlabel("Max Galilean boost")
-        ax.axvline(0.25, color="#8c8c8c", linestyle="--", linewidth=1.0, alpha=0.8)
-        ymin, ymax = ax.get_ylim()
-        ax.text(
-            0.258,
-            ymin + 0.62 * (ymax - ymin),
-            "train radius",
-            rotation=90,
-            va="top",
-            ha="left",
-            color="#5f5f5f",
-            fontsize=8,
-        )
+        _annotate_train_radius(ax, label_training_range=idx == 0)
     axes[0].set_title("Symmetry-induced OOD error")
     axes[1].set_title("Equivariance defect")
     axes[0].legend(frameon=False, loc="upper left")
-    fig.suptitle("N64 Galilean semi-supervised severity, 2% labels", y=1.04, fontsize=12)
+    fig.suptitle("N64 Galilean semi-supervised severity, 2% labels", y=1.04, fontsize=14)
     out_prefix.parent.mkdir(parents=True, exist_ok=True)
     for suffix in [".png", ".pdf"]:
         fig.savefig(out_prefix.with_suffix(suffix), bbox_inches="tight")
@@ -266,10 +304,12 @@ def main() -> None:
 
     plt.rcParams.update(
         {
-            "font.size": 10,
-            "axes.titlesize": 11,
-            "axes.labelsize": 10,
-            "legend.fontsize": 8.5,
+            "font.size": 12,
+            "axes.titlesize": 12.5,
+            "axes.labelsize": 12,
+            "xtick.labelsize": 10.5,
+            "ytick.labelsize": 10.5,
+            "legend.fontsize": 10.5,
             "figure.dpi": 150,
         }
     )
