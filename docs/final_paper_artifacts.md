@@ -1,6 +1,6 @@
 # Final N64 Galilean Artifact Map
 
-This file freezes the current paper-facing evidence for the narrow claim:
+This file records the current paper-facing evidence for the narrow claim:
 
 ```text
 A neural operator trained with local orbit consistency has lower symmetry-induced
@@ -26,12 +26,17 @@ Outputs:
 runs/paper_tables/2d_galilean_n64_2pct_headline_lambda_0p1.*
 runs/paper_tables/2d_galilean_n64_label_efficiency_lambda_0p1.*
 runs/paper_tables/2d_galilean_n64_2pct_lambda_robustness.*
+runs/paper_tables/2d_galilean_n64_2pct_lambda_extended.*
 runs/paper_tables/2d_galilean_n64_2pct_ood_severity_lambda_0p1.*
+runs/paper_tables/2d_galilean_n64_training_compute.*
+runs/paper_tables/2d_galilean_n64_defect_ood_correlation.*
+runs/paper_tables/2d_galilean_n64_2pct_oracle_canonicalization.*
+runs/paper_tables/2d_galilean_n64_2pct_oracle_canonicalization_summary.*
 runs/paper_tables/2d_galilean_n64_final_manifest.csv
 runs/paper_tables/2d_galilean_n64_claim_summary.csv
 runs/figures/2d_galilean_n64_label_efficiency_lambda_0p1.{png,pdf}
 runs/figures/2d_galilean_n64_2pct_ood_severity_lambda_0p1.{png,pdf}
-runs/figures/2d_galilean_n64_2pct_semi_supervised_ood_severity_lambda_0p1.{png,pdf}
+runs/figures/2d_galilean_n64_defect_ood_correlation.{png,pdf}
 ```
 
 `2d_galilean_n64_final_manifest.csv` checks every final training run for:
@@ -129,21 +134,21 @@ This is the strongest direct evidence for lower symmetry-induced OOD error.
 Use:
 
 ```text
-runs/paper_tables/2d_galilean_n64_2pct_lambda_robustness.aggregate.csv
+runs/paper_tables/2d_galilean_n64_2pct_lambda_extended.aggregate.csv
 ```
 
-The current lambda sweep supports using `lambda_orbit=0.10` as the final
-headline setting:
+The completed high-weight lambda sweep supports using `lambda_orbit=0.10` as
+the broader-experiment setting while documenting that `lambda_orbit=0.30` is
+the strongest tested value:
 
 ```text
-lambda 0.01: OOD 0.5768, defect 0.3955
-lambda 0.05: OOD 0.4518, defect 0.3161
 lambda 0.10: OOD 0.3950, defect 0.2677
+lambda 0.20: OOD 0.3564, defect 0.2268
+lambda 0.30: OOD 0.3416, defect 0.2044
 ```
 
-The semi-supervised joint-orbit branch remains useful as an appendix result:
-it substantially reduces equivariance defect, but it is not the headline
-predictive-error result.
+Earlier pilot branches and secondary variants are intentionally excluded from
+the anonymous ZIP because they are not part of the final submitted result path.
 
 ## Reviewer-Facing Claim Map
 

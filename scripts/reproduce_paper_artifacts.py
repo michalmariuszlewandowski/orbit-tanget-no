@@ -190,43 +190,6 @@ TRAINING_SPECS = {
             "lambda_orbit": 0.30,
         },
     ],
-    "ten_percent_sanity": [
-        {
-            "prefix": "runs/ablations/2d_galilean_n64_10pct_lambda_0p1/"
-            "fraction_0.10/aug_steps_6",
-            "method": "aug",
-            "data_fraction": 0.10,
-            "steps_per_epoch": 6,
-        },
-        {
-            "prefix": "runs/ablations/2d_galilean_n64_10pct_lambda_0p1/"
-            "fraction_0.10/aug_orbit_lambda_0.1_steps_4",
-            "method": "aug_orbit",
-            "data_fraction": 0.10,
-            "steps_per_epoch": 4,
-            "lambda_orbit": 0.10,
-        },
-    ],
-    "wrong_symmetry": [
-        {
-            "prefix": "runs/ablations/2d_galilean_n64_2pct_wrong_symmetry/"
-            "fraction_0.02/aug_orbit_shuffle_lambda_0.1_steps_4",
-            "method": "aug_orbit_shuffled",
-            "data_fraction": 0.02,
-            "steps_per_epoch": 4,
-            "lambda_orbit": 0.10,
-        },
-    ],
-    "no_output_control": [
-        {
-            "prefix": "runs/ablations/2d_galilean_n64_2pct_no_output_control/"
-            "fraction_0.02/aug_orbit_no_output_lambda_0.1_steps_4",
-            "method": "aug_orbit_no_output",
-            "data_fraction": 0.02,
-            "steps_per_epoch": 4,
-            "lambda_orbit": 0.10,
-        },
-    ],
 }
 
 TABLE_OUTPUTS = {
@@ -246,18 +209,6 @@ TABLE_OUTPUTS = {
         "out_prefix": "2d_galilean_n64_2pct_lambda_extended",
         "group_cols": ["method", "data_fraction", "steps_per_epoch", "lambda_orbit"],
     },
-    "ten_percent_sanity": {
-        "out_prefix": "2d_galilean_n64_10pct_lambda_0p1",
-        "group_cols": ["data_fraction", "method", "steps_per_epoch", "lambda_orbit"],
-    },
-    "wrong_symmetry": {
-        "out_prefix": "2d_galilean_n64_2pct_wrong_symmetry",
-        "group_cols": ["data_fraction", "method", "orbit_control", "steps_per_epoch", "lambda_orbit"],
-    },
-    "no_output_control": {
-        "out_prefix": "2d_galilean_n64_2pct_no_output_control",
-        "group_cols": ["data_fraction", "method", "orbit_control", "steps_per_epoch", "lambda_orbit"],
-    },
 }
 
 SEVERITY_MATRICES = [
@@ -276,6 +227,16 @@ ORACLE_MATRIX = "configs/ablations/2d_galilean_n64_2pct_oracle_canonicalization.
 
 def _norm_path(value: str | Path) -> str:
     return str(value).replace("\\", "/").strip("/")
+
+
+def _repo_relative_path(value: str | Path) -> str:
+    path = Path(value)
+    if path.is_absolute():
+        try:
+            return _norm_path(path.resolve(strict=False).relative_to(ROOT.resolve(strict=False)))
+        except ValueError:
+            return _norm_path(path)
+    return _norm_path(path)
 
 
 def _read_json(path: Path) -> dict[str, Any]:
@@ -472,7 +433,7 @@ def _manifest_for_training(df: pd.DataFrame) -> list[dict[str, Any]]:
                 "seed": record.get("seed"),
                 "severity": None,
                 "run_dir": run_dir_text,
-                "checkpoint": _norm_path(run_dir / "checkpoints/best.pt"),
+                "checkpoint": _repo_relative_path(run_dir / "checkpoints/best.pt"),
                 "config_hash": meta.get("config_hash", record.get("config_hash")),
                 "dataset_sha256": meta.get("dataset_sha256", record.get("dataset_sha256")),
                 "parameters": meta.get("parameters", record.get("parameters")),
@@ -650,30 +611,6 @@ def _regenerate_diagnostics(*, table_dir: Path, figures_dir: Path) -> None:
     subprocess.run(cmd, check=True)
 
 
-def _regenerate_reviewer_tables(*, table_dir: Path) -> None:
-    cmd = [
-        sys.executable,
-        str(ROOT / "scripts" / "make_reviewer_tables.py"),
-        "--table-dir",
-        str(table_dir),
-        "--out-prefix",
-        str(table_dir / "2d_galilean_n64_reviewer"),
-    ]
-    subprocess.run(cmd, check=True)
-
-
-def _regenerate_solver_closure(*, table_dir: Path) -> None:
-    cmd = [
-        sys.executable,
-        str(ROOT / "scripts" / "make_solver_closure_tables.py"),
-        "--max-boosts",
-        "0.25,0.35,0.50",
-        "--out-prefix",
-        str(table_dir / "2d_galilean_n64_solver_closure"),
-    ]
-    subprocess.run(cmd, check=True)
-
-
 def main() -> None:
     parser = argparse.ArgumentParser(
         description="Regenerate cached paper-facing N64 Galilean artifacts."
@@ -682,7 +619,6 @@ def main() -> None:
     parser.add_argument("--out-dir", default="runs/paper_tables")
     parser.add_argument("--figures-dir", default="runs/figures")
     parser.add_argument("--skip-figures", action="store_true")
-    parser.add_argument("--skip-solver-closure", action="store_true")
     args = parser.parse_args()
 
     out_dir = Path(args.out_dir)
@@ -739,9 +675,6 @@ def main() -> None:
         out_path=out_dir / "2d_galilean_n64_claim_summary.csv",
     )
     _regenerate_diagnostics(table_dir=out_dir, figures_dir=Path(args.figures_dir))
-    _regenerate_reviewer_tables(table_dir=out_dir)
-    if not args.skip_solver_closure:
-        _regenerate_solver_closure(table_dir=out_dir)
     if not args.skip_figures:
         _regenerate_figures(table_dir=out_dir, figures_dir=Path(args.figures_dir))
 

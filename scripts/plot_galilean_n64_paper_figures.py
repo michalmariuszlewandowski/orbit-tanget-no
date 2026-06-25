@@ -19,7 +19,6 @@ METHOD_LABELS = {
     "aug_steps_6": "Aug, 6 updates/epoch",
     "aug_orbit_steps_4": "Augmentation + orbit (lambda=0.05), 4 steps",
     "aug_orbit_lambda_0.1_steps_4": r"Aug + orbit, $\lambda=0.10$, 4 updates/epoch",
-    "semi_aug_orbit": "Semi-supervised orbit",
 }
 
 METHOD_STYLES = {
@@ -33,7 +32,6 @@ METHOD_STYLES = {
         "linestyle": "--",
         "offset": 1.06,
     },
-    "semi_aug_orbit": {"color": "#54a24b", "marker": "^", "linestyle": "-.", "offset": 1.00},
 }
 
 METRIC_LABELS = {
@@ -240,51 +238,6 @@ def plot_ood_severity(runs_csv: Path, out_prefix: Path) -> None:
     plt.close(fig)
 
 
-def plot_semisupervised_ood_severity(
-    supervised_runs_csv: Path, semi_runs_csv: Path, out_prefix: Path
-) -> None:
-    supervised = pd.read_csv(supervised_runs_csv)
-    semi = pd.read_csv(semi_runs_csv)
-    df = pd.concat([supervised, semi], ignore_index=True)
-    metrics = ["orbit_ood_relative_l2", "equivariance_defect_relative"]
-    required = {"method", "max_boost", "severity", "seed", *metrics}
-    missing = sorted(required - set(df.columns))
-    if missing:
-        raise SystemExit(f"semi-supervised severity inputs missing columns: {', '.join(missing)}")
-
-    orbit_method = (
-        "aug_orbit_lambda_0.1_steps_4"
-        if "aug_orbit_lambda_0.1_steps_4" in set(df["method"])
-        else "aug_orbit_steps_4"
-    )
-    methods = ["aug_steps_6", orbit_method, "semi_aug_orbit"]
-    df = df[df["method"].isin(methods)].copy()
-    df["severity_order"] = df["severity"].map({name: i for i, name in enumerate(SEVERITY_ORDER)})
-    df = df.sort_values(["severity_order", "method", "seed"])
-    agg = _std_aggregate(df, ["max_boost", "method"], metrics)
-
-    fig, axes = plt.subplots(1, 2, figsize=(8.8, 3.35), constrained_layout=True)
-    for idx, (ax, metric) in enumerate(zip(axes, metrics)):
-        _plot_metric_curve(
-            ax,
-            df,
-            agg,
-            x_col="max_boost",
-            methods=methods,
-            metric=metric,
-        )
-        ax.set_xlabel("Max Galilean boost")
-        _annotate_train_radius(ax, label_training_range=idx == 0)
-    axes[0].set_title("Symmetry-induced OOD error")
-    axes[1].set_title("Equivariance defect")
-    axes[0].legend(frameon=False, loc="upper left")
-    fig.suptitle("N64 Galilean semi-supervised severity, 2% labels", y=1.04, fontsize=14)
-    out_prefix.parent.mkdir(parents=True, exist_ok=True)
-    for suffix in [".png", ".pdf"]:
-        fig.savefig(out_prefix.with_suffix(suffix), bbox_inches="tight")
-    plt.close(fig)
-
-
 def main() -> None:
     parser = argparse.ArgumentParser(description="Plot paper-facing N64 Galilean figures.")
     parser.add_argument(
@@ -294,10 +247,6 @@ def main() -> None:
     parser.add_argument(
         "--severity-runs-csv",
         default="runs/paper_tables/2d_galilean_n64_2pct_ood_severity_lambda_0p1.runs.csv",
-    )
-    parser.add_argument(
-        "--semi-severity-runs-csv",
-        default="runs/paper_tables/2d_galilean_n64_2pct_semi_supervised_ood_severity.runs.csv",
     )
     parser.add_argument("--out-dir", default="runs/figures")
     args = parser.parse_args()
@@ -317,20 +266,12 @@ def main() -> None:
     out_dir = Path(args.out_dir)
     label_prefix = out_dir / "2d_galilean_n64_label_efficiency_lambda_0p1"
     severity_prefix = out_dir / "2d_galilean_n64_2pct_ood_severity_lambda_0p1"
-    semi_severity_prefix = out_dir / "2d_galilean_n64_2pct_semi_supervised_ood_severity_lambda_0p1"
     plot_label_efficiency(Path(args.label_runs_csv), label_prefix)
     plot_ood_severity(Path(args.severity_runs_csv), severity_prefix)
     print(f"wrote {label_prefix.with_suffix('.png')}")
     print(f"wrote {label_prefix.with_suffix('.pdf')}")
     print(f"wrote {severity_prefix.with_suffix('.png')}")
     print(f"wrote {severity_prefix.with_suffix('.pdf')}")
-    semi_runs_csv = Path(args.semi_severity_runs_csv)
-    if semi_runs_csv.exists() and semi_runs_csv.stat().st_size > 0:
-        plot_semisupervised_ood_severity(
-            Path(args.severity_runs_csv), semi_runs_csv, semi_severity_prefix
-        )
-        print(f"wrote {semi_severity_prefix.with_suffix('.png')}")
-        print(f"wrote {semi_severity_prefix.with_suffix('.pdf')}")
 
 
 if __name__ == "__main__":

@@ -11,10 +11,6 @@ _ALLOWED_DATASETS = {
     "1d_advection",
     "burgers1d",
     "1d_burgers",
-    "rmd17",
-    "rmd17_force",
-    "rmd17_forces",
-    "md17_revised",
     "navier_stokes_vorticity2d",
     "navier_stokes_vorticity2d_boosted",
     "boosted_navier_stokes_vorticity2d",
@@ -39,9 +35,6 @@ _ALLOWED_MODELS = {
     "observable_galilean_canonical_fno2d",
     "galilean_canonical_fno2d",
     "pace_style_fno2d",
-    "molecule_mlp",
-    "molecular_mlp",
-    "fixed_molecule_mlp",
 }
 _ALLOWED_METHODS = {
     "baseline",
@@ -55,9 +48,6 @@ _ALLOWED_METHODS = {
     "aug_orbit_shuffled",
     "aug_orbit_no_output",
     "aug_orbit_input_only",
-    "semi_aug_orbit",
-    "semisup_aug_orbit",
-    "semi_supervised_aug_orbit",
 }
 _ALLOWED_TRANSFORMS = {
     "translation1d",
@@ -71,14 +61,6 @@ _ALLOWED_TRANSFORMS = {
     "ns2d_galilean",
     "galilean2d",
     "vorticity2d_galilean",
-    "d4_scalar2d",
-    "d4",
-    "d4_pseudoscalar2d",
-    "d4_vorticity2d",
-    "molecular_rigid_motion",
-    "molecule_rigid_motion",
-    "se3_molecular",
-    "rmd17_rigid_motion",
 }
 
 
@@ -256,18 +238,13 @@ def validate_config(config: dict[str, Any], *, require_dataset: bool = True) -> 
         "latency_repeats",
         "stop_after_epochs",
         "steps_per_epoch",
-        "orbit_batch_size",
-        "orbit_steps_per_epoch",
     ):
         _check_positive_int(training, "training", key)
-    for key in ("eval_orbit_samples", "latency_warmup", "num_workers", "unlabeled_orbit_steps_per_epoch"):
+    for key in ("eval_orbit_samples", "latency_warmup", "num_workers"):
         _check_nonnegative_int(training, "training", key)
     data_fraction = float(training.get("data_fraction", 1.0))
     if data_fraction <= 0 or data_fraction > 1:
         raise ValueError("training.data_fraction must lie in (0, 1]")
-    orbit_data_fraction = float(training.get("orbit_data_fraction", data_fraction))
-    if orbit_data_fraction <= 0 or orbit_data_fraction > 1:
-        raise ValueError("training.orbit_data_fraction must lie in (0, 1]")
     for key in ("lr", "weight_decay", "lambda_orbit", "lambda_aug", "orbit_eta"):
         _check_nonnegative_float(training, "training", key)
     orbit_control = str(training.get("orbit_control", "physical")).lower()
@@ -306,7 +283,7 @@ def validate_config(config: dict[str, Any], *, require_dataset: bool = True) -> 
             tname = str(transform.get("name", "translation1d")).lower()
             if tname not in _ALLOWED_TRANSFORMS:
                 raise ValueError(f"Unknown symmetry transform={tname!r}")
-            for key in ("max_shift", "max_boost", "length", "max_angle", "max_translation"):
+            for key in ("max_shift", "max_boost", "length"):
                 _check_positive_float(transform, "symmetry", key)
             for key in ("final_time",):
                 _check_nonnegative_float(transform, "symmetry", key)

@@ -7,9 +7,9 @@ set PYTEST_DISABLE_PLUGIN_AUTOLOAD=1
 set OMP_NUM_THREADS=1
 set MKL_NUM_THREADS=1
 set PYTHON=.venv\Scripts\python.exe
-set INTERNAL_LOG=runs\final_1d\final_1d_batch.internal.log
+set RUN_LOG=runs\final_1d\final_1d_batch.log
 
-echo [%DATE% %TIME%] wrapper started in %CD% > %INTERNAL_LOG%
+echo [%DATE% %TIME%] wrapper started in %CD% > %RUN_LOG%
 
 if "%~1"=="--plan" (
   echo plan: 1D final four-method training

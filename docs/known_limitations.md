@@ -1,6 +1,6 @@
 # Known limitations
 
-This repository contains paper-grade infrastructure, not completed evidence that orbit consistency works. The empirical claim still depends on the June--September runs.
+This repository contains paper-grade infrastructure and cached paper-facing evidence. Additional training runs may refine the empirical claim, but the included tables and figures define the submitted artifact snapshot.
 
 The two-dimensional Navier--Stokes solver is a compact pseudo-spectral RK4 implementation intended for pilots and symmetry debugging. Final paper numbers should include solver-validation reports, and possibly a higher-resolution or smaller-step reference check.
 

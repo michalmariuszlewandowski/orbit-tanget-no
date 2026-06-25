@@ -27,7 +27,7 @@ def main() -> None:
     env.setdefault("PYTEST_DISABLE_PLUGIN_AUTOLOAD", "1")
 
     _run([sys.executable, "scripts/check_configs.py"], env=env)
-    _run([sys.executable, "scripts/run_matrix.py", "--matrix", "configs/experiments_june_september.yaml", "--dry-run"], env=env)
+    _run([sys.executable, "scripts/run_matrix.py", "--matrix", "configs/experiments_core.yaml", "--dry-run"], env=env)
     if not args.skip_tests:
         _run([sys.executable, "-m", "pytest", "-q"], env=env)
     if not args.skip_solver_validation:

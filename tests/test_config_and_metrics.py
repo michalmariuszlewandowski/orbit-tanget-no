@@ -58,7 +58,7 @@ def test_all_experiment_configs_build_model_and_transform():
 
 def test_run_matrix_uses_valid_config_paths():
     root = Path(__file__).resolve().parents[1]
-    matrix_path = root / "configs" / "experiments_june_september.yaml"
+    matrix_path = root / "configs" / "experiments_core.yaml"
     matrix = yaml.safe_load(matrix_path.read_text())
     run_dirs = []
     for entry in matrix["experiments"]:

@@ -1,0 +1,63 @@
+# Version-control and local environment state.
+.submissionignore
+.git/
+.github/
+.venv/
+.mypy_cache/
+.pytest_cache/
+__pycache__/
+*.py[cod]
+*.egg-info/
+
+# Local agent/editor state.
+AGENTS.md
+.agents/
+.codex/
+.vscode/
+
+# Manuscript drafts and LaTeX sources are not part of the artifact archive.
+paper/
+
+# Large generated datasets, checkpoints, and non-paper run directories.
+data/
+runs/ablations/
+runs/adaptation/
+runs/appendix/
+runs/baselines/
+runs/debug/
+runs/final_1d/
+runs/logs/
+runs/july15/
+runs/june10/
+runs/manual/
+runs/pilot_2d_one_seed_30ep/
+runs/pilot/
+runs/quality/
+runs/smoke_after_adapt_fix/
+runs/smoke/
+runs/tmp_start_process/
+*.pt
+*.pth
+*.ckpt
+*.bin
+*.npy
+*.npz
+*.pkl
+
+# Build/cache artifacts.
+build/
+dist/
+htmlcov/
+*.aux
+*.blg
+*.fdb_latexmk
+*.fls
+*.log
+*.out
+*.synctex.gz
+*.toc
+
+# Internal planning notes not needed for anonymous review.
+docs/roadmap_iclr2027.md
+docs/pivot_criteria.md
+configs/experiments_june_september.yaml

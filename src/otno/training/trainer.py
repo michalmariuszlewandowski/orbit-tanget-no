@@ -147,7 +147,6 @@ def train_from_config(config: dict[str, Any]) -> dict[str, Any]:
     orbit_control = str(training_cfg.get("orbit_control", "physical")).lower()
     eval_every = int(training_cfg.get("eval_every", 5))
     grad_clip = training_cfg.get("grad_clip", None)
-    unlabeled_orbit_steps_per_epoch = int(training_cfg.get("unlabeled_orbit_steps_per_epoch", 0))
     aug_methods = {
         "aug",
         "augmentation",
@@ -157,9 +156,6 @@ def train_from_config(config: dict[str, Any]) -> dict[str, Any]:
         "aug_orbit_shuffled",
         "aug_orbit_no_output",
         "aug_orbit_input_only",
-        "semi_aug_orbit",
-        "semisup_aug_orbit",
-        "semi_supervised_aug_orbit",
     }
     orbit_methods = {
         "orbit",
@@ -170,11 +166,7 @@ def train_from_config(config: dict[str, Any]) -> dict[str, Any]:
         "aug_orbit_shuffled",
         "aug_orbit_no_output",
         "aug_orbit_input_only",
-        "semi_aug_orbit",
-        "semisup_aug_orbit",
-        "semi_supervised_aug_orbit",
     }
-    semi_orbit_methods = {"semi_aug_orbit", "semisup_aug_orbit", "semi_supervised_aug_orbit"}
     if method in {"aug_orbit_shuffle", "aug_orbit_shuffled"} and orbit_control == "physical":
         orbit_control = "shuffle_output"
     if method in {"aug_orbit_no_output", "aug_orbit_input_only"} and orbit_control == "physical":
@@ -233,25 +225,9 @@ def train_from_config(config: dict[str, Any]) -> dict[str, Any]:
         shuffle=True,
         skip_shuffle_epochs=max(0, start_epoch - 1),
     )
-    orbit_loader: DataLoader | None = None
-    orbit_steps_per_epoch = None
-    if method in semi_orbit_methods:
-        orbit_fraction = float(training_cfg.get("orbit_data_fraction", 1.0))
-        orbit_loader = _loader(
-            dataset_path,
-            "train",
-            config,
-            shuffle=True,
-            skip_shuffle_epochs=max(0, start_epoch - 1),
-            fraction_override=orbit_fraction,
-            batch_size_override=int(training_cfg.get("orbit_batch_size", training_cfg.get("batch_size", 32))),
-            seed_offset_override=40_000,
-        )
-        orbit_steps_per_epoch = int(training_cfg.get("orbit_steps_per_epoch", len(orbit_loader)))
     val_loader = _loader(dataset_path, "val", config, shuffle=False)
     test_loader = _loader(dataset_path, "test", config, shuffle=False)
     steps_per_epoch = int(training_cfg.get("steps_per_epoch", len(train_loader)))
-    split_unlabeled_orbit = method in semi_orbit_methods and unlabeled_orbit_steps_per_epoch > 0
 
     target_epoch = epochs
     if stop_after_epochs is not None:
@@ -261,16 +237,14 @@ def train_from_config(config: dict[str, Any]) -> dict[str, Any]:
     for epoch in range(start_epoch, target_epoch + 1):
         epoch_wall_start = time.perf_counter()
         model.train()
-        supervised_steps = orbit_steps_per_epoch if orbit_steps_per_epoch is not None and not split_unlabeled_orbit else steps_per_epoch
-        steps_this_epoch = supervised_steps + (unlabeled_orbit_steps_per_epoch if split_unlabeled_orbit else 0)
+        supervised_steps = steps_per_epoch
         progress = tqdm(
-            total=steps_this_epoch,
+            total=supervised_steps,
             desc=f"epoch {epoch}/{epochs}",
             leave=False,
             disable=not sys.stderr.isatty(),
         )
         train_iter = iter(train_loader)
-        orbit_iter = iter(orbit_loader) if orbit_loader is not None else None
         epoch_loss = 0.0
         epoch_logs: dict[str, float] = {}
         num_batches = 0
@@ -308,24 +282,14 @@ def train_from_config(config: dict[str, Any]) -> dict[str, Any]:
                 loss = loss + lambda_aug * aug_loss
                 logs["aug_loss"] = float(aug_loss.detach().cpu())
 
-            if method in orbit_methods and not split_unlabeled_orbit:
+            if method in orbit_methods:
                 if transform is None:
                     raise ValueError("Orbit method requires a symmetry transform")
-                orbit_a = a
-                orbit_base_pred = pred
-                if orbit_iter is not None:
-                    try:
-                        orbit_batch = next(orbit_iter)
-                    except StopIteration:
-                        orbit_iter = iter(orbit_loader)
-                        orbit_batch = next(orbit_iter)
-                    orbit_a = orbit_batch["a"].to(device)
-                    orbit_base_pred = model(orbit_a)
                 orb_loss, orb_stats = orbit_consistency_loss(
                     model,
-                    orbit_a,
+                    a,
                     transform,
-                    base_pred=orbit_base_pred,
+                    base_pred=pred,
                     normalize_by_epsilon=normalize_by_epsilon,
                     eta=eta,
                     target_mode=orbit_control,
@@ -335,34 +299,6 @@ def train_from_config(config: dict[str, Any]) -> dict[str, Any]:
 
             _accumulate(loss, logs)
 
-        if split_unlabeled_orbit:
-            if transform is None:
-                raise ValueError("Semi-supervised orbit method requires a symmetry transform")
-            if orbit_iter is None or orbit_loader is None:
-                raise ValueError("Semi-supervised orbit method requires an unlabeled orbit loader")
-            for _ in range(unlabeled_orbit_steps_per_epoch):
-                progress.update(1)
-                try:
-                    orbit_batch = next(orbit_iter)
-                except StopIteration:
-                    orbit_iter = iter(orbit_loader)
-                    orbit_batch = next(orbit_iter)
-                orbit_a = orbit_batch["a"].to(device)
-                optimizer.zero_grad(set_to_none=True)
-                orbit_base_pred = model(orbit_a)
-                orb_loss, orb_stats = orbit_consistency_loss(
-                    model,
-                    orbit_a,
-                    transform,
-                    base_pred=orbit_base_pred,
-                    normalize_by_epsilon=normalize_by_epsilon,
-                    eta=eta,
-                    target_mode=orbit_control,
-                )
-                loss = lambda_orbit * orb_loss
-                logs = {f"unlabeled_{key}": value for key, value in orb_stats.items()}
-                logs["unlabeled_weighted_orbit_loss"] = float(loss.detach().cpu())
-                _accumulate(loss, logs)
         progress.close()
 
         scheduler.step()
@@ -371,7 +307,6 @@ def train_from_config(config: dict[str, Any]) -> dict[str, Any]:
             "train_loss": epoch_loss / max(1, num_batches),
             "lr": scheduler.get_last_lr()[0],
             "train_supervised_steps": supervised_steps,
-            "train_unlabeled_orbit_steps": unlabeled_orbit_steps_per_epoch if split_unlabeled_orbit else 0,
             "train_epoch_seconds": time.perf_counter() - epoch_wall_start,
             **{f"train_{k}": v / max(1, num_batches) for k, v in epoch_logs.items()},
         }

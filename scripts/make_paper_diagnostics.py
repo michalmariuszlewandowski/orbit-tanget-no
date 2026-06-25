@@ -40,9 +40,6 @@ TRAIN_METHODS_WITH_ORBIT = {
     "orb",
     "aug_orbit",
     "orbit_aug",
-    "semi_aug_orbit",
-    "semisup_aug_orbit",
-    "semi_supervised_aug_orbit",
 }
 
 
@@ -287,13 +284,11 @@ def _compute_row(record: dict[str, Any], root: Path) -> dict[str, Any]:
     method = str(record.get("method", record.get("config.training.method", ""))).lower()
     batch_size = int(float(record.get("config.training.batch_size", record.get("batch_size", 0))))
     supervised_steps = int(sum(int(row.get("train_supervised_steps", 0)) for row in train_rows))
-    unlabeled_steps = int(sum(int(row.get("train_unlabeled_orbit_steps", 0)) for row in train_rows))
-    optimizer_steps = supervised_steps + unlabeled_steps
+    optimizer_steps = supervised_steps
     forward_multiplier = _estimate_forward_multiplier(method)
-    model_forward_passes = supervised_steps * forward_multiplier + unlabeled_steps * 2
+    model_forward_passes = supervised_steps * forward_multiplier
     augmentation_batches = supervised_steps if method in TRAIN_METHODS_WITH_AUG else 0
     orbit_batches = supervised_steps if method in TRAIN_METHODS_WITH_ORBIT else 0
-    orbit_batches += unlabeled_steps
     wall_seconds = pd.to_numeric(pd.Series([record.get("train_wall_seconds")]), errors="coerce").iloc[0]
     wall_source = "recorded"
     if not np.isfinite(wall_seconds):

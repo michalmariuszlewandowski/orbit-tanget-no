@@ -22,7 +22,7 @@ validate-solvers:
 	$(TEST_ENV) $(PYTHON) scripts/validate_solvers.py --out runs/quality/solver_validation.json
 
 dry-run:
-	PYTHONPATH=src $(PYTHON) scripts/run_matrix.py --matrix configs/experiments_june_september.yaml --dry-run
+	PYTHONPATH=src $(PYTHON) scripts/run_matrix.py --matrix configs/experiments_core.yaml --dry-run
 
 tables:
 	PYTHONPATH=src $(PYTHON) scripts/make_paper_tables.py --runs runs --out-prefix runs/paper_tables/main

@@ -40,11 +40,6 @@ def collect_run_rows(runs_dir: str | Path) -> list[dict[str, Any]]:
                     row.setdefault("orbit_data_fraction", float(training["orbit_data_fraction"]))
                 if "orbit_steps_per_epoch" in training:
                     row.setdefault("orbit_steps_per_epoch", int(training["orbit_steps_per_epoch"]))
-                if "unlabeled_orbit_steps_per_epoch" in training:
-                    row.setdefault(
-                        "unlabeled_orbit_steps_per_epoch",
-                        int(training["unlabeled_orbit_steps_per_epoch"]),
-                    )
                 if "lambda_orbit" in training:
                     row.setdefault("lambda_orbit", float(training["lambda_orbit"]))
         rows.append(row)

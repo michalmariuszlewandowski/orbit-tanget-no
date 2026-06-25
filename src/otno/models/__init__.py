@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from .canonical import CanonicalFNO1d, ObservableGalileanCanonicalFNO2d
 from .fno import FNO1d, FNO2d
-from .molecular import MoleculeMLP
 
 
 def _canonicalizers(value) -> list[str]:
@@ -70,14 +69,6 @@ def build_model(config: dict):
             depth=int(model_cfg.get("depth", 4)),
             add_grid=bool(model_cfg.get("add_grid", True)),
         )
-    if name in {"molecule_mlp", "molecular_mlp", "fixed_molecule_mlp"}:
-        return MoleculeMLP(
-            n_atoms=int(model_cfg.get("n_atoms", model_cfg.get("atoms", 1))),
-            in_channels=int(model_cfg.get("in_channels", 4)),
-            out_channels=int(model_cfg.get("out_channels", 3)),
-            hidden=int(model_cfg.get("hidden", model_cfg.get("width", 128))),
-            depth=int(model_cfg.get("depth", 4)),
-        )
     raise ValueError(f"Unknown model name: {name}")
 
 
@@ -86,6 +77,5 @@ __all__ = [
     "FNO2d",
     "CanonicalFNO1d",
     "ObservableGalileanCanonicalFNO2d",
-    "MoleculeMLP",
     "build_model",
 ]
