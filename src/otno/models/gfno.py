@@ -52,7 +52,8 @@ def _d4_tables() -> tuple[tuple[tuple[int, ...], ...], tuple[int, ...]]:
 
 
 def _center_slices(size: int, modes: int) -> tuple[slice, slice]:
-    retained = min(modes, size // 2)
+    # Even grids have one Nyquist bin, so retain only complete +/- frequency pairs.
+    retained = min(modes, (size - 1) // 2)
     full = slice(size // 2 - retained, size // 2 + retained + 1)
     param = slice(modes - retained, modes + retained + 1)
     return full, param

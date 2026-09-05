@@ -2,12 +2,10 @@ import torch
 
 from otno.data.solvers1d import (
     random_fourier_field_1d,
-    random_lpsda_fourier_field_1d,
     solve_advection_1d,
     solve_burgers_1d,
-    solve_kdv_1d_trajectory,
 )
-from otno.symmetry.transforms import Burgers1DGalilean, KdV1DGalilean, TransformSample, Translation1D
+from otno.symmetry.transforms import Burgers1DGalilean, TransformSample, Translation1D
 
 
 def test_advection_translation_commutes_with_solver():
@@ -43,43 +41,6 @@ def test_burgers_galilean_identity_small_time():
     )
     max_err = (left - right).abs().max().item()
     assert max_err < 2e-3
-
-
-def test_kdv_galilean_identity_small_time():
-    u0 = random_lpsda_fourier_field_1d(2, 64, length=32.0, terms=4, seed=4)
-    final_time = 0.2
-    output_steps = 4
-    transform = KdV1DGalilean(
-        max_boost=0.05,
-        final_time=final_time,
-        input_steps=1,
-        output_steps=output_steps,
-        length=32.0,
-    )
-    sample = TransformSample(
-        params={"boost": torch.tensor([0.03, -0.02])},
-        epsilon=torch.tensor([0.03, 0.02]),
-        name="kdv1d_galilean",
-    )
-    base = solve_kdv_1d_trajectory(
-        u0,
-        final_time=final_time,
-        dt=0.005,
-        num_frames=output_steps + 1,
-        length=32.0,
-    ).permute(0, 2, 1)
-    left = solve_kdv_1d_trajectory(
-        transform.apply_input(base[..., :1], sample)[..., 0],
-        final_time=final_time,
-        dt=0.005,
-        num_frames=output_steps + 1,
-        length=32.0,
-    ).permute(0, 2, 1)[..., 1:]
-    right = transform.apply_output(base[..., 1:], sample)
-    rel = torch.linalg.norm((left - right).reshape(left.shape[0], -1), dim=-1) / torch.linalg.norm(
-        right.reshape(right.shape[0], -1), dim=-1
-    ).clamp_min(1e-8)
-    assert float(rel.max()) < 1e-3
 
 
 def test_navier_stokes_translation_commutes_with_solver_small_time():

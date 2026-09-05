@@ -1,3 +1,4 @@
+import pytest
 import torch
 
 from otno.models import (
@@ -112,11 +113,12 @@ def test_d4_gfno2d_shape():
     assert y.shape == (2, 16, 16, 1)
 
 
-def test_d4_gfno2d_pseudoscalar_equivariance():
+@pytest.mark.parametrize(("size", "modes"), [(16, 2), (8, 4), (8, 8), (9, 4), (9, 8)])
+def test_d4_gfno2d_pseudoscalar_equivariance(size, modes):
     torch.manual_seed(0)
-    model = D4GFNO2d(in_channels=1, out_channels=1, width=4, modes1=2, modes2=2, depth=1)
+    model = D4GFNO2d(in_channels=1, out_channels=1, width=4, modes1=modes, modes2=modes, depth=1)
     transform = D4Pseudoscalar2D()
-    x = torch.randn(2, 16, 16, 1)
+    x = torch.randn(2, size, size, 1)
     sample = TransformSample(
         params={"k": torch.tensor([1, 2]), "flip": torch.tensor([False, True])},
         epsilon=torch.ones(2),
@@ -125,6 +127,9 @@ def test_d4_gfno2d_pseudoscalar_equivariance():
     lhs = model(transform.apply_input(x, sample))
     rhs = transform.apply_output(model(x), sample)
     assert torch.allclose(lhs, rhs, atol=1e-4, rtol=1e-4)
+    lhs.square().mean().backward()
+    assert all(parameter.grad is not None and torch.isfinite(parameter.grad).all()
+               for parameter in model.parameters())
 
 
 def test_observable_galilean_canonical_fno2d_shape():

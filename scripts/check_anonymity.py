@@ -2,167 +2,150 @@
 from __future__ import annotations
 
 import argparse
-import fnmatch
 import re
+import subprocess
 from collections.abc import Iterable
 from pathlib import Path
 
 
-TEXT_SUFFIXES = {
-    "",
-    ".bib",
-    ".cfg",
-    ".cmd",
-    ".csv",
-    ".ini",
-    ".json",
-    ".jsonl",
-    ".md",
-    ".ps1",
-    ".py",
-    ".rst",
-    ".tex",
-    ".toml",
-    ".txt",
-    ".yaml",
-    ".yml",
-}
-
-DEFAULT_EXCLUDES = {
-    ".git/**",
-    ".venv/**",
-    ".deps/**",
-    ".mypy_cache/**",
-    ".pytest_cache/**",
-    "__pycache__/**",
-    "uv.lock",
-    "paper/related_work.bib",
-}
-
-# Attribution of an external baseline is required and does not identify the
-# authors of this artifact. Keep this exception exact, rather than allowing
-# arbitrary code-host links.
+# This external baseline attribution does not identify the project authors.
 PUBLIC_REFERENCE_URLS = {
     "https://github.com/camlab-ethz/ConvolutionalNeuralOperator",
 }
 
-PATTERNS: list[tuple[str, re.Pattern[str]]] = [
+PATTERNS = [
     (
         "local user path",
-        re.compile(r"(?:[A-Za-z]:)?[/\\]Users[/\\][^/\\\s]+|/home/[^/\s]+", re.IGNORECASE),
+        re.compile(r"(?:[A-Za-z]:)?[/\\](?:Users|home)[/\\][^/\\\s]+", re.I),
+    ),
+    ("email address", re.compile(r"\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b", re.I)),
+    (
+        "LaTeX author",
+        re.compile(r"\\author\{(?!Anonymous Authors\})[^}]+\}", re.I),
     ),
     (
-        "email address",
-        re.compile(r"\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b", re.IGNORECASE),
+        "author or affiliation metadata",
+        re.compile(r"^\s*(?:authors?|affiliations?|orcid)\s*[:=]\s*\S+", re.I),
     ),
     (
-        "non-anonymous LaTeX author",
-        re.compile(r"\\author\{(?!Anonymous Authors\})[^}]+\}", re.IGNORECASE),
-    ),
-    (
-        "affiliation metadata",
-        re.compile(
-            r"\b(?:affiliation|affiliations|orcid|acknowledg(?:e|ment|ments)|funded by|grant)\b",
-            re.IGNORECASE,
-        ),
+        "PDF author metadata",
+        re.compile(r"/Author\s*\([^)]*[^\s)][^)]*\)", re.I),
     ),
     (
         "public code host URL",
         re.compile(
-            r"\b(?:https?://)?(?:www\.)?(?:github|gitlab)\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+",
-            re.IGNORECASE,
+            r"\b(?:(?:https?://)?(?:www\.)?|git@)(?:github|gitlab)\.com"
+            r"[/:][A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+",
+            re.I,
         ),
     ),
 ]
+COMMIT_PATTERN = re.compile(r"\b[0-9a-f]{7,40}\b", re.I)
 
 
-def _norm(path: Path) -> str:
-    return path.as_posix().strip("/")
+def repository_files(root: Path) -> list[tuple[Path, str]]:
+    """Read existing tracked files and untracked files allowed by Git's ignore rules."""
+    result = subprocess.run(
+        ["git", "-C", str(root), "ls-files", "--cached", "--others", "--exclude-standard", "-z"],
+        check=True,
+        capture_output=True,
+    )
+    names = sorted(set(result.stdout.decode("utf-8").split("\0")) - {""})
+    return [
+        (root / name, name)
+        for name in names
+        if (root / name).is_file() or (root / name).is_symlink()
+    ]
 
 
-def _load_submission_excludes(root: Path) -> set[str]:
-    path = root / ".submissionignore"
-    if not path.exists():
-        return set()
-    excludes: set[str] = set()
-    for raw in path.read_text(encoding="utf-8").splitlines():
-        line = raw.strip()
-        if not line or line.startswith("#") or line.startswith("!"):
-            continue
-        excludes.add(line)
-        if line.endswith("/"):
-            excludes.add(f"{line}**")
-    return excludes
+def git_identities(root: Path) -> tuple[set[str], set[str]]:
+    """Read identity terms and commit IDs without storing them in repository files."""
+    history = subprocess.check_output(
+        ["git", "-C", str(root), "log", "--all", "--format=%H%x00%an%x00%ae%x00%cn%x00%ce"],
+        encoding="utf-8",
+    )
+    terms, commits = set(), set()
+    for record in history.splitlines():
+        commit, *identities = record.split("\0")
+        commits.add(commit)
+        terms.update(identity for identity in identities if identity)
+    remotes = subprocess.check_output(
+        ["git", "-C", str(root), "remote", "-v"], encoding="utf-8"
+    )
+    terms.update(re.findall(r"(?:github|gitlab)\.com[/:]([^/:\s]+)/", remotes, re.I))
+    return terms, commits
 
 
-def _is_excluded(rel_path: str, patterns: set[str]) -> bool:
-    return any(fnmatch.fnmatch(rel_path, pattern) for pattern in patterns)
-
-
-def _iter_text_files(root: Path, excludes: set[str]):
-    for path in root.rglob("*"):
-        if not path.is_file():
-            continue
-        rel = _norm(path.relative_to(root))
-        if rel == "scripts/check_anonymity.py":
-            continue
-        if _is_excluded(rel, excludes):
-            continue
-        if path.suffix.lower() in TEXT_SUFFIXES or path.name in {"Makefile"}:
-            yield path, rel
-
-
-def check(root: Path, files: Iterable[tuple[Path, str]] | None = None) -> list[str]:
-    """Scan a workspace, or exactly the selected release payload when supplied."""
-    excludes = DEFAULT_EXCLUDES | _load_submission_excludes(root)
-    findings: list[str] = []
-    selected = files if files is not None else _iter_text_files(root, excludes)
+def check(
+    root: Path,
+    files: Iterable[tuple[Path, str]] | None = None,
+    *,
+    terms: Iterable[str] = (),
+    commits: Iterable[str] = (),
+) -> list[str]:
+    """Find identifying text and files that need review in the current working tree."""
+    findings = []
+    selected = repository_files(root) if files is None else files
+    terms = [term.casefold() for term in terms if term]
+    commit_prefixes = {commit[:length].lower() for commit in commits for length in range(7, 41)}
     for path, rel in selected:
-        if rel == "scripts/check_anonymity.py":
+        if path.is_symlink() or not path.resolve().is_relative_to(root.resolve()):
+            findings.append(f"{rel}: symbolic link or path outside the repository")
             continue
-        if path.suffix.lower() not in TEXT_SUFFIXES and path.name != "Makefile":
-            continue
+        if path.name.startswith(".env") or path.suffix.lower() in {".pem", ".key", ".p12", ".pfx"}:
+            findings.append(f"{rel}: possible credential file")
+        if path.suffix.lower() in {".zip", ".gz", ".tar", ".7z"}:
+            findings.append(f"{rel}: archive contents require review")
+        for term in terms:
+            if term in rel.casefold():
+                findings.append(f"{rel}: identifying search term in filename")
+        if any(value.lower() in commit_prefixes for value in COMMIT_PATTERN.findall(rel)):
+            findings.append(f"{rel}: repository commit ID in filename")
         try:
-            text = path.read_text(encoding="utf-8")
-        except UnicodeDecodeError:
+            # Also inspect printable metadata in binary files without deserializing them.
+            content = path.read_bytes().decode("utf-8", errors="replace")
+        except OSError as error:
+            findings.append(f"{rel}: could not read file: {error.strerror}")
             continue
-        for line_no, line in enumerate(text.splitlines(), start=1):
-            scanned_line = line
+        for line_no, line in enumerate(content.splitlines(), start=1):
             for public_url in PUBLIC_REFERENCE_URLS:
-                scanned_line = re.sub(re.escape(public_url) + r"(?![\w./-])", "", scanned_line)
+                line = re.sub(re.escape(public_url) + r"(?![\w./-])", "", line)
             for label, pattern in PATTERNS:
-                if pattern.search(scanned_line):
-                    findings.append(f"{rel}:{line_no}: {label}: {line.strip()}")
+                if pattern.search(line):
+                    findings.append(f"{rel}:{line_no}: {label}")
+            if any(term in line.casefold() for term in terms):
+                findings.append(f"{rel}:{line_no}: identifying search term")
+            if any(value.lower() in commit_prefixes for value in COMMIT_PATTERN.findall(line)):
+                findings.append(f"{rel}:{line_no}: repository commit ID; redact in anonymous mirror")
     return findings
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(
-        description="Scan anonymous submission files for identifying metadata."
-    )
-    parser.add_argument("--root", default=".", help="Repository root to scan.")
+    parser = argparse.ArgumentParser(description="Check Git candidate files for identifying text.")
+    parser.add_argument("--root", default=".", help="Repository directory to scan.")
     parser.add_argument(
-        "--all-files",
-        action="store_true",
-        help="Scan the broader workspace instead of the curated release.",
+        "--term", action="append", default=[], help="Additional identifying name or term; repeatable."
+    )
+    parser.add_argument(
+        "--git-identities", action="store_true",
+        help="Also check local Git author names, emails, remote owners, and commit IDs.",
     )
     args = parser.parse_args()
-
     root = Path(args.root).resolve()
-    if args.all_files:
-        findings = check(root)
-    else:
-        from make_anonymous_submission import release_files
-
-        findings = check(
-            root, release_files(root, root / "dist/local_orbit_consistency_anonymous.zip")
-        )
+    try:
+        files = repository_files(root)
+        terms, commits = git_identities(root) if args.git_identities else (set(), set())
+    except (OSError, subprocess.CalledProcessError) as error:
+        parser.error(f"Cannot read Git candidate files: {error}")
+    findings = check(root, files, terms=terms | set(args.term), commits=commits)
+    print(f"Checked {len(files)} existing tracked and nonignored untracked files.")
+    print("Scope: text and printable metadata; review binary contents and Git/hosting metadata separately.")
     if findings:
         print("Potential anonymity issues:")
         for finding in findings:
             print(f"  {finding}")
         raise SystemExit(1)
-    print("Anonymity scan passed.")
+    print("No identifying patterns found in the checked files.")
 
 
 if __name__ == "__main__":

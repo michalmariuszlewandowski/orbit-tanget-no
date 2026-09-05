@@ -1,6 +1,6 @@
 experiments:
-  # Sanity check outside the extreme low-label regime: compare compute-matched
-  # augmentation against the final lambda=0.10 orbit setting at 10% labels.
+  # N64 Galilean comparison at 10% labels: compute-matched augmentation and
+  # augmentation plus orbit consistency at lambda=0.10.
   - config: configs/pilot/2d_navier_stokes_galilean.yaml
     seeds: [23, 31, 47]
     overrides:

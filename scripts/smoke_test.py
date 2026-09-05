@@ -9,7 +9,6 @@ if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
 import argparse
-from pathlib import Path
 
 from otno.training.trainer import train_from_config
 

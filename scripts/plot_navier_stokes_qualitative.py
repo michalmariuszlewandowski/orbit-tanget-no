@@ -602,7 +602,7 @@ def _plot_fixed_stress_diagnostics(
     axes[0].legend(frameon=False, loc="lower right")
     _format_diagnostic_axis(axes[0])
 
-    # (b) Full 256-case distribution used by the disclosed median-effect rule.
+    # (b) Full 256-case distribution used by the median-effect selection rule.
     improvement = (errors["aug_ood"] - errors["loco_ood"]).numpy()
     sorted_improvement = np.sort(improvement)
     cumulative = np.arange(1, improvement.size + 1, dtype=float) / improvement.size
@@ -719,7 +719,7 @@ def _plot_equivariance_residuals(
     boost: tuple[float, float],
     out_prefix: Path,
 ) -> dict[str, Any]:
-    """Plot spatial equivariance residuals for the same disclosed example."""
+    """Plot spatial equivariance residuals for the selected example."""
     aug_residual = np.abs(_array(fields["aug_ood"][index]) - _array(fields["aug_equiv"][index]))
     loco_residual = np.abs(
         _array(fields["loco_ood"][index]) - _array(fields["loco_equiv"][index])

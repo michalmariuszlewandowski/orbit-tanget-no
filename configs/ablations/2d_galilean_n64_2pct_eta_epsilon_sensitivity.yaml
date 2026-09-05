@@ -1,9 +1,7 @@
 experiments:
-  # Compact robustness sweep for the finite-difference denominator and local
-  # step distribution in the N64 2%-label Galilean Aug+Orbit setting.
-  #
-  # Eta settings keep the default step radius fixed. Epsilon settings keep the
-  # default eta fixed. The shared default row is included once.
+  # Finite-difference denominator and local-step sensitivity at 2% labels.
+  # Eta settings hold the step radius fixed; epsilon settings hold eta fixed.
+  # The shared default setting is included once.
   - config: configs/pilot/2d_navier_stokes_galilean.yaml
     seeds: [23, 31, 47]
     overrides:

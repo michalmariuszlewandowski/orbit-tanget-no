@@ -17,10 +17,11 @@ from otno.training.losses import (
 )
 
 
-def _rng_context(seed: int | None, device: torch.device):
+def _rng_context(seed: int | None):
     if seed is None:
         return nullcontext()
-    devices = [device] if device.type == "cuda" else []
+    # torch.manual_seed also seeds every CUDA device, even for CPU evaluation.
+    devices = list(range(torch.cuda.device_count()))
     return torch.random.fork_rng(devices=devices, enabled=True)
 
 
@@ -64,11 +65,9 @@ def evaluate_model(
     start = time.perf_counter()
     num_samples = 0
     num_batches = 0
-    with _rng_context(seed, device):
+    with _rng_context(seed):
         if seed is not None:
             torch.manual_seed(seed)
-            if device.type == "cuda":
-                torch.cuda.manual_seed_all(seed)
         for batch_idx, batch in enumerate(loader):
             if max_batches is not None and batch_idx >= max_batches:
                 break

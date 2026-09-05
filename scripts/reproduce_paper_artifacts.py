@@ -14,9 +14,9 @@ if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
 import pandas as pd
-import yaml
 
-from otno.reporting import collect_run_rows
+from otno.reporting import collect_run_rows, drop_empty_config_columns
+from run_ood_severity_matrix import _jobs as _iter_severity_jobs, _symmetry_value
 
 
 METRIC_COLS = [
@@ -39,7 +39,6 @@ REQUIRED_TRAINING_FILES = [
     "val_metrics.jsonl",
     "test_metrics.json",
     "checkpoints/best.pt",
-    "checkpoints/last.pt",
 ]
 
 TRAINING_SPECS = {
@@ -268,6 +267,7 @@ def _aggregate(df: pd.DataFrame, group_cols: list[str]) -> pd.DataFrame:
 
 def _write_table(df: pd.DataFrame, out_prefix: Path, group_cols: list[str]) -> pd.DataFrame:
     out_prefix.parent.mkdir(parents=True, exist_ok=True)
+    df = drop_empty_config_columns(df)
     df.to_csv(out_prefix.with_suffix(".runs.csv"), index=False)
     aggregate = _aggregate(df, group_cols)
     aggregate.to_csv(out_prefix.with_suffix(".aggregate.csv"), index=False)
@@ -300,55 +300,6 @@ def _select_training_rows(all_runs: pd.DataFrame, table_name: str) -> pd.DataFra
     out = pd.concat(frames, ignore_index=True)
     sort_cols = [col for col in ["spec_index", "seed", "run_dir"] if col in out.columns]
     return out.sort_values(sort_cols).drop(columns=["run_dir_norm", "spec_index"])
-
-
-def _format_value(value: Any, context: dict[str, Any]) -> Any:
-    if isinstance(value, str):
-        return value.format(**context)
-    if isinstance(value, list):
-        return [_format_value(item, context) for item in value]
-    if isinstance(value, dict):
-        return {key: _format_value(item, context) for key, item in value.items()}
-    return value
-
-
-def _symmetry_value(symmetry: dict[str, Any], key: str) -> Any:
-    if key in symmetry:
-        return symmetry[key]
-    for transform in symmetry.get("transforms", []):
-        if isinstance(transform, dict) and key in transform:
-            return transform[key]
-    return None
-
-
-def _iter_severity_jobs(matrix_path: Path) -> list[dict[str, Any]]:
-    with matrix_path.open("r", encoding="utf-8") as f:
-        matrix = yaml.safe_load(f) or {}
-    jobs: list[dict[str, Any]] = []
-    for entry in matrix.get("evaluations", []):
-        seeds = entry.get("seeds", [None])
-        methods = entry.get("methods", [None])
-        if not isinstance(seeds, list):
-            seeds = [seeds]
-        if not isinstance(methods, list):
-            methods = [methods]
-        for method in methods:
-            for seed in seeds:
-                context = dict(entry.get("format", {}))
-                if method is not None:
-                    context["method"] = method
-                if seed is not None:
-                    context["seed"] = int(seed)
-                job = _format_value(dict(entry), context)
-                job.pop("methods", None)
-                job.pop("seeds", None)
-                job.pop("format", None)
-                if method is not None:
-                    job["method"] = method
-                if seed is not None:
-                    job["seed"] = int(seed)
-                jobs.append(job)
-    return jobs
 
 
 def _collect_severity_rows() -> pd.DataFrame:
@@ -623,7 +574,7 @@ def _regenerate_diagnostics(*, table_dir: Path, figures_dir: Path) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Regenerate cached paper-facing N64 Galilean artifacts."
+        description="Regenerate N64 Galilean tables and figures from recorded metrics."
     )
     parser.add_argument("--runs", default="runs")
     parser.add_argument("--out-dir", default="runs/paper_tables")

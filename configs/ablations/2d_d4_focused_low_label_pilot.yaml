@@ -1,7 +1,7 @@
 experiments:
-  # D4-only low-label pilot. Translation is removed because no-grid FNOs are
-  # already strongly translation friendly; this isolates the less automatic
-  # vorticity pseudoscalar D4 symmetry.
+  # D4-only vorticity comparison at low label fractions. Excluding translations
+  # isolates the pseudoscalar D4 action; FNOs without grid features already
+  # commute with periodic grid translations.
   - config: configs/pilot/2d_navier_stokes_translation_d4.yaml
     seeds: [23]
     overrides:

@@ -1,7 +1,6 @@
 experiments:
-  # Robustness sweep for the headline 2%-label N64 boosted-Galilean result.
-  # Lambda 0.05 is the existing main setting and should skip from the completed
-  # paper-ladder checkpoints; 0.01 and 0.1 test sensitivity around it.
+  # N64 Galilean orbit weights 0.01, 0.05, and 0.10 at 2% labels.
+  # The 0.05 setting shares output paths with the paper-ladder matrix.
   - config: configs/pilot/2d_navier_stokes_galilean.yaml
     seeds: [23, 31, 47]
     overrides:

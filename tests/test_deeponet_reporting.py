@@ -49,7 +49,9 @@ def _valid_method_rows(module, spec):
 def test_deeponet_seed_validation_rejects_incomplete_runs():
     module = _load_module()
     with pytest.raises(module.DeepONetProtocolError, match="expected seeds"):
-        module._validate_seeds(pd.DataFrame({"seed": [23, 31, 47, 59]}), "test")
+        module.validation.seeds(
+            pd.DataFrame({"seed": [23, 31, 47, 59]}), "test", module.EXPECTED_SEEDS
+        )
 
 
 def _fno_reference_rows(module):

@@ -1,6 +1,6 @@
 experiments:
-  # D4-only 1%-label lambda refinement. The 0.05 point and the matching aug
-  # baseline already live in 2d_d4_focused_low_label_pilot.
+  # D4 orbit-weight sweep at 1% labels. The 0.05 weight and augmentation baseline
+  # are defined in 2d_d4_focused_low_label_pilot.
   - config: configs/pilot/2d_navier_stokes_translation_d4.yaml
     seeds: [23]
     overrides:

@@ -1,7 +1,5 @@
 experiments:
-  # Overnight headline table for the N64 boosted-Galilean 2%-label setting.
-  # This completes the paper-facing four-method comparison and extends the
-  # decisive augmentation-vs-orbit comparison from 3 to 5 seeds.
+  # N64 Galilean four-method comparison at 2% labels across five seeds.
   - config: configs/pilot/2d_navier_stokes_galilean.yaml
     seeds: [23, 31, 47, 59, 71]
     overrides:

@@ -10,9 +10,8 @@ if str(SRC) not in sys.path:
 
 import argparse
 from collections import Counter
-from typing import Any
 
-from otno.config import apply_dotted_overrides, load_config, validate_config
+from otno.config import apply_dotted_overrides, format_config_values, load_config, validate_config
 from otno.models import build_model
 from otno.symmetry.registry import build_transform
 
@@ -99,7 +98,7 @@ def _validate_adaptation_matrix(path: Path, *, require_checkpoints: bool = False
             context = dict(entry.get("format", {}))
             if seed is not None:
                 context["seed"] = int(seed)
-            overrides = _format_config_value(dict(entry.get("overrides", {})), context)
+            overrides = format_config_values(dict(entry.get("overrides", {})), context)
             merged = apply_dotted_overrides(load_config(cfg_path), overrides)
             for key in ["adaptation", "runtime"]:
                 if key not in merged:
@@ -121,16 +120,6 @@ def _validate_adaptation_matrix(path: Path, *, require_checkpoints: bool = False
     for run in duplicates:
         errors.append(f"{path}: duplicate run_dir {run}")
     return errors
-
-
-def _format_config_value(value: Any, context: dict[str, Any]) -> Any:
-    if isinstance(value, str):
-        return value.format(**context)
-    if isinstance(value, list):
-        return [_format_config_value(item, context) for item in value]
-    if isinstance(value, dict):
-        return {key: _format_config_value(item, context) for key, item in value.items()}
-    return value
 
 
 def _validate_evaluation_matrix(path: Path, *, require_checkpoints: bool = False) -> list[str]:
@@ -155,7 +144,7 @@ def _validate_evaluation_matrix(path: Path, *, require_checkpoints: bool = False
                     context["method"] = method
                 if seed is not None:
                     context["seed"] = int(seed)
-                expanded = _format_config_value(dict(entry), context)
+                expanded = format_config_values(dict(entry), context)
                 checkpoint = expanded.get("checkpoint")
                 out_dir = expanded.get("out_dir")
                 if not checkpoint:

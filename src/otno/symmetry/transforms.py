@@ -31,27 +31,6 @@ def periodic_shift_1d(x: torch.Tensor, shift: torch.Tensor | float, *, length: f
     return y.permute(0, 2, 1).contiguous()
 
 
-def periodic_shift_1d_per_channel(
-    x: torch.Tensor,
-    shift: torch.Tensor,
-    *,
-    length: float = 1.0,
-) -> torch.Tensor:
-    """Return ``f_c(x - shift_c)`` for tensors ``[batch, n, channels]``."""
-    if x.ndim != 3:
-        raise ValueError(f"Expected [batch, n, channels], got {tuple(x.shape)}")
-    batch, n, channels = x.shape
-    shift_t = torch.as_tensor(shift, device=x.device, dtype=x.dtype)
-    if shift_t.shape != (batch, channels):
-        raise ValueError(f"Expected shift [batch, channels], got {tuple(shift_t.shape)}")
-    x_ch = x.permute(0, 2, 1)
-    x_ft = torch.fft.rfft(x_ch, dim=-1)
-    freqs = torch.fft.rfftfreq(n, d=length / n, device=x.device).to(x.dtype)
-    phase = torch.exp(-2j * math.pi * shift_t[:, :, None] * freqs[None, None, :])
-    y = torch.fft.irfft(x_ft * phase, n=n, dim=-1)
-    return y.permute(0, 2, 1).contiguous()
-
-
 def periodic_derivative_1d(x: torch.Tensor, *, length: float = 1.0) -> torch.Tensor:
     """Return the spatial derivative of periodic 1D fields."""
     if x.ndim != 3:
@@ -306,72 +285,6 @@ class Burgers1DGalilean(BaseTransform):
         )
         tangent[..., self.channel] = tangent[..., self.channel] + boost.view(-1, 1)
         return tangent
-
-
-class KdV1DGalilean(BaseTransform):
-    """Galilean-like KdV action without an explicit frame/input-channel parameter.
-
-    The point symmetry is ``(x, t, u) -> (x + c t, t, u + c)``. On a fixed
-    Eulerian grid this becomes ``u'(x,t)=u(x-c t,t)+c``.
-    """
-
-    name = "kdv1d_galilean"
-
-    def __init__(
-        self,
-        max_boost: float = 0.2,
-        final_time: float = 20.0,
-        input_steps: int = 20,
-        output_steps: int = 100,
-        length: float = 128.0,
-    ):
-        self.max_boost = float(max_boost)
-        self.final_time = float(final_time)
-        self.input_steps = int(input_steps)
-        self.output_steps = int(output_steps)
-        self.length = float(length)
-
-    def _times(self, channels: int, device: torch.device, dtype: torch.dtype, *, output: bool) -> torch.Tensor:
-        total = self.input_steps + self.output_steps
-        if channels != (self.output_steps if output else self.input_steps):
-            raise ValueError(
-                f"{self.name} expected {self.output_steps if output else self.input_steps} "
-                f"{'output' if output else 'input'} channels, got {channels}"
-            )
-        times = torch.linspace(0.0, self.final_time, total, device=device, dtype=dtype)
-        return times[self.input_steps :] if output else times[: self.input_steps]
-
-    def sample(self, batch_size: int, device: torch.device, dtype: torch.dtype = torch.float32) -> TransformSample:
-        boost = (2 * torch.rand(batch_size, device=device, dtype=dtype) - 1) * self.max_boost
-        eps = boost.abs().clamp_min(1e-6)
-        return TransformSample({"boost": boost}, eps, self.name)
-
-    def _apply(self, x: torch.Tensor, sample: TransformSample, *, output: bool) -> torch.Tensor:
-        if x.ndim != 3:
-            raise ValueError(f"{self.name} expects [batch, n, channels], got {tuple(x.shape)}")
-        boost = sample.params["boost"].to(device=x.device, dtype=x.dtype)
-        times = self._times(x.shape[-1], x.device, x.dtype, output=output)
-        shift = boost[:, None] * times[None, :]
-        shifted = periodic_shift_1d_per_channel(x, shift, length=self.length)
-        return shifted + boost.view(-1, 1, 1)
-
-    def apply_input(self, a: torch.Tensor, sample: TransformSample) -> torch.Tensor:
-        return self._apply(a, sample, output=False)
-
-    def apply_output(self, u: torch.Tensor, sample: TransformSample) -> torch.Tensor:
-        return self._apply(u, sample, output=True)
-
-    def input_tangent(self, a: torch.Tensor, sample: TransformSample) -> torch.Tensor:
-        boost = sample.params["boost"].to(device=a.device, dtype=a.dtype)
-        times = self._times(a.shape[-1], a.device, a.dtype, output=False)
-        derivative = periodic_derivative_1d(a, length=self.length)
-        return -boost.view(-1, 1, 1) * times.view(1, 1, -1) * derivative + boost.view(-1, 1, 1)
-
-    def output_tangent(self, u: torch.Tensor, sample: TransformSample) -> torch.Tensor:
-        boost = sample.params["boost"].to(device=u.device, dtype=u.dtype)
-        times = self._times(u.shape[-1], u.device, u.dtype, output=True)
-        derivative = periodic_derivative_1d(u, length=self.length)
-        return -boost.view(-1, 1, 1) * times.view(1, 1, -1) * derivative + boost.view(-1, 1, 1)
 
 
 class NavierStokes2DGalilean(BaseTransform):

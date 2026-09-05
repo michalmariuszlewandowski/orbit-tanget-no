@@ -31,7 +31,7 @@ def main() -> None:
     _run([sys.executable, "scripts/check_configs.py"], env=env)
     _run([sys.executable, "scripts/run_matrix.py", "--matrix", "configs/experiments_core.yaml", "--dry-run"], env=env)
     if not args.skip_tests:
-        _run([sys.executable, "-m", "pytest", "-q"], env=env)
+        _run([sys.executable, "-m", "pytest", "-q", "-p", "no:cacheprovider"], env=env)
     if not args.skip_solver_validation:
         _run([sys.executable, "scripts/validate_solvers.py"], env=env)
     if not args.skip_smoke:

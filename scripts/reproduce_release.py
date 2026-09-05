@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Plan or run the v11 experiment registry without replacing evidence inputs."""
+"""Plan or run experiments from the release registry."""
 from __future__ import annotations
 
 import argparse
@@ -50,6 +50,7 @@ class Step:
     immutable: bool = False
     expected_config: dict[str, Any] | None = None
     fresh_report_inputs: list[str] = field(default_factory=list)
+    evaluations: list[tuple[dict[str, Any], str]] = field(default_factory=list)
 
 
 def _path(root: Path, value: str) -> Path:
@@ -73,6 +74,7 @@ def selected_suites(registry: dict, requested: list[str]) -> list[str]:
     suites = registry["suites"]
     wanted: set[str] = set()
     visiting: set[str] = set()
+    ordered: list[str] = []
 
     def add(name: str) -> None:
         if name not in suites:
@@ -86,15 +88,15 @@ def selected_suites(registry: dict, requested: list[str]) -> list[str]:
             add(dependency)
         visiting.remove(name)
         wanted.add(name)
+        ordered.append(name)
 
     for name in (list(suites) if "all" in requested else requested):
         add(name)
-    # The registry order is intentionally the documented execution order.
-    return [name for name in suites if name in wanted]
+    return ordered
 
 
 def source_files(registry: dict, root: Path = ROOT) -> set[str]:
-    """Source dependency inventory for the release packager."""
+    """List the source and config dependencies of the experiment registry."""
     files = {"scripts/reproduce_release.py", "scripts/run_matrix.py"}
     for data in registry["datasets"].values():
         files.add(data["config"])
@@ -113,7 +115,7 @@ def source_files(registry: dict, root: Path = ROOT) -> set[str]:
 
 
 def build_plan(registry: dict, suites: list[str], root: Path = ROOT) -> list[Step]:
-    # Import existing expansion helpers rather than reimplementing their seed rules.
+    # Share seed expansion with the matrix runners.
     from run_adapt_matrix import _command as adapt_command
     from run_adapt_matrix import _jobs as adapt_jobs
     from run_ood_severity_matrix import _jobs as evaluation_jobs
@@ -195,6 +197,7 @@ def build_plan(registry: dict, suites: list[str], root: Path = ROOT) -> list[Ste
                     + [registry["datasets"][data]["path"] for data in suite.get("datasets", [])]
                 )),
                 produces=outputs + [spec["out_prefix"] + ".runs.csv", spec["out_prefix"] + ".aggregate.csv"],
+                evaluations=list(zip(jobs, outputs)),
             ))
 
     for stage in ("reports", "figures"):
@@ -230,7 +233,13 @@ def _file_hash(path: Path, size: int, modified_ns: int) -> str:
     return digest.hexdigest()
 
 
-def completed(step: Step, root: Path) -> bool:
+def completed(step: Step, root: Path, *, verify_evaluation_inputs: bool = False) -> bool:
+    from run_ood_severity_matrix import _read_cached_metrics
+
+    for job, output in step.evaluations:
+        path = _path(root, output)
+        if path.is_file() and (verify_evaluation_inputs or path.with_suffix(".evaluation.json").is_file()):
+            _read_cached_metrics(job, path, root, "cpu")
     if not step.produces or not all(_path(root, path).is_file() for path in step.produces):
         return False
     if step.stage == "train":
@@ -296,14 +305,16 @@ def completed(step: Step, root: Path) -> bool:
     return True
 
 
-def preflight(steps: list[Step], root: Path = ROOT) -> list[str]:
-    """Check the entire plan before any expensive or mutating step starts."""
+def preflight(
+    steps: list[Step], root: Path = ROOT, *, verify_evaluation_inputs: bool = False
+) -> list[str]:
+    """Validate all inputs and dependencies before execution."""
     available: set[str] = set()
     problems: list[str] = []
     for step in steps:
         try:
             report_command(step, root)
-            done = completed(step, root)
+            done = completed(step, root, verify_evaluation_inputs=verify_evaluation_inputs)
         except (ValueError, OSError) as exc:
             problems.append(str(exc))
             continue
@@ -324,7 +335,7 @@ def preflight(steps: list[Step], root: Path = ROOT) -> list[str]:
 
 
 def report_command(step: Step, root: Path) -> list[str]:
-    """Use strict historical or strict fresh auditing; never mix campaigns."""
+    """Select validation rules for either archived or newly trained runs."""
     if not step.fresh_report_inputs:
         return step.command
     kinds = set()
@@ -366,17 +377,17 @@ def main() -> None:
             print(f"[{step.stage}] {shlex.join(report_command(step, ROOT))}", flush=True)
     if not args.execute and not args.preflight:
         return
-    problems = preflight(steps)
+    problems = preflight(steps, ROOT, verify_evaluation_inputs=args.execute)
     if problems:
         raise SystemExit("Release preflight failed:\n" + "\n".join(problems))
     print("RELEASE PREFLIGHT PASSED", flush=True)
     if not args.execute:
         return
-    # The audited backbone protocols require CPU while retaining device: auto
-    # in their recorded configs. Keep that protocol on GPU-equipped hosts too.
+    # Backbone runs used CPU with device: auto in their configs.
+    # Disable CUDA to reproduce that setting on hosts with a GPU.
     env = dict(os.environ, OMP_NUM_THREADS="1", MKL_NUM_THREADS="1", CUDA_VISIBLE_DEVICES="")
     for step in steps:
-        if step.stage in ("data", "train", "evaluate") and completed(step, ROOT):
+        if step.stage in ("data", "train", "evaluate") and completed(step, ROOT, verify_evaluation_inputs=True):
             print(f"skip completed: {step.name}", flush=True)
             continue
         subprocess.run(report_command(step, ROOT), cwd=ROOT, env=env, check=True)

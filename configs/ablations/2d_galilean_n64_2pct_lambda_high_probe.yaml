@@ -1,8 +1,6 @@
 experiments:
-  # Cheap high-lambda probe for the 2%-label N64 Galilean Aug+Orbit setting.
-  # The existing sweep stops at lambda_orbit=0.10, which is the best completed
-  # value. Lambda 0.20 and 0.30 are expanded to matched seeds to compare
-  # high-weight settings against the completed lambda 0.10 row.
+  # N64 Galilean orbit weights 0.20 and 0.30 at 2% labels, with matched seeds
+  # for comparison against lambda=0.10.
   - config: configs/pilot/2d_navier_stokes_galilean.yaml
     seeds: [23, 31, 47, 59, 71]
     overrides:

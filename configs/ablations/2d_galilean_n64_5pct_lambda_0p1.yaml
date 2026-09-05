@@ -1,6 +1,5 @@
 experiments:
-  # Check whether the stronger orbit weight from the 2%-label headline result
-  # also improves the 5%-label N64 boosted-Galilean point.
+  # N64 Galilean orbit consistency at 5% labels and lambda=0.10.
   - config: configs/pilot/2d_navier_stokes_galilean.yaml
     seeds: [23, 31, 47]
     overrides:

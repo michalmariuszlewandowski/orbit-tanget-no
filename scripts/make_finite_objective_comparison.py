@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Aggregate the cache-only finite-objective comparison requested by Reviewer 3."""
+"""Aggregate recorded metrics for the finite-objective comparison."""
 
 from __future__ import annotations
 
@@ -19,7 +19,7 @@ if str(SRC) not in sys.path:
 import pandas as pd
 from scipy.stats import t as student_t
 
-from otno.reporting import collect_run_rows
+from otno.reporting import collect_run_rows, value_matches
 
 
 DEFAULT_OUT_PREFIX = "runs/paper_tables/2d_galilean_n64_2pct_finite_objective_comparison"
@@ -37,7 +37,7 @@ AGGREGATE_METRICS = CORE_METRICS + (
 
 
 class ComparisonValidationError(ValueError):
-    """Raised when the recorded runs do not exactly match the audited protocol."""
+    """Raised when recorded runs do not match the comparison protocol."""
 
 
 @dataclass(frozen=True)
@@ -169,17 +169,6 @@ def _validate_seed_set(df: pd.DataFrame, spec: ObjectiveSpec) -> list[int]:
     return seeds
 
 
-def _value_matches(actual: Any, expected: Any) -> bool:
-    if isinstance(expected, bool):
-        return isinstance(actual, bool) and actual is expected
-    if isinstance(expected, float):
-        try:
-            return math.isclose(float(actual), expected, rel_tol=0.0, abs_tol=1e-12)
-        except (TypeError, ValueError):
-            return False
-    return actual == expected
-
-
 def _validate_constant(
     df: pd.DataFrame,
     *,
@@ -191,7 +180,7 @@ def _validate_constant(
         raise ComparisonValidationError(f"{objective}: missing protocol field {column!r}")
     bad: list[str] = []
     for _, row in df.iterrows():
-        if not _value_matches(row[column], expected):
+        if not value_matches(row[column], expected):
             bad.append(f"seed={int(row['seed'])}: {row[column]!r}")
     if bad:
         raise ComparisonValidationError(
@@ -615,10 +604,7 @@ def build_comparison(specs: tuple[ObjectiveSpec, ...]) -> tuple[pd.DataFrame, ..
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description=(
-            "Aggregate recorded N64 Galilean finite-objective controls; this script never "
-            "trains or evaluates a model."
-        )
+        description="Aggregate recorded N64 Galilean finite-objective control metrics."
     )
     parser.add_argument(
         "--aug-root",

@@ -6,7 +6,6 @@ from __future__ import annotations
 import argparse
 import math
 import sys
-from collections import Counter
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -20,7 +19,7 @@ import numpy as np
 import pandas as pd
 from scipy.stats import t as student_t
 
-from otno.reporting import collect_run_rows
+from otno.reporting import RunValidation, collect_run_rows, is_missing
 
 
 EXPECTED_SEEDS = (23, 31, 47, 59, 71)
@@ -69,6 +68,9 @@ class CNO2dProtocolError(ValueError):
     """Raised when cached runs do not exactly match the declared protocol."""
 
 
+validation = RunValidation(CNO2dProtocolError)
+
+
 @dataclass(frozen=True)
 class MethodSpec:
     method: str
@@ -113,10 +115,8 @@ METHOD_SPECS = (
 )
 
 
-# These are the only checkpoint continuations authorized by the campaign's
-# recorded pause state.  The checkpoint files are overwritten as training
-# continues, so their pre-resume hashes are retained here for disclosure rather
-# than presented as hashes of the final checkpoint files.
+# Resumes recorded in the campaign's pause state. Hashes refer to checkpoints
+# before resuming; training overwrites those files.
 AUTHORIZED_RESUMES = {
     ("baseline", 23): ResumeSpec(
         last_completed_epoch=108,
@@ -141,69 +141,10 @@ AUTHORIZED_RESUMES = {
 }
 
 
-def _value_matches(actual: Any, expected: Any) -> bool:
-    if isinstance(expected, bool):
-        return isinstance(actual, bool) and actual is expected
-    if isinstance(expected, float):
-        try:
-            return math.isclose(float(actual), expected, rel_tol=0.0, abs_tol=1e-12)
-        except (TypeError, ValueError):
-            return False
-    return actual == expected
-
-
-def _validate_constant(df: pd.DataFrame, column: str, expected: Any, context: str) -> None:
-    if column not in df.columns:
-        raise CNO2dProtocolError(f"{context}: missing protocol field {column!r}")
-    failures = []
-    for _, row in df.iterrows():
-        if not _value_matches(row[column], expected):
-            failures.append(f"seed={row.get('seed')}: {row[column]!r}")
-    if failures:
-        raise CNO2dProtocolError(
-            f"{context}: expected {column}={expected!r}; found " + "; ".join(failures)
-        )
-
-
-def _is_missing(value: Any) -> bool:
-    return value is None or (isinstance(value, float) and math.isnan(value))
-
-
-def _validate_optional_constant(
-    df: pd.DataFrame, column: str, expected: Any, context: str
-) -> None:
-    if column not in df.columns:
-        return
-    failures = []
-    for _, row in df.iterrows():
-        value = row[column]
-        if not _is_missing(value) and not _value_matches(value, expected):
-            failures.append(f"seed={row.get('seed')}: {value!r}")
-    if failures:
-        raise CNO2dProtocolError(
-            f"{context}: expected absent or {column}={expected!r}; found "
-            + "; ".join(failures)
-        )
-
-
-def _validate_absent(df: pd.DataFrame, column: str, context: str) -> None:
-    if column not in df.columns:
-        return
-    failures = []
-    for _, row in df.iterrows():
-        value = row[column]
-        if not _is_missing(value):
-            failures.append(f"seed={row.get('seed')}: {value!r}")
-    if failures:
-        raise CNO2dProtocolError(
-            f"{context}: expected {column!r} to be absent; found " + "; ".join(failures)
-        )
-
-
 def _annotate_authorized_resumes(
     df: pd.DataFrame, spec: MethodSpec, context: str, *, historical: bool = True
 ) -> pd.DataFrame:
-    """Validate the exact campaign resume allowlist and add disclosure fields."""
+    """Validate recorded campaign resumes and add their checkpoint metadata."""
     out = df.copy()
     expected = {
         (method, seed): resume_spec
@@ -215,7 +156,7 @@ def _annotate_authorized_resumes(
 
     for _, row in out.iterrows():
         value = row.get("config.runtime.resume")
-        if _is_missing(value):
+        if is_missing(value):
             resumed = False
         elif isinstance(value, (bool, np.bool_)):
             resumed = bool(value)
@@ -276,123 +217,8 @@ def _annotate_authorized_resumes(
     return out
 
 
-def _validate_nonempty_consistent(
-    df: pd.DataFrame, column: str, context: str
-) -> None:
-    if column not in df.columns:
-        raise CNO2dProtocolError(f"{context}: missing provenance field {column!r}")
-    values: list[tuple[Any, Any]] = []
-    for _, row in df.iterrows():
-        value = row[column]
-        if _is_missing(value) or (isinstance(value, str) and not value.strip()):
-            raise CNO2dProtocolError(
-                f"{context}: empty provenance field {column!r} for seed={row.get('seed')}"
-            )
-        values.append((row.get("seed"), value))
-    expected = values[0][1]
-    failures = [
-        f"seed={seed}: {value!r}"
-        for seed, value in values[1:]
-        if not _value_matches(value, expected)
-    ]
-    if failures:
-        raise CNO2dProtocolError(
-            f"{context}: inconsistent {column!r}; expected {expected!r}; found "
-            + "; ".join(failures)
-        )
-
-
-def _validate_consistent(df: pd.DataFrame, column: str, context: str) -> None:
-    if column not in df.columns:
-        raise CNO2dProtocolError(f"{context}: missing provenance field {column!r}")
-    expected = df.iloc[0][column]
-    failures = []
-    for _, row in df.iloc[1:].iterrows():
-        value = row[column]
-        both_missing = _is_missing(expected) and _is_missing(value)
-        if not both_missing and (
-            _is_missing(expected)
-            or _is_missing(value)
-            or not _value_matches(value, expected)
-        ):
-            failures.append(f"seed={row.get('seed')}: {value!r}")
-    if failures:
-        raise CNO2dProtocolError(
-            f"{context}: inconsistent {column!r}; expected {expected!r}; found "
-            + "; ".join(failures)
-        )
-
-
-def _validate_seeds(
-    df: pd.DataFrame,
-    context: str,
-    expected_seeds: tuple[int, ...] = EXPECTED_SEEDS,
-) -> None:
-    if "seed" not in df.columns:
-        raise CNO2dProtocolError(f"{context}: missing seed field")
-    seeds = [int(seed) for seed in df["seed"]]
-    counts = Counter(seeds)
-    duplicates = {seed: count for seed, count in counts.items() if count != 1}
-    if duplicates:
-        raise CNO2dProtocolError(f"{context}: duplicate seed rows {duplicates}")
-    if set(seeds) != set(expected_seeds):
-        raise CNO2dProtocolError(
-            f"{context}: expected seeds {list(expected_seeds)}, found {sorted(seeds)}"
-        )
-
-
 def load_fno_reference_seeds(path: Path) -> tuple[int, ...]:
-    """Read the exact seed set shared by the four primary FNO rows."""
-    if not path.is_file():
-        raise CNO2dProtocolError(f"FNO seed reference does not exist: {path}")
-    try:
-        df = pd.read_csv(path)
-    except (OSError, pd.errors.ParserError) as exc:
-        raise CNO2dProtocolError(f"could not read FNO seed reference {path}: {exc}") from exc
-
-    required = {"method", "model_name", "seed"}
-    missing = sorted(required.difference(df.columns))
-    if missing:
-        raise CNO2dProtocolError(f"FNO seed reference {path} is missing columns {missing}")
-
-    reference: tuple[int, ...] | None = None
-    for spec in METHOD_SPECS:
-        group = df[df["method"] == spec.method]
-        context = f"FNO {spec.method} seed reference in {path}"
-        if group.empty:
-            raise CNO2dProtocolError(f"{context}: no rows")
-        model_names = set(group["model_name"].dropna().astype(str))
-        if model_names != {"fno2d"}:
-            raise CNO2dProtocolError(
-                f"{context}: expected model_name='fno2d', found {sorted(model_names)}"
-            )
-        try:
-            seeds = [int(seed) for seed in group["seed"]]
-        except (TypeError, ValueError) as exc:
-            raise CNO2dProtocolError(f"{context}: non-integer seed") from exc
-        counts = Counter(seeds)
-        duplicates = {seed: count for seed, count in counts.items() if count != 1}
-        if duplicates:
-            raise CNO2dProtocolError(f"{context}: duplicate seed rows {duplicates}")
-        current = tuple(sorted(seeds))
-        if reference is None:
-            reference = current
-        elif current != reference:
-            raise CNO2dProtocolError(
-                f"{context}: expected the shared FNO seeds {reference}, found {current}"
-            )
-    if reference is None:
-        raise CNO2dProtocolError(f"FNO seed reference {path} contains no methods")
-    return reference
-
-
-def _validate_finite_metrics(df: pd.DataFrame, context: str) -> None:
-    for metric in FINITE_METRICS:
-        if metric not in df.columns:
-            raise CNO2dProtocolError(f"{context}: missing metric {metric!r}")
-        values = pd.to_numeric(df[metric], errors="coerce")
-        if values.isna().any() or not values.map(math.isfinite).all():
-            raise CNO2dProtocolError(f"{context}: non-finite values in {metric!r}")
+    return validation.fno_reference_seeds(path, [spec.method for spec in METHOD_SPECS])
 
 
 def _expected_protocol(spec: MethodSpec, *, fresh_runs: bool = False) -> dict[str, Any]:
@@ -497,16 +323,16 @@ def _load_method(
     context = f"{spec.method} under {method_root}"
     if df.empty:
         raise CNO2dProtocolError(f"{context}: no completed test_metrics.json files")
-    _validate_seeds(df, context, expected_seeds)
+    validation.seeds(df, context, expected_seeds)
     for column, expected in _expected_protocol(spec, fresh_runs=fresh_runs).items():
-        _validate_constant(df, column, expected, context)
-    _validate_absent(df, "config.training.stop_after_epochs", context)
+        validation.constant(df, column, expected, context)
+    validation.absent(df, "config.training.stop_after_epochs", context)
     for column in NONEMPTY_PROVENANCE_FIELDS:
         if fresh_runs and column == "environment.git_commit":
             continue
-        _validate_nonempty_consistent(df, column, context)
+        validation.nonempty_consistent(df, column, context)
     for column in CONSISTENT_PROVENANCE_FIELDS:
-        _validate_consistent(df, column, context)
+        validation.consistent(df, column, context)
     for _, row in df.iterrows():
         if int(row["seed"]) != int(row["config.seed"]):
             raise CNO2dProtocolError(
@@ -516,12 +342,12 @@ def _load_method(
             raise CNO2dProtocolError(
                 f"{context}: metrics/environment config hash mismatch in {row['run_dir']}"
             )
-    _validate_finite_metrics(df, context)
+    validation.finite_metrics(df, context, FINITE_METRICS)
     if fresh_runs:
-        _validate_optional_constant(df, "config.runtime.resume", False, context)
-        _validate_absent(df, "config.runtime.source_snapshot", context)
-        _validate_absent(df, "config.runtime.source_snapshot_sha256", context)
-        _validate_nonempty_consistent(df, "source_sha256", context)
+        validation.optional_constant(df, "config.runtime.resume", False, context)
+        validation.absent(df, "config.runtime.source_snapshot", context)
+        validation.absent(df, "config.runtime.source_snapshot_sha256", context)
+        validation.nonempty_consistent(df, "source_sha256", context)
     out = _annotate_authorized_resumes(df, spec, context, historical=not fresh_runs)
     out["method_label"] = spec.label
     out["optimizer_steps"] = spec.steps_per_epoch * 150
@@ -544,9 +370,9 @@ def build_run_frame(
     for column in NONEMPTY_PROVENANCE_FIELDS:
         if fresh_runs and column == "environment.git_commit":
             continue
-        _validate_nonempty_consistent(df, column, "CNO2d campaign")
+        validation.nonempty_consistent(df, column, "CNO2d campaign")
     for column in CONSISTENT_PROVENANCE_FIELDS:
-        _validate_consistent(df, column, "CNO2d campaign")
+        validation.consistent(df, column, "CNO2d campaign")
     if fresh_runs:
         from otno.reporting import validate_fresh_run_provenance
 
@@ -768,13 +594,13 @@ def _manifest(run_df: pd.DataFrame) -> pd.DataFrame:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Aggregate completed CNO2d backbone runs; never trains or evaluates models."
+        description="Validate and aggregate recorded CNO2d backbone metrics."
     )
     parser.add_argument("--run-root", type=Path, default=DEFAULT_RUN_ROOT)
     parser.add_argument("--out-prefix", type=Path, default=DEFAULT_OUT_PREFIX)
     parser.add_argument(
         "--fresh-runs", action="store_true",
-        help="Audit new direct CPU/one-thread runs against their actual source and dataset hashes.",
+        help="Validate new runs against their source manifest and dataset hashes.",
     )
     parser.add_argument(
         "--fno-runs",

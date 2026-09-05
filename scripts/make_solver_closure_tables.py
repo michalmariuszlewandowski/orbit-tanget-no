@@ -226,7 +226,7 @@ def run_closure(config: dict[str, Any], args: argparse.Namespace) -> tuple[pd.Da
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Build paper-facing solver-level Galilean closure tables."
+        description="Build solver-level Galilean closure tables."
     )
     parser.add_argument("--config", default="configs/pilot/2d_navier_stokes_galilean.yaml")
     parser.add_argument("--dataset-path", default=None)

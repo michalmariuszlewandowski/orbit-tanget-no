@@ -2,30 +2,23 @@
 from __future__ import annotations
 
 import argparse
+import sys
 from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+SRC = ROOT / "src"
+if str(SRC) not in sys.path:
+    sys.path.insert(0, str(SRC))
 
 import pandas as pd
 
+from otno.reporting import paired_metric_summary
 
 METRICS = [
     ("relative_l2", "ID L2"),
     ("orbit_ood_relative_l2", "OOD L2"),
     ("equivariance_defect_relative", "Eq. defect"),
 ]
-
-T_CRIT_95 = {
-    1: 12.706204736432095,
-    2: 4.302652729911275,
-    3: 3.182446305284263,
-    4: 2.7764451051977987,
-    5: 2.570581835636305,
-    6: 2.4469118511449692,
-    7: 2.3646242510102993,
-    8: 2.306004135204166,
-    9: 2.2621571627409915,
-    10: 2.2281388519649385,
-}
-
 
 def _fmt(value: float) -> str:
     if abs(value) < 0.01 and value != 0:
@@ -102,34 +95,15 @@ def _paired_rows_from_frames(
 ) -> list[dict[str, object]]:
     rows: list[dict[str, object]] = []
     for metric, label in METRICS:
-        reference = reference_df[["seed", metric]].dropna().rename(columns={metric: "reference"})
-        candidate = candidate_df[["seed", metric]].dropna().rename(columns={metric: "candidate"})
-        pivot = reference.merge(candidate, on="seed", how="inner").sort_values("seed")
-        if pivot.empty:
-            raise SystemExit(f"No paired seeds found for {setting} / {metric}")
-        diff = pivot["candidate"] - pivot["reference"]
-        n = int(diff.shape[0])
-        mean = float(diff.mean())
-        std = float(diff.std(ddof=1)) if n > 1 else 0.0
-        sem = std / (n**0.5) if n > 0 else 0.0
-        tcrit = T_CRIT_95.get(n - 1, 1.96)
-        half_width = tcrit * sem
-        ref_mean = float(pivot["reference"].mean())
-        cand_mean = float(pivot["candidate"].mean())
-        reduction = 100.0 * (ref_mean - cand_mean) / ref_mean
         rows.append(
             {
                 "setting": setting,
                 "metric": label,
                 "reference_method": reference_label,
                 "candidate_method": candidate_label,
-                "seed_count": n,
-                "reference_mean": ref_mean,
-                "candidate_mean": cand_mean,
-                "paired_delta_mean": mean,
-                "paired_delta_ci95_low": mean - half_width,
-                "paired_delta_ci95_high": mean + half_width,
-                "relative_reduction_pct": reduction,
+                **paired_metric_summary(
+                    reference_df, candidate_df, metric, context=f"{setting} / {metric}"
+                ),
             }
         )
     return rows
@@ -321,7 +295,7 @@ def write_wrong_symmetry_table(out_prefix: Path, table_dir: Path) -> pd.DataFram
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Build reviewer-facing paper supplement tables.")
+    parser = argparse.ArgumentParser(description="Build supplementary comparison tables.")
     parser.add_argument("--out-prefix", default="runs/paper_tables/2d_galilean_n64_reviewer")
     parser.add_argument("--table-dir", default="runs/paper_tables")
     args = parser.parse_args()

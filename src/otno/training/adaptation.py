@@ -16,10 +16,11 @@ from otno.training.losses import orbit_consistency_loss
 from otno.training.metrics import evaluate_model, measure_inference_latency
 from otno.utils import (
     append_jsonl,
+    check_run_directory,
     dump_json,
-    ensure_dir,
     get_device,
     make_torch_generator,
+    prepare_run_directory,
     seed_worker,
     set_seed,
 )
@@ -111,7 +112,7 @@ def _random_orbit_consistency_loss(
         loss,
         {
             "orbit_loss": float(loss.detach().cpu()),
-            "orbit_defect_relative": float(
+            "orbit_defect_absolute": float(
                 diff.reshape(diff.shape[0], -1).norm(dim=-1).mean().detach().cpu()
             ),
             "epsilon_mean": float(sample.epsilon.detach().mean().cpu()),
@@ -123,7 +124,6 @@ def _random_orbit_consistency_loss(
 def _build_adaptation_transform(
     *,
     adaptation_cfg: dict[str, Any],
-    base_cfg: dict[str, Any],
     key: str,
     default: BaseTransform | None,
 ) -> BaseTransform | None:
@@ -136,12 +136,19 @@ def _build_adaptation_transform(
 
 
 def adapt_from_config(config: dict[str, Any]) -> dict[str, Any]:
+    runtime_cfg = config.get("runtime", {})
+    if runtime_cfg.get("resume", False):
+        raise ValueError("Adaptation does not support runtime.resume; start a new adaptation run.")
     seed = int(config.get("seed", 0))
     deterministic = bool(config.get("runtime", {}).get("deterministic", False))
     set_seed(seed, deterministic=deterministic)
     device = get_device(config.get("runtime", {}).get("device", "auto"))
-    run_dir = ensure_dir(config.get("runtime", {}).get("run_dir", "runs/adapt/default"))
-    save_config(config, run_dir / "config.yaml")
+    output_files = ("config.yaml", "adapt_metrics.jsonl", "adapt_results.json", "adapted.pt")
+    run_dir = check_run_directory(
+        runtime_cfg.get("run_dir", "runs/adapt/default"),
+        output_files=output_files,
+        overwrite=bool(runtime_cfg.get("overwrite", True)),
+    )
 
     adaptation_cfg = config.get("adaptation", {})
     ckpt_path = Path(adaptation_cfg["checkpoint"])
@@ -160,7 +167,6 @@ def adapt_from_config(config: dict[str, Any]) -> dict[str, Any]:
         raise ValueError("Adaptation requires a symmetry transform in the checkpoint config")
     transform = _build_adaptation_transform(
         adaptation_cfg=adaptation_cfg,
-        base_cfg=base_cfg,
         key="orbit_symmetry",
         default=base_transform,
     )
@@ -168,13 +174,11 @@ def adapt_from_config(config: dict[str, Any]) -> dict[str, Any]:
         raise ValueError("Adaptation requires an orbit transform")
     eval_transform = _build_adaptation_transform(
         adaptation_cfg=adaptation_cfg,
-        base_cfg=base_cfg,
         key="eval_symmetry",
         default=transform,
     )
     target_input_transform = _build_adaptation_transform(
         adaptation_cfg=adaptation_cfg,
-        base_cfg=base_cfg,
         key="target_input_symmetry",
         default=eval_transform if bool(adaptation_cfg.get("adapt_on_target_inputs", False)) else None,
     )
@@ -214,6 +218,19 @@ def adapt_from_config(config: dict[str, Any]) -> dict[str, Any]:
     gamma = float(adaptation_cfg.get("gamma_prediction_preservation", 0.0))
     normalize_by_epsilon = bool(adaptation_cfg.get("normalize_by_epsilon", True))
     loss_mode = str(adaptation_cfg.get("loss_mode", "orbit")).lower()
+    if loss_mode in {"orbit", "orbit_preserve", "orbit_preservation"}:
+        loss_fn = orbit_consistency_loss
+    elif loss_mode in {"random_orbit", "random_orbit_preserve", "random_orbit_preservation"}:
+        loss_fn = _random_orbit_consistency_loss
+    elif loss_mode in {"preserve", "preservation", "none"}:
+        loss_fn = None
+    else:
+        raise ValueError(f"Unknown adaptation.loss_mode: {loss_mode}")
+    prepare_run_directory(
+        run_dir, output_files=output_files,
+        overwrite=bool(runtime_cfg.get("overwrite", True)),
+    )
+    save_config(config, run_dir / "config.yaml")
 
     for epoch in range(1, epochs + 1):
         model.train()
@@ -229,23 +246,15 @@ def adapt_from_config(config: dict[str, Any]) -> dict[str, Any]:
             a_raw = batch["a"].to(device)
             a, _ = _apply_target_input_transform(a_raw, target_input_transform)
             optimizer.zero_grad(set_to_none=True)
-            if loss_mode in {"orbit", "orbit_preserve", "orbit_preservation"}:
-                orb, stats = orbit_consistency_loss(
+            if loss_fn is not None:
+                orb, stats = loss_fn(
                     model,
                     a,
                     transform,
                     normalize_by_epsilon=normalize_by_epsilon,
                     eta=float(adaptation_cfg.get("orbit_eta", 1e-6)),
                 )
-            elif loss_mode in {"random_orbit", "random_orbit_preserve", "random_orbit_preservation"}:
-                orb, stats = _random_orbit_consistency_loss(
-                    model,
-                    a,
-                    transform,
-                    normalize_by_epsilon=normalize_by_epsilon,
-                    eta=float(adaptation_cfg.get("orbit_eta", 1e-6)),
-                )
-            elif loss_mode in {"preserve", "preservation", "none"}:
+            else:
                 orb = torch.zeros((), device=device)
                 stats = {
                     "orbit_loss": 0.0,
@@ -253,8 +262,6 @@ def adapt_from_config(config: dict[str, Any]) -> dict[str, Any]:
                     "epsilon_mean": 0.0,
                     "epsilon_max": 0.0,
                 }
-            else:
-                raise ValueError(f"Unknown adaptation.loss_mode: {loss_mode}")
             preservation = torch.zeros((), device=device)
             if gamma > 0:
                 pred = model(a)

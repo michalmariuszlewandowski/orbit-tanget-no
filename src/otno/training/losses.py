@@ -86,17 +86,7 @@ def relative_defect_per_sample(
     mask: torch.Tensor | None = None,
     eps: float = 1e-8,
 ) -> torch.Tensor:
-    if pred_t.shape != pred_equiv.shape:
-        raise ValueError(
-            f"pred_t and pred_equiv shapes differ: {tuple(pred_t.shape)} vs {tuple(pred_equiv.shape)}"
-        )
-    diff = pred_t - pred_equiv
-    ref = pred_equiv
-    if mask is not None:
-        m = _broadcast_mask(mask, diff)
-        diff = diff * m
-        ref = ref * m
-    return _flatten_per_sample(diff).norm(dim=-1) / _flatten_per_sample(ref).norm(dim=-1).clamp_min(eps)
+    return relative_l2_per_sample(pred_t, pred_equiv, mask=mask, eps=eps)
 
 
 def mean_squared_per_sample(x: torch.Tensor, mask: torch.Tensor | None = None) -> torch.Tensor:

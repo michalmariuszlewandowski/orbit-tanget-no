@@ -1,5 +1,5 @@
 experiments:
-  # Final full-label four-method table, replicated over the paper seed set.
+  # Full-label four-method comparison across the paper seed set.
   - config: configs/baselines/1d_burgers_baseline.yaml
     seeds: [23, 31, 47]
     overrides:

@@ -165,9 +165,8 @@ def solve_navier_stokes_vorticity_2d(
 ) -> torch.Tensor:
     """Pseudo-spectral RK4 solver for 2D periodic vorticity dynamics.
 
-    The nonlinear advective term is de-aliased by default. This solver is intended
-    for controlled neural-operator experiments; final paper tables should include
-    a solver convergence audit with smaller time steps.
+    The nonlinear advective term is de-aliased by default. Check time-step
+    convergence by halving ``dt`` on a held-out subset.
     """
     steps = max(1, int(math.ceil(final_time / dt)))
     h = final_time / steps

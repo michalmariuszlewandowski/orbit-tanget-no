@@ -24,7 +24,7 @@ def release():
 def test_fresh_release_plan_has_all_training_and_report_dependencies(release, tmp_path):
     registry = release.load_registry()
     plan = release.build_plan(registry, release.selected_suites(registry, ["all"]))
-    # A fresh extraction contains only this irreproducible historical split.
+    # The checkout includes the fixed rMD17 split.
     # Other data, checkpoints and intermediate tables must all have producers.
     preserved = next(step for step in plan if step.immutable)
     target = tmp_path / preserved.produces[0]
@@ -35,7 +35,7 @@ def test_fresh_release_plan_has_all_training_and_report_dependencies(release, tm
     assert all((ROOT / path).is_file() for path in release.source_files(registry))
 
 
-def test_v11_plan_includes_controls_and_excludes_unreported_pilots(release):
+def test_release_plan_includes_controls_and_excludes_unreported_pilots(release):
     registry = release.load_registry()
     plan = release.build_plan(registry, release.selected_suites(registry, ["all"]))
     runs = [step.protected_dir for step in plan if step.stage == "train"]
@@ -47,6 +47,28 @@ def test_v11_plan_includes_controls_and_excludes_unreported_pilots(release):
     assert not any("fraction_0.005" in run for run in runs)
     assert not any("labels_100/" in run or "lpsda" in run for run in runs)
     assert all("--overwrite" not in step.command for step in plan)
+
+
+def test_report_manifest_accepts_best_checkpoint_without_last(release, tmp_path, monkeypatch):
+    import pandas as pd
+
+    spec = importlib.util.spec_from_file_location(
+        "paper_artifact_report", ROOT / "scripts/reproduce_paper_artifacts.py"
+    )
+    report = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(report)
+    monkeypatch.setattr(report, "ROOT", tmp_path)
+    run_dir = tmp_path / "runs/example/seed_23"
+    for name in release.TRAIN_FILES:
+        path = run_dir / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("{}", encoding="utf-8")
+    rows = pd.DataFrame([{"run_dir": "runs/example/seed_23", "seed": 23}])
+    assert report._manifest_for_training(rows)[0]["complete"]
+    (run_dir / "checkpoints/best.pt").unlink()
+    missing = report._manifest_for_training(rows)[0]
+    assert not missing["complete"]
+    assert missing["missing_files"] == "checkpoints/best.pt"
 
 
 def test_partial_training_is_rejected_before_starting_other_jobs(release, tmp_path):
@@ -134,3 +156,154 @@ def test_backbone_report_selects_fresh_audit_and_rejects_mixed_campaign(release,
         release.report_command(step, tmp_path)
     target.write_text('{"source_sha256": "new"}', encoding="utf-8")
     assert release.report_command(step, tmp_path)[-1] == "--fresh-runs"
+
+
+@pytest.mark.parametrize("module_name", ["run_matrix", "run_adapt_matrix"])
+def test_matrix_overrides_keep_yaml_types_and_literal_ellipses(release, module_name):
+    import importlib
+    from otno.config import parse_overrides
+
+    runner = importlib.import_module(module_name)
+    values = {"a": "false", "b": "001", "c": ["a...b"], "d": "", "e": None, "f": True}
+    command = runner._command("base.yaml", values)
+    parsed = parse_overrides([command[index + 1] for index, arg in enumerate(command) if arg == "--override"])
+    assert parsed == values
+    assert type(parsed["a"]) is str
+    assert type(parsed["b"]) is str
+
+
+def test_suites_execute_dependencies_before_dependents_regardless_of_registry_order(release):
+    registry = {"suites": {"dependent": {"depends_on": ["base"]}, "base": {}}}
+    assert release.selected_suites(registry, ["dependent"]) == ["base", "dependent"]
+
+
+@pytest.mark.parametrize("module_name", ["run_ood_severity_matrix", "run_observable_canonicalization_matrix"])
+def test_evaluation_dry_run_does_not_write_or_replace_reports(release, tmp_path, monkeypatch, module_name):
+    import importlib
+
+    runner = importlib.import_module(module_name)
+    matrix = tmp_path / "matrix.yaml"
+    matrix.write_text("evaluations: []\n", encoding="utf-8")
+    for directory in (tmp_path, tmp_path / "missing"):
+        prefix = directory / "report"
+        if directory.exists():
+            for suffix in (".runs.csv", ".aggregate.csv", ".aggregate.tex"):
+                prefix.with_suffix(suffix).write_bytes(b"published table")
+        before = {path: path.read_bytes() for path in tmp_path.rglob("*") if path.is_file()}
+        monkeypatch.setattr(sys, "argv", [module_name, "--matrix", str(matrix), "--out-prefix", str(prefix), "--dry-run"])
+        runner.main()
+        after = {path: path.read_bytes() for path in tmp_path.rglob("*") if path.is_file()}
+        assert after == before
+    assert not (tmp_path / "missing").exists()
+
+
+@pytest.mark.parametrize("module_name", ["run_ood_severity_matrix", "run_observable_canonicalization_matrix"])
+def test_evaluation_cache_reuse_requires_unchanged_job_checkpoint_data_and_metrics(
+    release, tmp_path, monkeypatch, module_name, request
+):
+    import importlib
+    import torch
+    import yaml
+    from otno.models import build_model
+    from otno.utils import file_sha256
+
+    threads = torch.get_num_threads()
+    torch.set_num_threads(1)
+    request.addfinalizer(lambda: torch.set_num_threads(threads))
+    runner = importlib.import_module(module_name)
+    monkeypatch.setattr(runner, "ROOT", tmp_path)
+    cfg = {
+        "model": {"name": "fno2d", "in_channels": 3, "out_channels": 1, "width": 4, "modes": 2, "depth": 1},
+        "dataset": {"path": "data.pt"},
+        "training": {"batch_size": 2},
+    }
+    a = torch.randn(2, 8, 8, 3)
+    a[..., 1:] = 0
+    torch.save({"splits": {"test": {"a": a, "u": a[..., :1]}}}, tmp_path / "data.pt")
+    checkpoint = {"model": build_model(cfg).state_dict(), "config": cfg, "meta": {"dataset_sha256": "0" * 64}}
+    torch.save(checkpoint, tmp_path / "checkpoint.pt")
+    job = {
+        "checkpoint": "checkpoint.pt", "out_dir": "evaluation", "seed": 23, "method": "baseline",
+        "severity": "small", "severity_scale": 1.0, "orbit_samples": 1,
+        "latency_repeats": 1, "latency_warmup": 0,
+        "symmetry": {"name": "navier_stokes2d_galilean", "max_boost": 0.01},
+    }
+    matrix = tmp_path / "matrix.yaml"
+    matrix.write_text(yaml.safe_dump({"evaluations": [job]}), encoding="utf-8")
+    monkeypatch.setattr(sys, "argv", [module_name, "--matrix", str(matrix), "--out-prefix", str(tmp_path / "table"), "--device", "cpu"])
+    with pytest.raises(ValueError, match="Dataset SHA-256 does not match checkpoint"):
+        runner.main()
+    assert not (tmp_path / "evaluation").exists()
+    checkpoint["meta"]["dataset_sha256"] = file_sha256(tmp_path / "data.pt")
+    torch.save(checkpoint, tmp_path / "checkpoint.pt")
+    runner.main()
+    relative = "evaluation/severity_metrics.json" if module_name == "run_ood_severity_matrix" else "evaluation/observable_canonicalization/metrics.json"
+    output = tmp_path / relative
+    original_metrics = output.read_bytes()
+
+    def no_recompute(*args, **kwargs):
+        raise AssertionError("Unchanged cache should be reused")
+
+    evaluator = "evaluate_model" if module_name == "run_ood_severity_matrix" else "evaluate_observable_canonicalization"
+    monkeypatch.setattr(runner, evaluator, no_recompute)
+    runner.main()
+    assert output.read_bytes() == original_metrics
+    for changed in (matrix, tmp_path / "checkpoint.pt", tmp_path / "data.pt", output):
+        original = changed.read_bytes()
+        if changed == matrix:
+            job["symmetry"]["max_boost"] = 0.02
+            changed.write_text(yaml.safe_dump({"evaluations": [job]}), encoding="utf-8")
+        else:
+            changed.write_bytes(original + b" ")
+        with pytest.raises(ValueError, match="inputs or metrics changed"):
+            runner.main()
+        changed.write_bytes(original)
+
+
+def test_execute_rejects_unverified_partial_evaluation_before_launching_training(
+    release, tmp_path, monkeypatch
+):
+    output = tmp_path / "evaluation/metrics.json"
+    output.parent.mkdir()
+    output.write_text('{"relative_l2": 0.1}', encoding="utf-8")
+    plan = [
+        release.Step("train", "train", ["training"], produces=["new/checkpoints/best.pt"]),
+        release.Step("evaluate", "evaluate", ["evaluation"],
+                     produces=["evaluation/metrics.json", "missing.csv"],
+                     evaluations=[({"checkpoint": "new/checkpoints/best.pt"}, "evaluation/metrics.json")]),
+    ]
+    assert release.preflight(plan, tmp_path) == []
+    monkeypatch.setattr(release, "ROOT", tmp_path)
+    monkeypatch.setattr(release, "load_registry", lambda *_: {"suites": {"test": {}}})
+    monkeypatch.setattr(release, "source_files", lambda *_: set())
+    monkeypatch.setattr(release, "build_plan", lambda *_: plan)
+    monkeypatch.setattr(sys, "argv", ["reproduce_release.py", "--execute"])
+
+    def no_training(*args, **kwargs):
+        raise AssertionError("Preflight must reject stale caches before training starts")
+
+    monkeypatch.setattr(release.subprocess, "run", no_training)
+    with pytest.raises(SystemExit, match="Cached evaluation has no input record"):
+        release.main()
+    assert output.read_text(encoding="utf-8") == '{"relative_l2": 0.1}'
+
+
+@pytest.mark.parametrize("module_name", ["run_matrix", "run_adapt_matrix"])
+def test_continue_on_error_runs_remaining_jobs_but_reports_failure(release, monkeypatch, module_name):
+    import importlib
+    from types import SimpleNamespace
+
+    runner = importlib.import_module(module_name)
+    monkeypatch.setattr(runner, "_jobs", lambda _: [("first.yaml", {}), ("second.yaml", {})])
+    calls = []
+
+    def run(command, **kwargs):
+        calls.append(command)
+        return SimpleNamespace(returncode=1 if len(calls) == 1 else 0)
+
+    monkeypatch.setattr(runner.subprocess, "run", run)
+    monkeypatch.setattr(sys, "argv", [module_name, "--matrix", "unused.yaml", "--continue-on-error"])
+    with pytest.raises(SystemExit) as error:
+        runner.main()
+    assert error.value.code == 1
+    assert len(calls) == 2

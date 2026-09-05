@@ -1,7 +1,0 @@
-"run_dir","seed","method","lambda_orbit","model_name","dataset_kind","relative_l2","orbit_ood_relative_l2","equivariance_defect_relative","latency_ms_per_sample","best_val_relative_l2"
-"runs\ablations\2d_full_seed_replication\seed_23\aug","23","aug","","fno2d","navier_stokes_vorticity2d","0.0037602143274853","0.00376457828679122","0.00120719824025883","12.960932187525","0.00369495581253432"
-"runs\ablations\2d_full_seed_replication\seed_23\aug_orbit_lambda_0.05","23","aug_orbit","0.05","fno2d","navier_stokes_vorticity2d","0.00378281777375378","0.00378298054783954","0.00121095190423759","11.2581137500456","0.0037310017796699"
-"runs\ablations\2d_full_aug_orbit_lambda\aug","31","aug","","fno2d","navier_stokes_vorticity2d","0.00368704105494544","0.00368629601871362","0.000901824951828445","11.8535365625121","0.00364473630907014"
-"runs\ablations\2d_full_aug_orbit_lambda\aug_orbit\lambda_0.05","31","aug_orbit","0.05","fno2d","navier_stokes_vorticity2d","0.00365264024003409","0.00364810510654934","0.000893135927302779","12.3899915624861","0.00359834090340883"
-"runs\ablations\2d_full_seed_replication\seed_47\aug","47","aug","","fno2d","navier_stokes_vorticity2d","0.00376090192003176","0.00376297121692915","0.000843340569112172","11.3738871874375","0.00376419356325641"
-"runs\ablations\2d_full_seed_replication\seed_47\aug_orbit_lambda_0.05","47","aug_orbit","0.05","fno2d","navier_stokes_vorticity2d","0.00379435987269972","0.00379458461975446","0.000845476888258645","16.0250046875262","0.0037901075265836"

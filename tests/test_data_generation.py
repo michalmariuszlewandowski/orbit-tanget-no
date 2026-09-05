@@ -1,9 +1,11 @@
 from pathlib import Path
 
 import numpy as np
+import pytest
+import torch
 
 from otno.data.datasets import load_tensor_dataset
-from otno.data.generators import generate_dataset_from_config
+from otno.data.generators import generate_dataset_from_config, validate_existing_dataset
 
 
 def test_generate_tiny_advection_dataset(tmp_path: Path):
@@ -147,3 +149,27 @@ def test_existing_dataset_config_mismatch_raises(tmp_path: Path):
         assert "metadata does not match" in str(exc)
     else:
         raise AssertionError("expected metadata mismatch")
+
+
+@pytest.mark.parametrize("fraction", [-0.1, float("nan"), 1.1])
+def test_dataset_fraction_must_select_a_valid_subset(tmp_path, fraction):
+    path = tmp_path / "data.pt"
+    values = torch.arange(4.0).reshape(4, 1, 1)
+    torch.save({"splits": {"train": {"a": values, "u": values}}}, path)
+    with pytest.raises(ValueError, match="fraction"):
+        load_tensor_dataset(path, "train", fraction=fraction)
+
+
+def test_generator_rejects_fractional_sample_counts_before_writing(tmp_path):
+    path = tmp_path / "invalid.pt"
+    config = {"kind": "advection1d", "n": 8, "num_train": 2.5,
+              "num_val": 1, "num_test": 1}
+    with pytest.raises(ValueError, match="num_train"):
+        generate_dataset_from_config(config, path)
+    assert not path.exists()
+
+
+def test_dataset_validation_accepts_nested_allow_stale_option(tmp_path):
+    path = tmp_path / "old.pt"
+    torch.save({"metadata": {}}, path)
+    validate_existing_dataset(path, {"dataset": {"allow_stale": True}})

@@ -1,8 +1,6 @@
 experiments:
-  # Non-periodic boundary diagnostic: Dirichlet heat equation plus a
-  # translation-like transformation that is only locally meaningful away from
-  # walls. The mask row uses BaseTransform.output_mask to score only valid
-  # overlap/interior regions.
+  # Dirichlet heat equation with translations restricted to the domain interior.
+  # BaseTransform.output_mask scores the valid overlap region.
   - config: configs/pilot/1d_heat_dirichlet_nonperiodic.yaml
     seeds: [23, 31, 47]
     overrides:

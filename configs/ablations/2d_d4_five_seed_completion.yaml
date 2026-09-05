@@ -1,6 +1,6 @@
 experiments:
-  # Complete the D4 architectural comparison to five seeds. Seeds 23, 31, and
-  # 47 already exist from the pilot/refinement/replication matrices.
+  # D4 comparison at seeds 59 and 71. Seeds 23, 31, and 47 are defined in the
+  # pilot, refinement, and replication matrices.
   - config: configs/pilot/2d_navier_stokes_translation_d4.yaml
     seeds: [59, 71]
     overrides:

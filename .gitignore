@@ -8,7 +8,9 @@ __pycache__/
 *.egg-info/
 
 # Large/generated experiment artifacts.
-/data/
+/data/*
+!/data/rmd17/
+/data/rmd17/*
 runs/*
 !runs/paper_tables/
 !runs/paper_tables/**
@@ -21,8 +23,14 @@ runs/*
 *.npy
 *.npz
 *.pkl
+!/data/rmd17/rmd17_ethanol_force_500.pt
 
 # Local build and editor noise.
+.agents/
+.codex/
+.vscode/
+.env
+.env.*
 build/
 dist/
 tmp/

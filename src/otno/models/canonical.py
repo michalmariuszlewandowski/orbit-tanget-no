@@ -73,15 +73,14 @@ def observed_galilean_boost_2d(
 
 
 class CanonicalFNO1d(nn.Module):
-    """FNO1d wrapped by lightweight analytic canonicalization.
+    """FNO1d with analytic canonicalization.
 
     Supported canonicalizers:
     - ``translation_first_mode``: phase-align the selected Fourier mode;
     - ``galilean_mean``: subtract the input-channel spatial mean and restore the
       Burgers Galilean action on the output.
 
-    This is intended as a computational baseline against orbit-consistency training.
-    It is deliberately simple and deterministic; no frame estimator is learned.
+    Both canonicalizers use deterministic frame estimates.
     """
 
     def __init__(

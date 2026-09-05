@@ -6,7 +6,6 @@ from otno.symmetry.transforms import (
     CompositeTransform,
     D4Pseudoscalar2D,
     D4Scalar2D,
-    KdV1DGalilean,
     MolecularRigidMotion,
     NavierStokes2DGalilean,
     NonPeriodicTranslation1D,
@@ -34,14 +33,6 @@ def _build_one(cfg: dict) -> BaseTransform:
             final_time=cfg.get("final_time", 0.5),
             channel=cfg.get("channel", 0),
             length=cfg.get("length", 1.0),
-        )
-    if name in {"kdv1d_galilean", "kdv_galilean"}:
-        return KdV1DGalilean(
-            max_boost=cfg.get("max_boost", 0.2),
-            final_time=cfg.get("final_time", 20.0),
-            input_steps=cfg.get("input_steps", 20),
-            output_steps=cfg.get("output_steps", 100),
-            length=cfg.get("length", 128.0),
         )
     if name in {"navier_stokes2d_galilean", "ns2d_galilean", "galilean2d", "vorticity2d_galilean"}:
         return NavierStokes2DGalilean(

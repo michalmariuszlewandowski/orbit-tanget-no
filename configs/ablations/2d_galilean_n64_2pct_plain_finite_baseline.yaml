@@ -1,8 +1,8 @@
 experiments:
-  # Reviewer control: the same finite Galilean transforms as normalized LOCO,
-  # but with the raw finite equivariance MSE.  For delta_i ~ U[-r,r] and
-  # r=0.25, E||delta||^2 = 2r^2/3 = 1/24, so lambda=2.4 matches the leading
-  # expected scale of normalized LOCO with lambda=0.1.
+  # Raw finite equivariance MSE with the same Galilean transforms as normalized
+  # LOCO. For delta_i ~ U[-r,r] and r=0.25, E||delta||^2 = 2r^2/3 = 1/24,
+  # so lambda=2.4 matches the leading expected scale of normalized LOCO at
+  # lambda=0.1.
   - config: configs/pilot/2d_navier_stokes_galilean.yaml
     seeds: [23, 31, 47, 59, 71]
     overrides:

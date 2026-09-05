@@ -13,12 +13,12 @@ import re
 
 import pandas as pd
 
-from otno.reporting import aggregate_runs, collect_run_rows
+from otno.reporting import aggregate_runs, collect_run_rows, drop_empty_config_columns
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Collect run metrics and write paper-table CSV/LaTeX drafts."
+        description="Collect run metrics and write CSV and LaTeX tables."
     )
     parser.add_argument("--runs", default="runs")
     parser.add_argument("--out-prefix", default="runs/paper_tables/main")
@@ -51,6 +51,7 @@ def main() -> None:
         if args.exclude_run_dir:
             exclude = re.compile(args.exclude_run_dir)
             df = df[~normalized.map(lambda value: bool(exclude.search(value)))]
+    df = drop_empty_config_columns(df)
     df.to_csv(out_prefix.with_suffix(".runs.csv"), index=False)
     group_cols = (
         [col.strip() for col in args.group_cols.split(",") if col.strip()]

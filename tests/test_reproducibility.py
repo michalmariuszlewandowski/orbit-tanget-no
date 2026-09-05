@@ -10,7 +10,7 @@ import pytest
 import torch
 
 from otno.training import trainer
-from otno.utils import capture_rng_state, restore_rng_state
+from otno.utils import capture_rng_state, restore_rng_state, set_seed
 
 
 def _config(tmp_path):
@@ -71,6 +71,7 @@ def test_resume_matches_uninterrupted_training(tmp_path, steps, method):
     for key in ("relative_l2", "orbit_ood_relative_l2", "equivariance_defect_relative"):
         assert full[key] == resumed[key]
     assert resumed["train_wall_seconds"] > partial["train_wall_seconds"]
+    assert not (tmp_path / "resumed/partial_metrics.json").exists()
 
 
 def test_final_checkpoint_keeps_last_weights_and_cli_reproduces_best_metrics(tmp_path, monkeypatch):
@@ -149,7 +150,138 @@ def test_semi_supervised_orbit_uses_full_inputs_without_their_labels(tmp_path, m
 def test_unsupported_semi_methods_fail_before_writing_artifacts(tmp_path, method):
     config = _config(tmp_path)
     config["training"]["method"] = method
-    with pytest.raises(ValueError, match="Unsupported training method"):
+    with pytest.raises(ValueError, match="Unknown training.method"):
         trainer.train_from_config(config)
     assert not Path(config["runtime"]["run_dir"]).exists()
     assert not Path(config["dataset"]["path"]).exists()
+
+
+def test_fresh_overwrite_removes_previous_logs_and_completion_marker(tmp_path):
+    config = _config(tmp_path)
+    config["training"].update(epochs=2, steps_per_epoch=1)
+    trainer.train_from_config(config)
+    run_dir = Path(config["runtime"]["run_dir"])
+    notes = run_dir / "notes.txt"
+    notes.write_text("Keep this file.")
+
+    config["runtime"]["overwrite"] = True
+    config["training"]["stop_after_epochs"] = 1
+    partial = trainer.train_from_config(config)
+
+    assert partial["status"] == "partial"
+    assert not (run_dir / "test_metrics.json").exists()
+    for filename in ("train_metrics.jsonl", "val_metrics.jsonl"):
+        records = [json.loads(line) for line in (run_dir / filename).read_text().splitlines()]
+        assert [record["epoch"] for record in records] == [1]
+    assert notes.read_text() == "Keep this file."
+
+
+def test_invalid_overwrite_preserves_previous_training_outputs(tmp_path):
+    config = _config(tmp_path)
+    run_dir = Path(config["runtime"]["run_dir"])
+    run_dir.mkdir()
+    prior = {"config.yaml": "seed: 17\n", "test_metrics.json": '{"relative_l2": 0.1}\n'}
+    for filename, contents in prior.items():
+        (run_dir / filename).write_text(contents)
+    config["runtime"]["overwrite"] = True
+    config["training"]["loss"] = "unknown_loss"
+
+    with pytest.raises(ValueError, match="training.loss"):
+        trainer.train_from_config(config)
+
+    for filename, contents in prior.items():
+        assert (run_dir / filename).read_text() == contents
+
+
+def test_resume_from_completed_best_checkpoint_recreates_last(tmp_path):
+    config = _config(tmp_path)
+    config["training"].update(epochs=1, steps_per_epoch=1)
+    expected = trainer.train_from_config(config)
+    run_dir = Path(config["runtime"]["run_dir"])
+    (run_dir / "checkpoints/last.pt").unlink()
+
+    config["runtime"]["resume"] = True
+    actual = trainer.train_from_config(config)
+
+    assert actual["relative_l2"] == expected["relative_l2"]
+    last = _load(run_dir / "checkpoints/last.pt")
+    best = _load(run_dir / "checkpoints/best.pt")
+    assert last["epoch"] == best["epoch"] == 1
+    for key, value in best["model"].items():
+        assert torch.equal(value, last["model"][key])
+
+
+def test_resume_rejects_missing_validation_selected_checkpoint(tmp_path):
+    config = _config(tmp_path)
+    config["training"].update(epochs=1, steps_per_epoch=1)
+    trainer.train_from_config(config)
+    run_dir = Path(config["runtime"]["run_dir"])
+    (run_dir / "checkpoints/best.pt").unlink()
+
+    config["runtime"]["resume"] = True
+    with pytest.raises(FileNotFoundError, match="best.pt"):
+        trainer.train_from_config(config)
+
+
+@pytest.mark.parametrize("missing", ["optimizer", "scheduler"])
+def test_resume_requires_optimizer_and_scheduler_state(tmp_path, missing):
+    config = _config(tmp_path)
+    config["training"].update(epochs=1, steps_per_epoch=1)
+    trainer.train_from_config(config)
+    last_path = Path(config["runtime"]["run_dir"]) / "checkpoints/last.pt"
+    checkpoint = _load(last_path)
+    checkpoint.pop(missing)
+    torch.save(checkpoint, last_path)
+
+    config["runtime"]["resume"] = True
+    with pytest.raises(ValueError, match=missing):
+        trainer.train_from_config(config)
+
+
+def test_resume_discards_uncommitted_epoch_logs_and_torn_tail(tmp_path, monkeypatch):
+    config = _config(tmp_path)
+    config["training"]["steps_per_epoch"] = 1
+    expected = trainer.train_from_config(config)
+    expected_model = _load(tmp_path / "full/checkpoints/last.pt")["model"]
+    config["runtime"]["run_dir"] = str(tmp_path / "interrupted")
+    original_save = trainer._torch_save_atomic
+
+    def interrupt_last_checkpoint(payload, path, **kwargs):
+        if path.name == "last.pt" and payload["epoch"] == 2:
+            raise RuntimeError("Simulated interruption before checkpoint commit")
+        original_save(payload, path, **kwargs)
+
+    monkeypatch.setattr(trainer, "_torch_save_atomic", interrupt_last_checkpoint)
+    with pytest.raises(RuntimeError, match="Simulated interruption"):
+        trainer.train_from_config(config)
+    run_dir = Path(config["runtime"]["run_dir"])
+    with (run_dir / "train_metrics.jsonl").open("a") as stream:
+        stream.write('{"epoch":')
+
+    monkeypatch.setattr(trainer, "_torch_save_atomic", original_save)
+    config["runtime"]["resume"] = True
+    actual = trainer.train_from_config(config)
+
+    assert actual["relative_l2"] == expected["relative_l2"]
+    for filename in ("train_metrics.jsonl", "val_metrics.jsonl"):
+        records = [json.loads(line) for line in (run_dir / filename).read_text().splitlines()]
+        assert [record["epoch"] for record in records] == [1, 2, 3]
+    actual_model = _load(run_dir / "checkpoints/last.pt")["model"]
+    for key, value in expected_model.items():
+        assert torch.equal(value, actual_model[key])
+
+
+def test_set_seed_resets_determinism_between_in_process_runs():
+    enabled = torch.are_deterministic_algorithms_enabled()
+    warn_only = torch.is_deterministic_algorithms_warn_only_enabled()
+    cudnn_deterministic = torch.backends.cudnn.deterministic
+    cudnn_benchmark = torch.backends.cudnn.benchmark
+    try:
+        set_seed(1, deterministic=True)
+        set_seed(1, deterministic=False)
+        assert not torch.are_deterministic_algorithms_enabled()
+        assert not torch.backends.cudnn.deterministic
+    finally:
+        torch.use_deterministic_algorithms(enabled, warn_only=warn_only)
+        torch.backends.cudnn.deterministic = cudnn_deterministic
+        torch.backends.cudnn.benchmark = cudnn_benchmark

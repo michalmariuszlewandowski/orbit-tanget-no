@@ -1,4 +1,0 @@
-method,lambda_orbit,model_name,dataset_kind,relative_l2_mean,relative_l2_std,relative_l2_count,orbit_ood_relative_l2_mean,orbit_ood_relative_l2_std,orbit_ood_relative_l2_count,equivariance_defect_relative_mean,equivariance_defect_relative_std,equivariance_defect_relative_count,latency_ms_per_sample_mean,latency_ms_per_sample_std,latency_ms_per_sample_count,latency_ms_per_batch_mean,latency_ms_per_batch_std,latency_ms_per_batch_count
-aug,0.05,fno2d,navier_stokes_vorticity2d,0.003687041054945439,,1,0.0036862960187136196,,1,0.0009018249518284449,,1,11.85353656251209,,1,189.65658500019345,,1
-aug_orbit,0.01,fno2d,navier_stokes_vorticity2d,0.0036688046529889107,,1,0.003663490671897307,,1,0.0008958154889331382,,1,11.72624468754293,,1,187.6199150006869,,1
-aug_orbit,0.05,fno2d,navier_stokes_vorticity2d,0.0036526402400340885,,1,0.0036481051065493375,,1,0.0008931359273027795,,1,12.389991562486102,,1,198.23986499977764,,1

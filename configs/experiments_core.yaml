@@ -1,6 +1,5 @@
 experiments:
-  # Exact-symmetry diagnostic: method should reduce equivariance defect on
-  # inexpensive data before larger experiments are run.
+  # Advection translation-equivariance diagnostic.
   - config: configs/pilot/1d_advection_translation.yaml
     overrides:
       training.method: baseline

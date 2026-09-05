@@ -1,7 +1,0 @@
-augmentation_checkpoint: runs/ablations/2d_galilean_n64_label_efficiency_compute_matched/fraction_0.02/aug_steps_6/seed_23/checkpoints/best.pt
-loco_checkpoint: runs/ablations/2d_galilean_n64_2pct_lambda_robustness/fraction_0.02/aug_orbit_lambda_0.1_steps_4/seed_23/checkpoints/best.pt
-fixed_relative_boost: [0.50, 0.00]
-batch_size: 16
-device: cpu
-out_prefix: runs/figures/2d_galilean_n64_id_ood_fields
-metadata_out: runs/paper_tables/2d_galilean_n64_id_ood_fields.json

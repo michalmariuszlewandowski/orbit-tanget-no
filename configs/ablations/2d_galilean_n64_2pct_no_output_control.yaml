@@ -1,7 +1,6 @@
 experiments:
-  # Milder wrong-symmetry control for the headline 2%-label N64 Galilean result.
-  # This keeps the transformed input view but removes the physical output action,
-  # training G(T_g a) to match G(a) rather than T_g G(a).
+  # N64 Galilean control at 2% labels with the physical output action omitted.
+  # The transformed input prediction G(T_g a) is matched to G(a), not T_g G(a).
   - config: configs/pilot/2d_navier_stokes_galilean.yaml
     seeds: [23, 31, 47]
     overrides:

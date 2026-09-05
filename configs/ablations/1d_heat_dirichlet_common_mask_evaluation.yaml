@@ -1,7 +1,6 @@
 evaluations:
-  # Re-evaluate every boundary-diagnostic checkpoint on identical transformed
-  # examples and a common scoring region.  This removes the training/evaluation
-  # mask confound in the original cached summary.
+  # Evaluate boundary checkpoints on identical transformed examples and a common
+  # scoring region to separate training-mask effects from evaluation-mask effects.
   - severity: full_domain
     severity_scale: 0
     methods: [baseline, aug_orbit_no_mask, aug_orbit_mask]

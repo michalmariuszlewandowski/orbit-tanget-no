@@ -1,7 +1,6 @@
 experiments:
-  # Theory-facing tangent-propagation baseline for the N64 boosted-Galilean
-  # 2%-label setting. This compares explicit infinitesimal equivariance
-  # matching against finite-orbit LOCO with the same FNO2d architecture.
+  # Tangent propagation at 2% labels: explicit infinitesimal equivariance
+  # matching with the same FNO2d architecture as finite-orbit LOCO.
   - config: configs/pilot/2d_navier_stokes_galilean.yaml
     seeds: [23, 31, 47, 59, 71]
     overrides:

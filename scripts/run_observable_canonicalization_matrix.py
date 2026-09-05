@@ -5,7 +5,6 @@ import argparse
 import sys
 import time
 from collections import defaultdict
-from contextlib import nullcontext
 from pathlib import Path
 from typing import Any
 
@@ -18,7 +17,6 @@ if str(ROOT / "scripts") not in sys.path:
 
 import pandas as pd
 import torch
-import yaml
 from torch.utils.data import DataLoader
 
 from otno.data.datasets import load_tensor_dataset
@@ -27,35 +25,11 @@ from otno.models.canonical import observed_galilean_boost_2d
 from otno.symmetry.registry import build_transform
 from otno.symmetry.transforms import NavierStokes2DGalilean, TransformSample
 from otno.training.losses import relative_defect_per_sample, relative_l2_per_sample
-from otno.training.metrics import measure_inference_latency
-from otno.utils import dump_json, get_device
-from run_ood_severity_matrix import _jobs, _symmetry_value
-
-
-def _rng_context(seed: int | None, device: torch.device):
-    if seed is None:
-        return nullcontext()
-    devices = [device] if device.type == "cuda" else []
-    return torch.random.fork_rng(devices=devices, enabled=True)
-
-
-def _add_stats(name: str, values: torch.Tensor, sums: dict[str, float], sumsqs: dict[str, float], counts: dict[str, int]) -> None:
-    flat = values.detach().reshape(-1).float().cpu()
-    sums[name] += float(flat.sum())
-    sumsqs[name] += float((flat * flat).sum())
-    counts[name] += int(flat.numel())
-
-
-def _finalize(sums: dict[str, float], sumsqs: dict[str, float], counts: dict[str, int]) -> dict[str, float]:
-    out: dict[str, float] = {}
-    for key, count in counts.items():
-        mean = sums[key] / count
-        var = max(0.0, sumsqs[key] / count - mean * mean)
-        std = var**0.5
-        out[key] = mean
-        out[f"{key}_std"] = std
-        out[f"{key}_stderr"] = std / (count**0.5)
-    return out
+from otno.training.metrics import _add_stats, _finalize, _rng_context, measure_inference_latency
+from otno.utils import get_device
+from run_ood_severity_matrix import (
+    _evaluation_metadata, _jobs, _read_cached_metrics, _symmetry_value, _write_metrics,
+)
 
 
 def _observed_boost_sample(a: torch.Tensor, transform: NavierStokes2DGalilean) -> TransformSample:
@@ -116,11 +90,9 @@ def evaluate_observable_canonicalization(
     num_samples = 0
     num_batches = 0
 
-    with _rng_context(seed, device):
+    with _rng_context(seed):
         if seed is not None:
             torch.manual_seed(seed)
-            if device.type == "cuda":
-                torch.cuda.manual_seed_all(seed)
         for batch in loader:
             a = batch["a"].to(device)
             u = batch["u"].to(device)
@@ -222,7 +194,6 @@ def main() -> None:
     args = parser.parse_args()
 
     out_prefix = Path(args.out_prefix)
-    out_prefix.parent.mkdir(parents=True, exist_ok=True)
     device = get_device(args.device)
     rows: list[dict[str, Any]] = []
     for job in _jobs(Path(args.matrix)):
@@ -234,18 +205,21 @@ def main() -> None:
         if args.dry_run:
             continue
         if out_path.exists() and not overwrite:
-            metrics = yaml.safe_load(out_path.read_text(encoding="utf-8")) or {}
+            metrics = _read_cached_metrics(job, out_path, ROOT, str(device))
         else:
             if not checkpoint.exists():
                 raise FileNotFoundError(f"Missing checkpoint: {checkpoint}")
-            out_dir.mkdir(parents=True, exist_ok=True)
             ckpt = torch.load(checkpoint, map_location=device, weights_only=False)
             cfg = ckpt.get("config", ckpt.get("base_config"))
             if cfg is None:
                 raise KeyError(f"Checkpoint missing config/base_config: {checkpoint}")
+            metadata = _evaluation_metadata(
+                job, cfg["dataset"]["path"], ROOT, str(device),
+                expected_dataset_sha256=ckpt.get("meta", {}).get("dataset_sha256"),
+            )
             model = build_model(cfg).to(device)
             model.load_state_dict(ckpt["model"])
-            dataset, _ = load_tensor_dataset(cfg["dataset"]["path"], str(job.get("split", "test")))
+            dataset, _ = load_tensor_dataset(ROOT / cfg["dataset"]["path"], str(job.get("split", "test")))
             loader = DataLoader(dataset, batch_size=int(job.get("batch_size", cfg.get("training", {}).get("batch_size", 32))), shuffle=False)
             transform = build_transform({"symmetry": job["symmetry"]})
             if not isinstance(transform, NavierStokes2DGalilean):
@@ -293,7 +267,7 @@ def main() -> None:
             metrics["observable_canonical_latency_overhead_pct"] = 100.0 * (
                 canonical_ms - direct_ms
             ) / max(direct_ms, 1e-12)
-            dump_json(metrics, out_path)
+            _write_metrics(metrics, out_path, metadata)
         row = {
             "checkpoint": str(checkpoint.relative_to(ROOT)),
             "run_dir": str(out_dir.relative_to(ROOT)),
@@ -309,6 +283,7 @@ def main() -> None:
     if args.dry_run:
         return
 
+    out_prefix.parent.mkdir(parents=True, exist_ok=True)
     runs = pd.DataFrame(rows).sort_values(["severity_scale", "method", "seed"]) if rows else pd.DataFrame()
     aggregate = _aggregate(rows)
     runs.to_csv(out_prefix.with_suffix(".runs.csv"), index=False)

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import copy
+import math
 from pathlib import Path
 from typing import Any
 
@@ -13,9 +14,6 @@ _ALLOWED_DATASETS = {
     "1d_burgers",
     "heat1d_dirichlet",
     "dirichlet_heat1d",
-    "kdv1d",
-    "1d_kdv",
-    "lpsda_kdv1d",
     "navier_stokes_vorticity2d",
     "navier_stokes_vorticity2d_boosted",
     "boosted_navier_stokes_vorticity2d",
@@ -24,6 +22,7 @@ _ALLOWED_DATASETS = {
     "boosted_ns2d",
     "2d_navier_stokes",
     "rmd17_force",
+    "rmd17",
 }
 _ALLOWED_MODELS = {
     "fno1d",
@@ -36,10 +35,6 @@ _ALLOWED_MODELS = {
     "cno_2d",
     "canonical_fno1d",
     "canonical_fno_1d",
-    "translation_canonical_fno1d",
-    "phase_canonical_fno1d",
-    "galilean_canonical_fno1d",
-    "burgers_galilean_canonical_fno1d",
     "canonical_fno2d",
     "canonical_fno_2d",
     "observable_galilean_canonical_fno2d",
@@ -66,8 +61,6 @@ _ALLOWED_METHODS = {
     "aug_orbit_no_output",
     "aug_orbit_input_only",
     "semi_aug_orbit",
-    "mixed_semi_aug_orbit",
-    "split_semi_aug_orbit",
     "tangent",
     "tangent_prop",
     "tangent_propagation",
@@ -85,8 +78,6 @@ _ALLOWED_TRANSFORMS = {
     "burgers1d_galilean",
     "galilean1d",
     "burgers_galilean",
-    "kdv1d_galilean",
-    "kdv_galilean",
     "navier_stokes2d_galilean",
     "ns2d_galilean",
     "galilean2d",
@@ -179,24 +170,36 @@ def apply_dotted_overrides(base: dict[str, Any], overrides: dict[str, Any]) -> d
     return recursive_update(base, dotted_overrides_to_nested(overrides))
 
 
-def _check_positive_int(section: dict[str, Any], section_name: str, key: str) -> None:
-    if key in section and int(section[key]) < 1:
-        raise ValueError(f"{section_name}.{key} must be a positive integer")
+def format_config_values(value: Any, context: dict[str, Any]) -> Any:
+    """Substitute matrix fields such as {seed} in nested configuration values."""
+    if isinstance(value, str):
+        return value.format(**context)
+    if isinstance(value, list):
+        return [format_config_values(item, context) for item in value]
+    if isinstance(value, dict):
+        return {key: format_config_values(item, context) for key, item in value.items()}
+    return value
 
 
-def _check_nonnegative_int(section: dict[str, Any], section_name: str, key: str) -> None:
-    if key in section and int(section[key]) < 0:
-        raise ValueError(f"{section_name}.{key} must be a non-negative integer")
-
-
-def _check_nonnegative_float(section: dict[str, Any], section_name: str, key: str) -> None:
-    if key in section and float(section[key]) < 0:
-        raise ValueError(f"{section_name}.{key} must be non-negative")
-
-
-def _check_positive_float(section: dict[str, Any], section_name: str, key: str) -> None:
-    if key in section and float(section[key]) <= 0:
-        raise ValueError(f"{section_name}.{key} must be positive")
+def _check_number(
+    section: dict[str, Any], section_name: str, key: str,
+    *, integer: bool = False, positive: bool = False,
+) -> None:
+    if key not in section:
+        return
+    value = section[key]
+    try:
+        number = float(value)
+        valid = not isinstance(value, bool) and math.isfinite(number)
+        valid = valid and (number > 0 if positive else number >= 0)
+        if integer:
+            valid = valid and int(value) == number
+    except (TypeError, ValueError, OverflowError):
+        valid = False
+    if not valid:
+        bound = "positive" if positive else "non-negative"
+        kind = "integer" if integer else "finite number"
+        raise ValueError(f"{section_name}.{key} must be a {bound} {kind}")
 
 
 def _iter_transform_cfgs(symmetry: dict[str, Any]) -> list[dict[str, Any]]:
@@ -206,7 +209,7 @@ def _iter_transform_cfgs(symmetry: dict[str, Any]) -> list[dict[str, Any]]:
 
 
 def validate_config(config: dict[str, Any], *, require_dataset: bool = True) -> None:
-    """Fail early on configuration mistakes that would otherwise produce ambiguous runs."""
+    """Validate configuration values before starting a run."""
     dataset: dict[str, Any] = {}
     kind = ""
     if require_dataset:
@@ -220,15 +223,13 @@ def validate_config(config: dict[str, Any], *, require_dataset: bool = True) -> 
         if kind and kind not in _ALLOWED_DATASETS:
             raise ValueError(f"Unknown dataset.kind={kind!r}")
         for key in ("n", "num_train", "num_val", "num_test", "solver_batch_size"):
-            _check_positive_int(dataset, "dataset", key)
-        _check_nonnegative_float(dataset, "dataset", "final_time")
-        _check_nonnegative_float(dataset, "dataset", "viscosity")
+            _check_number(dataset, "dataset", key, integer=True, positive=True)
+        for key in ("final_time", "viscosity", "diffusivity"):
+            _check_number(dataset, "dataset", key)
+        _check_number(dataset, "dataset", "charge_scale", positive=True)
         if kind in {
             "burgers1d",
             "1d_burgers",
-            "kdv1d",
-            "1d_kdv",
-            "lpsda_kdv1d",
             "navier_stokes_vorticity2d",
             "navier_stokes_vorticity2d_boosted",
             "boosted_navier_stokes_vorticity2d",
@@ -237,16 +238,16 @@ def validate_config(config: dict[str, Any], *, require_dataset: bool = True) -> 
             "boosted_ns2d",
             "2d_navier_stokes",
         }:
-            _check_positive_float(dataset, "dataset", "dt")
+            _check_number(dataset, "dataset", "dt", positive=True)
         elif "dt" in dataset:
-            _check_nonnegative_float(dataset, "dataset", "dt")
+            _check_number(dataset, "dataset", "dt")
         if kind in {
             "navier_stokes_vorticity2d_boosted",
             "boosted_navier_stokes_vorticity2d",
             "ns2d_boosted",
             "boosted_ns2d",
         }:
-            _check_nonnegative_float(dataset, "dataset", "max_boost")
+            _check_number(dataset, "dataset", "max_boost")
 
     model = config.get("model", {})
     name = str(model.get("name", "fno1d")).lower()
@@ -281,14 +282,15 @@ def validate_config(config: dict[str, Any], *, require_dataset: bool = True) -> 
         "lift_project_channels",
         "resample_halo",
     ):
-        _check_positive_int(model, "model", key)
-    _check_nonnegative_float(model, "model", "negative_slope")
+        _check_number(model, "model", key, integer=True, positive=True)
+    _check_number(model, "model", "negative_slope")
     if "branch_channels" in model:
         channels = model["branch_channels"]
         if not isinstance(channels, (list, tuple)) or not channels:
             raise ValueError("model.branch_channels must be a non-empty sequence")
-        if any(int(channel) < 1 for channel in channels):
-            raise ValueError("model.branch_channels values must be positive integers")
+        for channel in channels:
+            _check_number({"branch_channels": channel}, "model", "branch_channels",
+                          integer=True, positive=True)
 
     training = config.get("training", {})
     method = str(training.get("method", "baseline")).lower()
@@ -301,15 +303,18 @@ def validate_config(config: dict[str, Any], *, require_dataset: bool = True) -> 
         "latency_repeats",
         "stop_after_epochs",
         "steps_per_epoch",
+        "orbit_steps_per_epoch",
+        "orbit_batch_size",
     ):
-        _check_positive_int(training, "training", key)
+        _check_number(training, "training", key, integer=True, positive=True)
     for key in ("eval_orbit_samples", "latency_warmup", "num_workers"):
-        _check_nonnegative_int(training, "training", key)
-    data_fraction = float(training.get("data_fraction", 1.0))
-    if data_fraction <= 0 or data_fraction > 1:
-        raise ValueError("training.data_fraction must lie in (0, 1]")
+        _check_number(training, "training", key, integer=True)
+    for key in ("data_fraction", "orbit_data_fraction"):
+        _check_number(training, "training", key, positive=True)
+        if float(training.get(key, 1.0)) > 1:
+            raise ValueError(f"training.{key} must lie in (0, 1]")
     for key in ("lr", "weight_decay", "lambda_orbit", "lambda_aug", "lambda_tangent", "orbit_eta"):
-        _check_nonnegative_float(training, "training", key)
+        _check_number(training, "training", key)
     orbit_control = str(training.get("orbit_control", "physical")).lower()
     if orbit_control not in {
         "physical",
@@ -326,42 +331,27 @@ def validate_config(config: dict[str, Any], *, require_dataset: bool = True) -> 
         raise ValueError(f"Unknown training.orbit_control={orbit_control!r}")
 
     symmetry = config.get("symmetry")
-    if method in {
-        "aug",
-        "augmentation",
-        "orbit",
-        "orb",
-        "aug_orbit",
-        "orbit_aug",
-        "aug_orbit_shuffle",
-        "aug_orbit_shuffled",
-        "aug_orbit_no_output",
-        "aug_orbit_input_only",
-        "semi_aug_orbit",
-        "mixed_semi_aug_orbit",
-        "split_semi_aug_orbit",
-        "tangent",
-        "tangent_prop",
-        "tangent_propagation",
-        "aug_tangent",
-        "tangent_aug",
-    } and not symmetry:
-        raise ValueError(f"training.method={method!r} requires a symmetry section")
+    if method != "baseline" and (not symmetry or symmetry.get("enabled", True) is False):
+        raise ValueError(f"training.method={method!r} requires an enabled symmetry section")
     if symmetry:
         if symmetry.get("enabled", True) is False:
             return
+        if "transforms" in symmetry and not symmetry["transforms"]:
+            raise ValueError("symmetry.transforms must be non-empty")
         for transform in _iter_transform_cfgs(symmetry):
             tname = str(transform.get("name", "translation1d")).lower()
             if tname not in _ALLOWED_TRANSFORMS:
                 raise ValueError(f"Unknown symmetry transform={tname!r}")
             for key in ("max_shift", "max_boost", "length"):
-                _check_positive_float(transform, "symmetry", key)
+                _check_number(transform, "symmetry", key, positive=True)
             for key in ("final_time",):
-                _check_nonnegative_float(transform, "symmetry", key)
+                _check_number(transform, "symmetry", key)
             for key in ("min_shift", "min_boost"):
-                _check_nonnegative_float(transform, "symmetry", key)
+                _check_number(transform, "symmetry", key)
         if "probabilities" in symmetry and "transforms" in symmetry:
             if len(symmetry["probabilities"]) != len(symmetry["transforms"]):
                 raise ValueError("symmetry.probabilities must match symmetry.transforms length")
-            if sum(float(x) for x in symmetry["probabilities"]) <= 0:
-                raise ValueError("symmetry.probabilities must have positive sum")
+            probabilities = [float(x) for x in symmetry["probabilities"]]
+            if (any(not math.isfinite(x) or x < 0 for x in probabilities)
+                    or not 0 < sum(probabilities) < math.inf):
+                raise ValueError("symmetry.probabilities must be finite, non-negative, and have positive sum")

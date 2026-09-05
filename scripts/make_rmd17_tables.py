@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import argparse
-import math
 import sys
 from pathlib import Path
 from typing import Iterable
@@ -14,7 +13,7 @@ if str(SRC) not in sys.path:
 
 import pandas as pd
 
-from otno.reporting import collect_run_rows
+from otno.reporting import RunValidation, collect_run_rows, paired_metric_summary
 
 METRICS = [
     ("force_mae", "Force MAE"),
@@ -40,20 +39,6 @@ METHOD_LABELS = {
     "aug_orbit": "MLP + aug. + LOCO",
 }
 
-T_CRIT_95 = {
-    1: 12.706204736432095,
-    2: 4.302652729911275,
-    3: 3.182446305284263,
-    4: 2.7764451051977987,
-    5: 2.570581835636305,
-    6: 2.4469118511449692,
-    7: 2.3646242510102993,
-    8: 2.306004135204166,
-    9: 2.2621571627409915,
-    10: 2.2281388519649385,
-}
-
-
 def _fmt(value: float) -> str:
     if abs(value) < 0.00005 and value != 0:
         return f"{value:.2e}"
@@ -72,34 +57,35 @@ def _method_sort_key(method: str) -> int:
 
 
 def _filter_runs(df: pd.DataFrame, run_root: str) -> pd.DataFrame:
-    normalized = df["run_dir"].astype(str).str.replace("\\", "/", regex=False)
-    root = run_root.replace("\\", "/").rstrip("/")
-    out = df[normalized.str.contains(root, regex=False)].copy()
+    if df.empty or "run_dir" not in df:
+        raise SystemExit(f"No completed rMD17 runs found under {run_root!r}")
+    root = Path(run_root).resolve()
+    selected = df["run_dir"].map(lambda value: Path(str(value)).resolve().is_relative_to(root))
+    out = df[selected].copy()
     if out.empty:
         raise SystemExit(f"No completed rMD17 runs found under {run_root!r}")
     return out
 
 
 def _aggregate(df: pd.DataFrame) -> pd.DataFrame:
+    validation = RunValidation()
+    if "dataset_sha256" in df:
+        validation.nonempty_consistent(df, "dataset_sha256", "rMD17 campaign")
+    metrics = [metric for metric, _ in METRICS]
+    metrics.extend(metric for metric in ("latency_ms_per_sample", "train_wall_seconds") if metric in df)
     rows = []
     for method, group in df.groupby("method", sort=False):
+        seeds = validation.seed_values(group, str(method))
+        validation.finite_metrics(group, str(method), tuple(metrics))
         row: dict[str, object] = {
             "method": method,
             "method_label": METHOD_LABELS.get(method, method),
-            "seed_count": int(group["seed"].nunique()),
+            "seed_count": len(seeds),
         }
-        for metric, _ in METRICS:
-            values = pd.to_numeric(group[metric], errors="coerce").dropna()
+        for metric in metrics:
+            values = pd.to_numeric(group[metric], errors="raise")
             row[f"{metric}_mean"] = float(values.mean())
-            row[f"{metric}_std"] = float(values.std(ddof=1)) if values.shape[0] > 1 else 0.0
-        if "latency_ms_per_sample" in group:
-            values = pd.to_numeric(group["latency_ms_per_sample"], errors="coerce").dropna()
-            row["latency_ms_per_sample_mean"] = float(values.mean())
-            row["latency_ms_per_sample_std"] = float(values.std(ddof=1)) if values.shape[0] > 1 else 0.0
-        if "train_wall_seconds" in group:
-            values = pd.to_numeric(group["train_wall_seconds"], errors="coerce").dropna()
-            row["train_wall_seconds_mean"] = float(values.mean())
-            row["train_wall_seconds_std"] = float(values.std(ddof=1)) if values.shape[0] > 1 else 0.0
+            row[f"{metric}_std"] = float(values.std(ddof=1))
         rows.append(row)
     aggregate = pd.DataFrame(rows)
     aggregate["method_order"] = aggregate["method"].map(_method_sort_key)
@@ -111,35 +97,14 @@ def _paired_rows(df: pd.DataFrame, reference: str = "aug", candidate: str = "aug
     ref = df[df["method"] == reference]
     cand = df[df["method"] == candidate]
     for metric, label in METRICS:
-        paired = (
-            ref[["seed", metric]]
-            .rename(columns={metric: "reference"})
-            .merge(cand[["seed", metric]].rename(columns={metric: "candidate"}), on="seed", how="inner")
-            .sort_values("seed")
-        )
-        if paired.empty:
-            continue
-        diff = paired["candidate"] - paired["reference"]
-        n = int(diff.shape[0])
-        mean = float(diff.mean())
-        std = float(diff.std(ddof=1)) if n > 1 else 0.0
-        sem = std / math.sqrt(n) if n else 0.0
-        tcrit = T_CRIT_95.get(n - 1, 1.96)
-        ref_mean = float(paired["reference"].mean())
-        cand_mean = float(paired["candidate"].mean())
+        summary = paired_metric_summary(ref, cand, metric, context=f"rMD17 {candidate} vs {reference}")
         rows.append(
             {
                 "metric": metric,
                 "metric_label": label,
-                "seed_count": n,
                 "reference_method": reference,
                 "candidate_method": candidate,
-                "reference_mean": ref_mean,
-                "candidate_mean": cand_mean,
-                "paired_delta_mean": mean,
-                "paired_delta_ci95_low": mean - tcrit * sem,
-                "paired_delta_ci95_high": mean + tcrit * sem,
-                "relative_reduction_pct": 100.0 * (ref_mean - cand_mean) / ref_mean,
+                **summary,
             }
         )
     return pd.DataFrame(rows)
@@ -223,15 +188,8 @@ def main() -> None:
         expected_seeds = tuple(
             int(value.strip()) for value in args.expected_seeds.split(",") if value.strip()
         )
-        expected_set = set(expected_seeds)
         for method, group in df.groupby("method", sort=False):
-            seeds = [int(seed) for seed in group["seed"]]
-            found_set = set(seeds)
-            if found_set != expected_set or len(seeds) != len(expected_seeds):
-                raise SystemExit(
-                    f"Method {method!r} does not contain exactly one run for seeds "
-                    f"{list(expected_seeds)}; found {sorted(seeds)}"
-                )
+            RunValidation().seeds(group, str(method), expected_seeds)
     df["method_order"] = df["method"].map(_method_sort_key)
     df = df.sort_values(["method_order", "seed", "run_dir"]).drop(columns=["method_order"])
 
@@ -252,12 +210,10 @@ def main() -> None:
         "dataset_sha256",
         "config_hash",
     ]
-    _subset_columns(df, runs_columns).to_csv(out_prefix.with_suffix(".runs.csv"), index=False)
-
     aggregate = _aggregate(df)
-    aggregate.to_csv(out_prefix.with_suffix(".aggregate.csv"), index=False)
-
     paired = _paired_rows(df)
+    _subset_columns(df, runs_columns).to_csv(out_prefix.with_suffix(".runs.csv"), index=False)
+    aggregate.to_csv(out_prefix.with_suffix(".aggregate.csv"), index=False)
     paired.to_csv(out_prefix.with_suffix(".paired.csv"), index=False)
 
     _write_latex_table(out_prefix.with_suffix(".tex"), aggregate, caption=args.caption, label=args.label)

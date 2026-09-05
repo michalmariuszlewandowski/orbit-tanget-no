@@ -11,33 +11,12 @@ if str(SRC) not in sys.path:
 import argparse
 import shlex
 import subprocess
-from typing import Any
 
 import yaml
 
-from otno.config import apply_dotted_overrides, load_config
+from otno.config import apply_dotted_overrides, format_config_values, load_config
 from otno.training.adaptation import adapt_from_config
-
-
-def _value_to_cli(value) -> str:
-    if isinstance(value, str):
-        return value
-    if isinstance(value, bool):
-        return "true" if value else "false"
-    text = yaml.safe_dump(value, default_flow_style=True, sort_keys=False).strip()
-    if text.endswith("\n..."):
-        text = text[:-4].strip()
-    return text.replace("...", "").strip() or "null"
-
-
-def _format_value(value: Any, context: dict[str, Any]) -> Any:
-    if isinstance(value, str):
-        return value.format(**context)
-    if isinstance(value, list):
-        return [_format_value(item, context) for item in value]
-    if isinstance(value, dict):
-        return {key: _format_value(item, context) for key, item in value.items()}
-    return value
+from run_matrix import _value_to_cli
 
 
 def _jobs(matrix_path: Path) -> list[tuple[str, dict]]:
@@ -52,7 +31,7 @@ def _jobs(matrix_path: Path) -> list[tuple[str, dict]]:
             context = dict(entry.get("format", {}))
             if seed is not None:
                 context["seed"] = int(seed)
-            overrides = _format_value(dict(entry.get("overrides", {})), context)
+            overrides = format_config_values(dict(entry.get("overrides", {})), context)
             if seed is not None:
                 overrides["seed"] = int(seed)
             jobs.append((entry["config"], overrides))
@@ -80,6 +59,7 @@ def main() -> None:
     )
     args = parser.parse_args()
 
+    failed = False
     for config, overrides in _jobs(Path(args.matrix)):
         cmd = _command(config, overrides)
         print(" ".join(shlex.quote(part) for part in cmd), flush=True)
@@ -94,13 +74,18 @@ def main() -> None:
             try:
                 adapt_from_config(apply_dotted_overrides(load_config(config), overrides))
             except Exception as exc:
+                failed = True
                 print(f"adaptation matrix job failed: {exc}", file=sys.stderr, flush=True)
                 if not args.continue_on_error:
                     raise
             continue
         completed = subprocess.run(cmd, check=False)
-        if completed.returncode != 0 and not args.continue_on_error:
-            raise SystemExit(completed.returncode)
+        if completed.returncode != 0:
+            failed = True
+            if not args.continue_on_error:
+                raise SystemExit(completed.returncode)
+    if failed:
+        raise SystemExit(1)
 
 
 if __name__ == "__main__":

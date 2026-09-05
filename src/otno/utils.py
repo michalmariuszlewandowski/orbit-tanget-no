@@ -6,7 +6,6 @@ import os
 import platform
 import random
 import subprocess
-import time
 from pathlib import Path
 from typing import Any
 
@@ -17,18 +16,16 @@ import torch
 def set_seed(seed: int, *, deterministic: bool = False) -> None:
     """Seed Python, NumPy, and PyTorch.
 
-    Deterministic kernels are opt-in because some PyTorch deterministic paths are slower or
-    unavailable on specific accelerators. The flag is intended for final paper runs and
-    reproducibility audits, not necessarily for rapid sweeps.
+    Deterministic kernels are opt-in because they may be slower or unavailable
+    on some accelerators. Unsupported deterministic operations emit a warning.
     """
     random.seed(seed)
     np.random.seed(seed)
     torch.manual_seed(seed)
-    torch.cuda.manual_seed_all(seed)
+    torch.backends.cudnn.deterministic = deterministic
+    torch.use_deterministic_algorithms(deterministic, warn_only=deterministic)
     if deterministic:
         torch.backends.cudnn.benchmark = False
-        torch.backends.cudnn.deterministic = True
-        torch.use_deterministic_algorithms(True, warn_only=True)
 
 
 def make_torch_generator(seed: int, device: str | torch.device = "cpu") -> torch.Generator:
@@ -73,6 +70,26 @@ def ensure_dir(path: str | Path) -> Path:
     return path
 
 
+def check_run_directory(
+    path: str | Path, *, output_files: tuple[str, ...], overwrite: bool,
+) -> Path:
+    """Reject protected outputs without creating or changing any files."""
+    path = Path(path)
+    if not overwrite and any((path / name).exists() for name in output_files):
+        raise FileExistsError(f"Run directory already contains outputs and runtime.overwrite=false: {path}")
+    return path
+
+
+def prepare_run_directory(
+    path: str | Path, *, output_files: tuple[str, ...], overwrite: bool,
+) -> Path:
+    """Remove prior outputs after the caller has validated a fresh run's inputs."""
+    path = check_run_directory(path, output_files=output_files, overwrite=overwrite)
+    for name in output_files:
+        (path / name).unlink(missing_ok=True)
+    return ensure_dir(path)
+
+
 def dump_json(data: dict[str, Any], path: str | Path) -> None:
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -89,7 +106,6 @@ def append_jsonl(data: dict[str, Any], path: str | Path) -> None:
 
 def count_parameters(model: torch.nn.Module) -> int:
     return sum(p.numel() for p in model.parameters() if p.requires_grad)
-
 
 
 def stable_json_hash(data: Any) -> str:
@@ -155,7 +171,6 @@ def environment_fingerprint(root: str | Path | None = None) -> dict[str, Any]:
     }
 
 
-
 def environment_manifest(config: dict[str, Any] | None = None) -> dict[str, Any]:
     manifest = environment_fingerprint(Path.cwd())
     manifest["omp_num_threads"] = os.environ.get("OMP_NUM_THREADS")
@@ -163,21 +178,3 @@ def environment_manifest(config: dict[str, Any] | None = None) -> dict[str, Any]
     if config is not None:
         manifest["config_hash"] = stable_json_hash(config)[:12]
     return manifest
-
-
-class Timer:
-    def __enter__(self):
-        if torch.cuda.is_available():
-            torch.cuda.synchronize()
-        self.start = time.perf_counter()
-        return self
-
-    def __exit__(self, exc_type, exc, tb):
-        if torch.cuda.is_available():
-            torch.cuda.synchronize()
-        self.end = time.perf_counter()
-        self.elapsed = self.end - self.start
-
-
-def repo_root_from_env() -> Path:
-    return Path(os.environ.get("OTNO_ROOT", Path.cwd()))

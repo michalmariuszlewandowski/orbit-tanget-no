@@ -6,12 +6,10 @@ from torch.nn import functional as F
 
 
 class MoleculeMLP(nn.Module):
-    """A deliberately non-equivariant fixed-molecule force predictor.
+    """Non-equivariant MLP for force prediction on a fixed molecule.
 
     Inputs have shape ``[batch, atoms, in_channels]`` and outputs have shape
-    ``[batch, atoms, out_channels]``. This baseline is intentionally simple:
-    it gives the orbit objective a portable vector-output model without
-    introducing a specialized molecular architecture.
+    ``[batch, atoms, out_channels]``.
     """
 
     def __init__(

@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import os
 import copy
+import json
+import math
 import sys
 import time
 from pathlib import Path
@@ -27,6 +29,7 @@ from otno.training.metrics import evaluate_model, measure_inference_latency
 from otno.utils import (
     append_jsonl,
     capture_rng_state,
+    check_run_directory,
     count_parameters,
     dump_json,
     ensure_dir,
@@ -34,21 +37,13 @@ from otno.utils import (
     file_sha256,
     get_device,
     make_torch_generator,
+    prepare_run_directory,
     restore_rng_state,
     seed_worker,
     set_seed,
     source_manifest,
     stable_json_hash,
 )
-
-
-def _get(config: dict[str, Any], *keys, default=None):
-    cursor: Any = config
-    for key in keys:
-        if not isinstance(cursor, dict) or key not in cursor:
-            return default
-        cursor = cursor[key]
-    return cursor
 
 
 def _prepare_dataset(config: dict[str, Any]) -> Path:
@@ -96,12 +91,30 @@ def _loader(
     )
 
 
-def _maybe_protect_run_dir(run_dir: Path, runtime_cfg: dict[str, Any]) -> None:
-    if bool(runtime_cfg.get("overwrite", True)):
+_RUN_OUTPUTS = (
+    "config.yaml", "meta.json", "source_manifest.json", "train_metrics.jsonl",
+    "val_metrics.jsonl", "test_metrics.json", "partial_metrics.json",
+    "rng_state_initial.pt", "rng_state_final.pt", "checkpoints/best.pt", "checkpoints/last.pt",
+)
+
+
+def _rewind_epoch_log(path: Path, completed_epoch: int) -> None:
+    if not path.exists():
         return
-    protected = ["config.yaml", "test_metrics.json", "checkpoints/best.pt", "checkpoints/last.pt"]
-    if any((run_dir / item).exists() for item in protected):
-        raise FileExistsError(f"Run directory already contains artifacts and runtime.overwrite=false: {run_dir}")
+    lines = path.read_text(encoding="utf-8").splitlines()
+    kept = []
+    for index, line in enumerate(lines):
+        try:
+            record = json.loads(line)
+        except json.JSONDecodeError:
+            if index == len(lines) - 1:
+                break  # An interruption can leave the final record partially written.
+            raise
+        if int(record["epoch"]) <= completed_epoch:
+            kept.append(line)
+    temporary = path.with_suffix(".tmp")
+    temporary.write_text("".join(line + "\n" for line in kept), encoding="utf-8")
+    os.replace(temporary, path)
 
 
 def _resume_config_hash(config: dict[str, Any]) -> str:
@@ -138,20 +151,20 @@ def train_from_config(config: dict[str, Any]) -> dict[str, Any]:
     validate_config(config)
     training_cfg = config.get("training", {})
     method = str(training_cfg.get("method", "baseline")).lower()
-    if method in {"mixed_semi_aug_orbit", "split_semi_aug_orbit"}:
-        raise ValueError(f"Unsupported training method {method!r}; this release implements semi_aug_orbit only.")
     if method == "semi_aug_orbit" and int(training_cfg.get("unlabeled_orbit_steps_per_epoch", 0)) != 0:
         raise ValueError("Separate unlabeled optimizer steps are unsupported; use joint semi_aug_orbit with orbit_steps_per_epoch.")
     seed = int(config.get("seed", 0))
-    deterministic = bool(config.get("runtime", {}).get("deterministic", False))
-    set_seed(seed, deterministic=deterministic)
-    device = get_device(_get(config, "runtime", "device", default="auto"))
     runtime_cfg = config.get("runtime", {})
-    run_dir = Path(_get(config, "runtime", "run_dir", default="runs/default"))
+    deterministic = bool(runtime_cfg.get("deterministic", False))
+    set_seed(seed, deterministic=deterministic)
+    device = get_device(runtime_cfg.get("device", "auto"))
+    run_dir = Path(runtime_cfg.get("run_dir", "runs/default"))
     resume = bool(runtime_cfg.get("resume", False))
     if not resume:
-        _maybe_protect_run_dir(run_dir, runtime_cfg)
-    run_dir = ensure_dir(run_dir)
+        check_run_directory(
+            run_dir, output_files=_RUN_OUTPUTS,
+            overwrite=bool(runtime_cfg.get("overwrite", True)),
+        )
 
     dataset_path = _prepare_dataset(config)
     lr = float(training_cfg.get("lr", 1e-3))
@@ -236,7 +249,6 @@ def train_from_config(config: dict[str, Any]) -> dict[str, Any]:
     best_val = float("inf")
     best_path = run_dir / "checkpoints" / "best.pt"
     last_path = run_dir / "checkpoints" / "last.pt"
-    ensure_dir(best_path.parent)
 
     start_epoch = 1
     prior_wall_seconds = 0.0
@@ -248,16 +260,19 @@ def train_from_config(config: dict[str, Any]) -> dict[str, Any]:
         ckpt = torch.load(resume_path, map_location="cpu", weights_only=False)
         if "rng_state" not in ckpt or "loader_rng_states" not in ckpt:
             raise ValueError("This legacy checkpoint lacks complete RNG state; exact resume is unavailable. Start a fresh run in a new directory.")
+        missing = {"model", "optimizer", "scheduler", "config", "epoch", "best_val", "meta"} - ckpt.keys()
+        if missing:
+            raise ValueError(f"Checkpoint lacks state required for resume: {', '.join(sorted(missing))}")
         if _resume_config_hash(config) != _resume_config_hash(ckpt["config"]):
             raise ValueError("Resume config changes experiment parameters; start a new run instead.")
         if ckpt.get("meta", {}).get("dataset_sha256") != meta["dataset_sha256"]:
             raise ValueError("Resume dataset SHA-256 differs from the checkpoint.")
         model.load_state_dict(ckpt["model"])
-        if "optimizer" in ckpt:
-            optimizer.load_state_dict(ckpt["optimizer"])
-        if "scheduler" in ckpt:
-            scheduler.load_state_dict(ckpt["scheduler"])
-        best_val = float(ckpt.get("best_val", best_val))
+        optimizer.load_state_dict(ckpt["optimizer"])
+        scheduler.load_state_dict(ckpt["scheduler"])
+        best_val = float(ckpt["best_val"])
+        if math.isfinite(best_val) and not best_path.exists():
+            raise FileNotFoundError(f"Resume requires the validation-selected checkpoint: {best_path}")
         start_epoch = int(ckpt.get("epoch", 0)) + 1
         resume_checkpoint = ckpt
         prior_wall_seconds = float(ckpt.get("train_wall_seconds", 0.0))
@@ -271,9 +286,7 @@ def train_from_config(config: dict[str, Any]) -> dict[str, Any]:
     val_loader = _loader(dataset_path, "val", config, shuffle=False)
     test_loader = _loader(dataset_path, "test", config, shuffle=False)
     loaders = {"train": train_loader, "val": val_loader, "test": test_loader}
-    # Joint semi-supervised path restored from the recorded paper-run source,
-    # commit 22ced69577376b9bcde71a6338090f76c75085d2 (removed in fed40c8).
-    # Its independent full-data loader contributes inputs only to the orbit loss.
+    # The independent full-data loader contributes inputs only to the orbit loss.
     orbit_loader = None
     if method == "semi_aug_orbit":
         orbit_loader = _loader(
@@ -287,6 +300,17 @@ def train_from_config(config: dict[str, Any]) -> dict[str, Any]:
         for name, loader in loaders.items():
             loader.generator.set_state(resume_checkpoint["loader_rng_states"][name].cpu())
         restore_rng_state(resume_checkpoint["rng_state"])
+        if not last_path.exists():
+            _torch_save_atomic(resume_checkpoint, last_path)
+        for filename in ("train_metrics.jsonl", "val_metrics.jsonl"):
+            _rewind_epoch_log(run_dir / filename, start_epoch - 1)
+        for filename in ("test_metrics.json", "partial_metrics.json", "rng_state_final.pt"):
+            (run_dir / filename).unlink(missing_ok=True)
+    else:
+        prepare_run_directory(
+            run_dir, output_files=_RUN_OUTPUTS,
+            overwrite=bool(runtime_cfg.get("overwrite", True)),
+        )
     save_config(config, run_dir / "config.yaml")
     dump_json(meta, run_dir / "meta.json")
     dump_json(source, run_dir / "source_manifest.json")
@@ -332,18 +356,6 @@ def train_from_config(config: dict[str, Any]) -> dict[str, Any]:
         epoch_loss = 0.0
         epoch_logs: dict[str, float] = {}
         num_batches = 0
-
-        def _accumulate(loss_value: torch.Tensor, logs: dict[str, float]) -> None:
-            nonlocal epoch_loss, num_batches
-            loss_value.backward()
-            if grad_clip is not None:
-                torch.nn.utils.clip_grad_norm_(model.parameters(), float(grad_clip))
-            optimizer.step()
-            epoch_loss += float(loss_value.detach().cpu())
-            for key, value in logs.items():
-                epoch_logs[key] = epoch_logs.get(key, 0.0) + float(value)
-            num_batches += 1
-            progress.set_postfix(loss=epoch_loss / num_batches)
 
         for _ in range(supervised_steps):
             progress.update(1)
@@ -403,7 +415,15 @@ def train_from_config(config: dict[str, Any]) -> dict[str, Any]:
                 loss = loss + lambda_tangent * tangent_loss
                 logs.update(tangent_stats)
 
-            _accumulate(loss, logs)
+            loss.backward()
+            if grad_clip is not None:
+                torch.nn.utils.clip_grad_norm_(model.parameters(), float(grad_clip))
+            optimizer.step()
+            epoch_loss += float(loss.detach().cpu())
+            for key, value in logs.items():
+                epoch_logs[key] = epoch_logs.get(key, 0.0) + float(value)
+            num_batches += 1
+            progress.set_postfix(loss=epoch_loss / num_batches)
 
         progress.close()
 
@@ -485,6 +505,7 @@ def train_from_config(config: dict[str, Any]) -> dict[str, Any]:
     results = {"best_val_relative_l2": best_val, **test_metrics, **latency, **meta}
     results["train_wall_seconds"] = prior_wall_seconds + time.perf_counter() - train_wall_start
     dump_json(results, run_dir / "test_metrics.json")
+    (run_dir / "partial_metrics.json").unlink(missing_ok=True)
     torch.save(capture_rng_state(), run_dir / "rng_state_final.pt")
     # Evaluation uses best.pt; last.pt must retain the final model/optimizer pair.
     last_checkpoint = torch.load(last_path, map_location="cpu", weights_only=False)

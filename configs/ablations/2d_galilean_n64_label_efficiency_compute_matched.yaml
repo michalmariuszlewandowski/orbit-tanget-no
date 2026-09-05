@@ -1,14 +1,7 @@
 experiments:
-  # Full N64 boosted-Galilean label-efficiency curve for the reviewer-facing
-  # comparison: plain augmentation gets extra supervised updates, while
-  # aug_orbit uses the existing paper-ladder budget.
-  #
-  # New rows:
-  #   - aug_steps_6 at 0.5%, 1%, and 2%
-  #   - aug_orbit_steps_4 at 0.5%
-  #
-  # Existing rows are included so the matrix documents the whole curve and
-  # skips completed checkpoints.
+  # N64 Galilean label-efficiency comparison with six augmentation updates or
+  # four augmentation-plus-orbit updates per epoch. Each setting uses
+  # 12 batch-level model evaluations per epoch.
   - config: configs/pilot/2d_navier_stokes_galilean.yaml
     seeds: [23, 31, 47]
     overrides:
@@ -37,8 +30,7 @@ experiments:
       runtime.overwrite: false
       runtime.run_dir: runs/ablations/2d_galilean_n64_label_efficiency_compute_matched/fraction_0.01/aug_steps_6
 
-  # 1% aug_orbit_steps_4 already exists, split between the one-seed pilot and
-  # the two-seed replication.
+  # At 1%, aug_orbit_steps_4 spans the seed-23 pilot and seeds-31/47 replication.
   - config: configs/pilot/2d_navier_stokes_galilean.yaml
     seeds: [23]
     overrides:

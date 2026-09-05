@@ -1,8 +1,7 @@
 experiments:
-  # Semi-supervised joint orbit training for the strongest N64 Galilean
-  # low-label point. Supervised and augmentation losses use the 2% labeled
-  # subset; the orbit-consistency loss samples batches from the full training
-  # split through orbit_data_fraction=1.0.
+  # Semi-supervised N64 Galilean orbit training at 2% labels. Supervised and
+  # augmentation losses use the labeled subset; orbit consistency samples
+  # inputs from the full training split through orbit_data_fraction=1.0.
   - config: configs/pilot/2d_navier_stokes_galilean.yaml
     seeds: [23, 31, 47]
     overrides:

@@ -1,12 +1,11 @@
 #!/usr/bin/env python
-"""Validate and aggregate the five-seed DeepONet reviewer experiment."""
+"""Validate and aggregate the five-seed DeepONet backbone experiment."""
 
 from __future__ import annotations
 
 import argparse
 import math
 import sys
-from collections import Counter
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -19,7 +18,7 @@ if str(SRC) not in sys.path:
 import pandas as pd
 from scipy.stats import t as student_t
 
-from otno.reporting import collect_run_rows, validate_fresh_run_provenance
+from otno.reporting import RunValidation, collect_run_rows, validate_fresh_run_provenance
 
 
 EXPECTED_SEEDS = (23, 31, 47, 59, 71)
@@ -62,6 +61,9 @@ class DeepONetProtocolError(ValueError):
     """Raised when cached runs do not exactly match the declared protocol."""
 
 
+validation = RunValidation(DeepONetProtocolError)
+
+
 @dataclass(frozen=True)
 class MethodSpec:
     method: str
@@ -98,192 +100,8 @@ METHOD_SPECS = (
 )
 
 
-def _value_matches(actual: Any, expected: Any) -> bool:
-    if isinstance(expected, bool):
-        return isinstance(actual, bool) and actual is expected
-    if isinstance(expected, float):
-        try:
-            return math.isclose(float(actual), expected, rel_tol=0.0, abs_tol=1e-12)
-        except (TypeError, ValueError):
-            return False
-    return actual == expected
-
-
-def _validate_constant(df: pd.DataFrame, column: str, expected: Any, context: str) -> None:
-    if column not in df.columns:
-        raise DeepONetProtocolError(f"{context}: missing protocol field {column!r}")
-    failures = []
-    for _, row in df.iterrows():
-        if not _value_matches(row[column], expected):
-            failures.append(f"seed={row.get('seed')}: {row[column]!r}")
-    if failures:
-        raise DeepONetProtocolError(
-            f"{context}: expected {column}={expected!r}; found " + "; ".join(failures)
-        )
-
-
-def _is_missing(value: Any) -> bool:
-    return value is None or (isinstance(value, float) and math.isnan(value))
-
-
-def _validate_optional_constant(
-    df: pd.DataFrame, column: str, expected: Any, context: str
-) -> None:
-    """Validate an optional scalar config field whenever a run records it."""
-    if column not in df.columns:
-        return
-    failures = []
-    for _, row in df.iterrows():
-        value = row[column]
-        if not _is_missing(value) and not _value_matches(value, expected):
-            failures.append(f"seed={row.get('seed')}: {value!r}")
-    if failures:
-        raise DeepONetProtocolError(
-            f"{context}: expected absent or {column}={expected!r}; found "
-            + "; ".join(failures)
-        )
-
-
-def _validate_absent(df: pd.DataFrame, column: str, context: str) -> None:
-    """Reject a field that marks a chunked rather than uninterrupted run."""
-    if column not in df.columns:
-        return
-    failures = []
-    for _, row in df.iterrows():
-        value = row[column]
-        if not _is_missing(value):
-            failures.append(f"seed={row.get('seed')}: {value!r}")
-    if failures:
-        raise DeepONetProtocolError(
-            f"{context}: expected {column!r} to be absent; found "
-            + "; ".join(failures)
-        )
-
-
-def _validate_nonempty_consistent(
-    df: pd.DataFrame, column: str, context: str
-) -> None:
-    """Require a provenance field and one value throughout the campaign."""
-    if column not in df.columns:
-        raise DeepONetProtocolError(f"{context}: missing provenance field {column!r}")
-    values: list[tuple[Any, Any]] = []
-    for _, row in df.iterrows():
-        value = row[column]
-        if _is_missing(value) or (isinstance(value, str) and not value.strip()):
-            raise DeepONetProtocolError(
-                f"{context}: empty provenance field {column!r} for seed={row.get('seed')}"
-            )
-        values.append((row.get("seed"), value))
-    expected = values[0][1]
-    failures = [
-        f"seed={seed}: {value!r}"
-        for seed, value in values[1:]
-        if not _value_matches(value, expected)
-    ]
-    if failures:
-        raise DeepONetProtocolError(
-            f"{context}: inconsistent {column!r}; expected {expected!r}; found "
-            + "; ".join(failures)
-        )
-
-
-def _validate_consistent(df: pd.DataFrame, column: str, context: str) -> None:
-    """Require a provenance field to be present and internally consistent."""
-    if column not in df.columns:
-        raise DeepONetProtocolError(f"{context}: missing provenance field {column!r}")
-    expected = df.iloc[0][column]
-    failures = []
-    for _, row in df.iloc[1:].iterrows():
-        value = row[column]
-        both_missing = _is_missing(expected) and _is_missing(value)
-        if not both_missing and (
-            _is_missing(expected)
-            or _is_missing(value)
-            or not _value_matches(value, expected)
-        ):
-            failures.append(f"seed={row.get('seed')}: {value!r}")
-    if failures:
-        raise DeepONetProtocolError(
-            f"{context}: inconsistent {column!r}; expected {expected!r}; found "
-            + "; ".join(failures)
-        )
-
-
-def _validate_seeds(
-    df: pd.DataFrame,
-    context: str,
-    expected_seeds: tuple[int, ...] = EXPECTED_SEEDS,
-) -> None:
-    if "seed" not in df.columns:
-        raise DeepONetProtocolError(f"{context}: missing seed field")
-    seeds = [int(seed) for seed in df["seed"]]
-    counts = Counter(seeds)
-    duplicates = {seed: count for seed, count in counts.items() if count != 1}
-    if duplicates:
-        raise DeepONetProtocolError(f"{context}: duplicate seed rows {duplicates}")
-    if set(seeds) != set(expected_seeds):
-        raise DeepONetProtocolError(
-            f"{context}: expected seeds {list(expected_seeds)}, found {sorted(seeds)}"
-        )
-
-
 def load_fno_reference_seeds(path: Path) -> tuple[int, ...]:
-    """Read the exact seed set shared by all four primary FNO rows."""
-    if not path.is_file():
-        raise DeepONetProtocolError(f"FNO seed reference does not exist: {path}")
-    try:
-        df = pd.read_csv(path)
-    except (OSError, pd.errors.ParserError) as exc:
-        raise DeepONetProtocolError(
-            f"could not read FNO seed reference {path}: {exc}"
-        ) from exc
-
-    required = {"method", "model_name", "seed"}
-    missing = sorted(required.difference(df.columns))
-    if missing:
-        raise DeepONetProtocolError(
-            f"FNO seed reference {path} is missing columns {missing}"
-        )
-
-    reference: tuple[int, ...] | None = None
-    for spec in METHOD_SPECS:
-        group = df[df["method"] == spec.method]
-        context = f"FNO {spec.method} seed reference in {path}"
-        if group.empty:
-            raise DeepONetProtocolError(f"{context}: no rows")
-        model_names = set(group["model_name"].dropna().astype(str))
-        if model_names != {"fno2d"}:
-            raise DeepONetProtocolError(
-                f"{context}: expected model_name='fno2d', found {sorted(model_names)}"
-            )
-        try:
-            seeds = [int(seed) for seed in group["seed"]]
-        except (TypeError, ValueError) as exc:
-            raise DeepONetProtocolError(f"{context}: non-integer seed") from exc
-        counts = Counter(seeds)
-        duplicates = {seed: count for seed, count in counts.items() if count != 1}
-        if duplicates:
-            raise DeepONetProtocolError(f"{context}: duplicate seed rows {duplicates}")
-        current = tuple(sorted(seeds))
-        if reference is None:
-            reference = current
-        elif current != reference:
-            raise DeepONetProtocolError(
-                f"{context}: expected the shared FNO seeds {reference}, found {current}"
-            )
-
-    if reference is None:
-        raise DeepONetProtocolError(f"FNO seed reference {path} contains no methods")
-    return reference
-
-
-def _validate_finite_metrics(df: pd.DataFrame, context: str) -> None:
-    for metric in AGGREGATE_METRICS:
-        if metric not in df.columns:
-            raise DeepONetProtocolError(f"{context}: missing metric {metric!r}")
-        values = pd.to_numeric(df[metric], errors="coerce")
-        if values.isna().any() or not values.map(math.isfinite).all():
-            raise DeepONetProtocolError(f"{context}: non-finite values in {metric!r}")
+    return validation.fno_reference_seeds(path, [spec.method for spec in METHOD_SPECS])
 
 
 def _expected_protocol(spec: MethodSpec) -> dict[str, Any]:
@@ -368,26 +186,26 @@ def _load_method(
     context = f"{spec.method} under {method_root}"
     if df.empty:
         raise DeepONetProtocolError(f"{context}: no completed test_metrics.json files")
-    _validate_seeds(df, context, expected_seeds)
+    validation.seeds(df, context, expected_seeds)
     protocol = _expected_protocol(spec)
     if fresh_runs:
         protocol.pop("dataset_sha256")
     for column, expected in protocol.items():
-        _validate_constant(df, column, expected, context)
-    _validate_optional_constant(df, "config.runtime.resume", False, context)
-    _validate_absent(df, "config.training.stop_after_epochs", context)
+        validation.constant(df, column, expected, context)
+    validation.optional_constant(df, "config.runtime.resume", False, context)
+    validation.absent(df, "config.training.stop_after_epochs", context)
     for column in NONEMPTY_PROVENANCE_FIELDS:
         if fresh_runs and column == "environment.git_commit":
             continue
-        _validate_nonempty_consistent(df, column, context)
+        validation.nonempty_consistent(df, column, context)
     for column in CONSISTENT_PROVENANCE_FIELDS:
-        _validate_consistent(df, column, context)
+        validation.consistent(df, column, context)
     for _, row in df.iterrows():
         if int(row["seed"]) != int(row["config.seed"]):
             raise DeepONetProtocolError(
                 f"{context}: metrics/config seed mismatch in {row['run_dir']}"
             )
-    _validate_finite_metrics(df, context)
+    validation.finite_metrics(df, context, AGGREGATE_METRICS)
     out = df.copy()
     out["method_label"] = spec.label
     out["optimizer_steps"] = spec.steps_per_epoch * 150
@@ -411,9 +229,9 @@ def build_run_frame(
     for column in NONEMPTY_PROVENANCE_FIELDS:
         if fresh_runs and column == "environment.git_commit":
             continue
-        _validate_nonempty_consistent(df, column, "DeepONet campaign")
+        validation.nonempty_consistent(df, column, "DeepONet campaign")
     for column in CONSISTENT_PROVENANCE_FIELDS:
-        _validate_consistent(df, column, "DeepONet campaign")
+        validation.consistent(df, column, "DeepONet campaign")
     if fresh_runs:
         try:
             validate_fresh_run_provenance(df, source_root=ROOT)
@@ -598,12 +416,14 @@ def _manifest(run_df: pd.DataFrame) -> pd.DataFrame:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Aggregate completed DeepONet reviewer runs; never trains or evaluates models."
+        description="Validate and aggregate recorded DeepONet backbone metrics."
     )
     parser.add_argument("--run-root", type=Path, default=DEFAULT_RUN_ROOT)
     parser.add_argument("--out-prefix", type=Path, default=DEFAULT_OUT_PREFIX)
-    parser.add_argument("--fresh-runs", action="store_true",
-                        help="Validate new CPU/one-thread runs using source manifests and their actual dataset, including releases without Git.")
+    parser.add_argument(
+        "--fresh-runs", action="store_true",
+        help="Validate new runs against their source manifest and dataset hashes.",
+    )
     parser.add_argument(
         "--fno-runs",
         type=Path,

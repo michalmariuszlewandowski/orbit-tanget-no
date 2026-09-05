@@ -1,6 +1,6 @@
 experiments:
-  # Complete the 3-seed D4-only 1%-label comparison. Seed 23 is already
-  # available from the D4 pilot/refinement runs.
+  # D4 comparison at seeds 31 and 47 with 1% labels. Seed 23 is defined in the
+  # pilot and refinement matrices.
   - config: configs/pilot/2d_navier_stokes_translation_d4.yaml
     seeds: [31, 47]
     overrides:

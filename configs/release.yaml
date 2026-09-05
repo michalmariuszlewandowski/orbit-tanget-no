@@ -1,7 +1,7 @@
-# The PDF, not the older root paper sources, defines this release inventory.
-# Stages are executed only with --execute. Existing evidence inputs are protected.
+# Experiments and artifacts for the paper.
+# Use --execute to run stages; existing inputs are protected.
 release_version: 1
-manuscript: TMLR rebuttal v11 (30 pages)
+manuscript: Local Orbit Consistency for Symmetry-Robust Neural Operators
 datasets:
   galilean:
     path: data/2d_ns_vorticity_galilean_n64.pt
@@ -110,9 +110,6 @@ suites:
     - main
     training:
     - matrix: configs/ablations/2d_galilean_n64_2pct_cno2d_5seed.yaml
-      overrides:
-        runtime.source_snapshot: null
-        runtime.source_snapshot_sha256: null
     reports:
     - command:
       - scripts/make_cno2d_backbone_table.py
@@ -290,7 +287,7 @@ suites:
       - runs/paper_tables/2d_d4_rotation_with_gfno_5seed.aggregate.csv
       - runs/paper_tables/2d_d4_rotation_with_gfno_5seed.aggregate.tex
   rmd17:
-    paper: Table 11 (three seeds, five methods; unnormalized historical objective)
+    paper: Table 11 (three seeds, five methods; unnormalized objective)
     datasets:
     - rmd17
     depends_on: *id002

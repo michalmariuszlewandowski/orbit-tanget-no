@@ -1,7 +1,5 @@
 experiments:
-  # Architectural D4 equivariance baseline for the D4-only vorticity benchmark.
-  # The model uses p4m/D4 group Fourier layers and is trained supervised only;
-  # equivariance is enforced by the architecture rather than by LOCO.
+  # Supervised D4-equivariant baseline using p4m/D4 group Fourier layers.
   - config: configs/pilot/2d_navier_stokes_translation_d4.yaml
     seeds: [23, 31, 47]
     overrides:

@@ -28,6 +28,8 @@ def load_tensor_dataset(
     fraction: float = 1.0,
     seed: int = 0,
 ) -> tuple[TensorDictDataset, dict[str, Any]]:
+    if not 0 < fraction <= 1:
+        raise ValueError("fraction must lie in (0, 1]")
     payload = torch.load(Path(path), map_location="cpu", weights_only=False)
     if "splits" not in payload or split not in payload["splits"]:
         raise KeyError(f"Dataset {path} does not contain split {split}")

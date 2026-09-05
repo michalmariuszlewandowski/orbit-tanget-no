@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Recompute v11 table statistics from the released per-seed CSV records."""
+"""Recompute paper table statistics from the released per-seed CSV records."""
 from __future__ import annotations
 
 import argparse
@@ -56,12 +56,11 @@ def verify(root: Path, reference: Path) -> tuple[int, int]:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", type=Path, default=ROOT)
-    parser.add_argument("--reference", default="figure_specs/paper_results_v11.yaml")
+    parser.add_argument("--reference", default="figure_specs/paper_results.yaml")
     args = parser.parse_args()
     root = args.root.resolve()
     rows, values = verify(root, root / args.reference)
-    print(f"PAPER VALUES VERIFIED: {rows} rows, {values} mean/std values; exact seed sets and provenance checked")
-    print("This verifies cached statistics; it does not rerun training or verify unlisted paper tables.")
+    print(f"PAPER VALUES VERIFIED: {rows} rows, {values} mean/std values; seed sets and hash fields checked")
 
 
 if __name__ == "__main__":

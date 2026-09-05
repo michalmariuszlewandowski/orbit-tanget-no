@@ -37,36 +37,6 @@ def random_fourier_field_1d(
     return amplitude * fields + mean
 
 
-def random_lpsda_fourier_field_1d(
-    num: int,
-    n: int,
-    *,
-    length: float = 128.0,
-    terms: int = 10,
-    amplitudes: tuple[float, float] = (-0.5, 0.5),
-    frequencies: tuple[int, ...] = (1, 2, 3),
-    seed: int | None = None,
-    device: torch.device | None = None,
-) -> torch.Tensor:
-    """Initial condition distribution used by the LPSDA KdV/KS experiments."""
-    generator = torch.Generator(device=device)
-    if seed is not None:
-        generator.manual_seed(seed)
-    x = torch.arange(n, device=device, dtype=torch.float32) * (length / n)
-    amp_low, amp_high = amplitudes
-    amps = amp_low + (amp_high - amp_low) * torch.rand(
-        num, terms, 1, generator=generator, device=device, dtype=x.dtype
-    )
-    freq_choices = torch.as_tensor(frequencies, device=device)
-    freq_idx = torch.randint(
-        0, len(frequencies), (num, terms, 1), generator=generator, device=device
-    )
-    freqs = freq_choices[freq_idx].to(x.dtype)
-    phase = 2 * math.pi * torch.rand(num, terms, 1, generator=generator, device=device, dtype=x.dtype)
-    fields = (amps * torch.sin(2 * math.pi * freqs * x[None, None, :] / length + phase)).sum(dim=1)
-    return fields
-
-
 def _fft_frequencies_1d(n: int, length: float, device: torch.device, dtype: torch.dtype) -> torch.Tensor:
     return 2 * math.pi * torch.fft.fftfreq(n, d=length / n, device=device).to(dtype)
 
@@ -155,8 +125,8 @@ def solve_burgers_1d(
 ) -> torch.Tensor:
     """Pseudo-spectral RK4 solver for viscous Burgers on a periodic line.
 
-    The nonlinear term is de-aliased by default using a 2/3-rule spectral filter. Final
-    paper runs should record a convergence audit by halving ``dt`` on a held-out subset.
+    The nonlinear term is de-aliased by default using a 2/3-rule spectral filter.
+    Check time-step convergence by halving ``dt`` on a held-out subset.
     """
     steps = max(1, int(math.ceil(final_time / dt)))
     h = final_time / steps
@@ -164,78 +134,3 @@ def solve_burgers_1d(
     for _ in range(steps):
         u = _rk4_step_burgers(u, h, viscosity=viscosity, length=length, dealias=dealias)
     return u
-
-
-def _etdrk4_coefficients(k: torch.Tensor, h: float) -> tuple[torch.Tensor, ...]:
-    l_op = 1j * k.pow(3)
-    e = torch.exp(h * l_op)
-    e2 = torch.exp(0.5 * h * l_op)
-    roots = torch.exp(
-        1j
-        * math.pi
-        * (torch.arange(1, 17, device=k.device, dtype=k.dtype) - 0.5)
-        / 16.0
-    )
-    lr = h * l_op[:, None] + roots[None, :]
-    q = h * torch.mean((torch.exp(lr / 2.0) - 1.0) / lr, dim=1)
-    f1 = h * torch.mean((-4.0 - lr + torch.exp(lr) * (4.0 - 3.0 * lr + lr.pow(2))) / lr.pow(3), dim=1)
-    f2 = h * torch.mean((2.0 + lr + torch.exp(lr) * (-2.0 + lr)) / lr.pow(3), dim=1)
-    f3 = h * torch.mean((-4.0 - 3.0 * lr - lr.pow(2) + torch.exp(lr) * (4.0 - lr)) / lr.pow(3), dim=1)
-    return e, e2, q, f1, f2, f3
-
-
-def solve_kdv_1d_trajectory(
-    u0: torch.Tensor,
-    *,
-    final_time: float = 20.0,
-    dt: float = 0.05,
-    num_frames: int = 120,
-    length: float = 128.0,
-    dealias: bool = True,
-) -> torch.Tensor:
-    """Pseudo-spectral ETDRK4 solver for KdV, returning ``[batch, frames, n]``.
-
-    The equation is ``u_t + u u_x + u_xxx = 0`` on a periodic line.
-    """
-    if u0.ndim != 2:
-        raise ValueError(f"Expected [batch, n], got {tuple(u0.shape)}")
-    if num_frames < 2:
-        raise ValueError("num_frames must be at least 2")
-    batch, n = u0.shape
-    steps = max(1, int(math.ceil(final_time / dt)))
-    h = final_time / steps
-    k = _fft_frequencies_1d(n, length, u0.device, u0.dtype)
-    e, e2, q, f1, f2, f3 = _etdrk4_coefficients(k, h)
-    keep = torch.ones(n, device=u0.device, dtype=torch.bool)
-    if dealias:
-        freqs = torch.fft.fftfreq(n, d=length / n, device=u0.device)
-        keep = freqs.abs() <= (2.0 / 3.0) * (n // 2) / length
-
-    def nonlinear(v_hat: torch.Tensor) -> torch.Tensor:
-        v = torch.fft.ifft(v_hat, dim=-1).real
-        square_hat = torch.fft.fft(v * v, dim=-1)
-        if dealias:
-            square_hat = square_hat * keep[None, :]
-        return -0.5j * k[None, :] * square_hat
-
-    record_steps = torch.linspace(0, steps, num_frames, device=u0.device).round().to(torch.long)
-    trajectory = torch.empty(batch, num_frames, n, device=u0.device, dtype=u0.dtype)
-    v_hat = torch.fft.fft(u0, dim=-1)
-    record_idx = 0
-    trajectory[:, record_idx] = u0
-    record_idx += 1
-    for step in range(1, steps + 1):
-        nv = nonlinear(v_hat)
-        a = e2[None, :] * v_hat + q[None, :] * nv
-        na = nonlinear(a)
-        b = e2[None, :] * v_hat + q[None, :] * na
-        nb = nonlinear(b)
-        c = e2[None, :] * a + q[None, :] * (2.0 * nb - nv)
-        nc = nonlinear(c)
-        v_hat = e[None, :] * v_hat + f1[None, :] * nv + 2.0 * f2[None, :] * (na + nb) + f3[None, :] * nc
-        while record_idx < num_frames and int(record_steps[record_idx].item()) == step:
-            trajectory[:, record_idx] = torch.fft.ifft(v_hat, dim=-1).real
-            record_idx += 1
-    if record_idx < num_frames:
-        trajectory[:, record_idx:] = torch.fft.ifft(v_hat, dim=-1).real[:, None, :]
-    return trajectory

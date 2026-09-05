@@ -10,12 +10,11 @@ import json
 import numpy as np
 import torch
 
+from otno.config import validate_config
 from otno.data.solvers1d import (
     random_fourier_field_1d,
-    random_lpsda_fourier_field_1d,
     solve_advection_1d,
     solve_burgers_1d,
-    solve_kdv_1d_trajectory,
 )
 from otno.data.solvers2d import random_fourier_field_2d, solve_navier_stokes_vorticity_2d
 
@@ -51,6 +50,7 @@ def validate_existing_dataset(path: str | Path, config: dict[str, Any]) -> None:
     path = Path(path)
     if not path.exists():
         return
+    config = config.get("dataset", config)
     payload = torch.load(path, map_location="cpu", weights_only=False)
     metadata = payload.get("metadata", {})
     expected = dataset_config_fingerprint(config)
@@ -213,58 +213,6 @@ def generate_heat_1d_dirichlet(config: dict[str, Any], out_path: str | Path) -> 
     return _save_dataset(payload, out_path)
 
 
-def generate_kdv_1d(config: dict[str, Any], out_path: str | Path) -> Path:
-    n = int(config.get("n", 256))
-    final_time = float(config.get("final_time", 20.0))
-    dt = float(config.get("dt", 0.05))
-    length = float(config.get("length", 128.0))
-    input_steps = int(config.get("input_steps", 20))
-    output_steps = int(config.get("output_steps", 100))
-    seed = int(config.get("seed", 0))
-    counts = _split_counts(config)
-    batch_size = int(config.get("solver_batch_size", 16))
-    payload: dict[str, Any] = {
-        "metadata": {
-            **_metadata("kdv1d", config),
-            "input_times": torch.linspace(0.0, final_time, input_steps + output_steps)[:input_steps].tolist(),
-            "output_times": torch.linspace(0.0, final_time, input_steps + output_steps)[input_steps:].tolist(),
-        },
-        "splits": {},
-    }
-    offset = 0
-    for split, num in counts.items():
-        a_all = []
-        u_all = []
-        generated = 0
-        while generated < num:
-            b = min(batch_size, num - generated)
-            u0 = random_lpsda_fourier_field_1d(
-                b,
-                n,
-                length=length,
-                terms=int(config.get("terms", 10)),
-                seed=seed + offset + generated,
-            )
-            trajectory = solve_kdv_1d_trajectory(
-                u0,
-                final_time=final_time,
-                dt=dt,
-                num_frames=input_steps + output_steps,
-                length=length,
-                dealias=bool(config.get("dealias", True)),
-            )
-            trajectory = trajectory.permute(0, 2, 1).contiguous()
-            a_all.append(trajectory[..., :input_steps].cpu())
-            u_all.append(trajectory[..., input_steps:].cpu())
-            generated += b
-        payload["splits"][split] = {
-            "a": torch.cat(a_all, dim=0).contiguous(),
-            "u": torch.cat(u_all, dim=0).contiguous(),
-        }
-        offset += 100_000
-    return _save_dataset(payload, out_path)
-
-
 def generate_navier_stokes_2d(config: dict[str, Any], out_path: str | Path) -> Path:
     n = int(config.get("n", 64))
     final_time = float(config.get("final_time", 0.5))
@@ -418,6 +366,7 @@ def generate_dataset_from_config(config: dict[str, Any], out_path: str | Path | 
     dataset_cfg = config.get("dataset", config)
     kind = str(dataset_cfg.get("kind", dataset_cfg.get("name", "burgers1d"))).lower()
     out_path = Path(out_path or dataset_cfg.get("path", f"data/{kind}.pt"))
+    validate_config({"dataset": {**dataset_cfg, "kind": kind, "path": str(out_path)}})
     if out_path.exists() and not bool(dataset_cfg.get("overwrite", False)):
         validate_existing_dataset(out_path, dataset_cfg)
         return out_path
@@ -427,8 +376,6 @@ def generate_dataset_from_config(config: dict[str, Any], out_path: str | Path | 
         return generate_burgers_1d(dataset_cfg, out_path)
     if kind in {"heat1d_dirichlet", "dirichlet_heat1d"}:
         return generate_heat_1d_dirichlet(dataset_cfg, out_path)
-    if kind in {"kdv1d", "1d_kdv", "lpsda_kdv1d"}:
-        return generate_kdv_1d(dataset_cfg, out_path)
     if kind in {"navier_stokes_vorticity2d", "ns2d", "2d_navier_stokes"}:
         return generate_navier_stokes_2d(dataset_cfg, out_path)
     if kind in {

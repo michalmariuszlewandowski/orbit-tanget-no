@@ -1,7 +1,7 @@
 experiments:
-  # Full four-method CNO2d reproduction of the FNO/DeepONet headline protocol.
-  # The primary pair is forward-count matched at 12 batch-level model evaluations
-  # per epoch (6 x 2 for augmentation versus 4 x 3 for augmentation plus LOCO).
+  # Four-method CNO2d comparison under the FNO/DeepONet protocol.
+  # Augmentation and augmentation plus LOCO each use 12 batch-level model
+  # evaluations per epoch (6 x 2 and 4 x 3, respectively).
   - config: configs/pilot/2d_navier_stokes_galilean_cno2d.yaml
     seeds: [23, 31, 47, 59, 71]
     overrides:

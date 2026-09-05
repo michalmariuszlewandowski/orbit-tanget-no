@@ -7,9 +7,7 @@ name = "orbit-tangent-no"
 version = "0.1.0"
 description = "Local orbit consistency for symmetry-robust neural operators"
 readme = "README.md"
-license = {file = "LICENSE"}
 requires-python = ">=3.10"
-authors = [{name = "Orbit Tangent NO Authors"}]
 dependencies = [
     "torch>=2.1",
     "numpy>=1.24",

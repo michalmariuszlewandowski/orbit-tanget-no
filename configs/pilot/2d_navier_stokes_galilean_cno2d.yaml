@@ -64,6 +64,4 @@ runtime:
   deterministic: false
   device: auto
   overwrite: false
-  source_snapshot: runs/ablations/2d_galilean_n64_2pct_cno2d_5seed/_provenance/source_snapshot.zip
-  source_snapshot_sha256: 73a64bfda1a3e6ba63eab3a372e1cd6b64d22fda76c0405dfd5facaa765fdb33
   run_dir: runs/pilot/2d_ns_galilean_cno2d/aug_orbit

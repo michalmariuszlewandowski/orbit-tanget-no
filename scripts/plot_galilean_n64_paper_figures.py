@@ -239,7 +239,7 @@ def plot_ood_severity(runs_csv: Path, out_prefix: Path) -> None:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Plot paper-facing N64 Galilean figures.")
+    parser = argparse.ArgumentParser(description="Plot N64 Galilean experiment figures.")
     parser.add_argument(
         "--label-runs-csv",
         default="runs/paper_tables/2d_galilean_n64_label_efficiency_lambda_0p1.runs.csv",

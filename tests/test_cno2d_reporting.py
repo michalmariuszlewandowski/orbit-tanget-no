@@ -94,7 +94,9 @@ def test_cno2d_resume_allowlist_matches_pause_record():
 def test_cno2d_seed_validation_rejects_incomplete_runs():
     module = _load_module()
     with pytest.raises(module.CNO2dProtocolError, match="expected seeds"):
-        module._validate_seeds(pd.DataFrame({"seed": [23, 31, 47, 59]}), "test")
+        module.validation.seeds(
+            pd.DataFrame({"seed": [23, 31, 47, 59]}), "test", module.EXPECTED_SEEDS
+        )
 
 
 def test_cno2d_loads_exact_shared_fno_seed_set(tmp_path):
