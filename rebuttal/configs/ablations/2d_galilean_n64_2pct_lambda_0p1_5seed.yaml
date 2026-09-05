@@ -1,0 +1,12 @@
+experiments:
+  # Extend the best lambda from the robustness sweep to 5 seeds. Seeds 23, 31,
+  # and 47 reuse completed robustness checkpoints; seeds 59 and 71 are new.
+  - config: configs/pilot/2d_navier_stokes_galilean.yaml
+    seeds: [23, 31, 47, 59, 71]
+    overrides:
+      training.method: aug_orbit
+      training.data_fraction: 0.02
+      training.steps_per_epoch: 4
+      training.lambda_orbit: 0.1
+      runtime.overwrite: false
+      runtime.run_dir: runs/ablations/2d_galilean_n64_2pct_lambda_robustness/fraction_0.02/aug_orbit_lambda_0.1_steps_4

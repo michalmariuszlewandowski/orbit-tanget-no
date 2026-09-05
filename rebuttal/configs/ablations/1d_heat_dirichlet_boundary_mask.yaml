@@ -1,0 +1,28 @@
+experiments:
+  # Non-periodic boundary diagnostic: Dirichlet heat equation plus a
+  # translation-like transformation that is only locally meaningful away from
+  # walls. The mask row uses BaseTransform.output_mask to score only valid
+  # overlap/interior regions.
+  - config: configs/pilot/1d_heat_dirichlet_nonperiodic.yaml
+    seeds: [23, 31, 47]
+    overrides:
+      training.method: baseline
+      runtime.overwrite: false
+      runtime.run_dir: runs/ablations/1d_heat_dirichlet_boundary_mask/baseline
+
+  - config: configs/pilot/1d_heat_dirichlet_nonperiodic.yaml
+    seeds: [23, 31, 47]
+    overrides:
+      training.method: aug_orbit
+      symmetry.use_mask: false
+      runtime.overwrite: false
+      runtime.run_dir: runs/ablations/1d_heat_dirichlet_boundary_mask/aug_orbit_no_mask
+
+  - config: configs/pilot/1d_heat_dirichlet_nonperiodic.yaml
+    seeds: [23, 31, 47]
+    overrides:
+      training.method: aug_orbit
+      symmetry.use_mask: true
+      symmetry.mask_margin: 0.05
+      runtime.overwrite: false
+      runtime.run_dir: runs/ablations/1d_heat_dirichlet_boundary_mask/aug_orbit_mask

@@ -1,0 +1,23 @@
+experiments:
+  # Theory-facing tangent-propagation baseline for the N64 boosted-Galilean
+  # 2%-label setting. This compares explicit infinitesimal equivariance
+  # matching against finite-orbit LOCO with the same FNO2d architecture.
+  - config: configs/pilot/2d_navier_stokes_galilean.yaml
+    seeds: [23, 31, 47, 59, 71]
+    overrides:
+      training.method: tangent
+      training.data_fraction: 0.02
+      training.steps_per_epoch: 4
+      training.lambda_tangent: 0.1
+      runtime.overwrite: false
+      runtime.run_dir: runs/ablations/2d_galilean_n64_2pct_tangent_baseline/fraction_0.02/tangent_lambda_0.1_steps_4
+
+  - config: configs/pilot/2d_navier_stokes_galilean.yaml
+    seeds: [23, 31, 47, 59, 71]
+    overrides:
+      training.method: aug_tangent
+      training.data_fraction: 0.02
+      training.steps_per_epoch: 4
+      training.lambda_tangent: 0.1
+      runtime.overwrite: false
+      runtime.run_dir: runs/ablations/2d_galilean_n64_2pct_tangent_baseline/fraction_0.02/aug_tangent_lambda_0.1_steps_4

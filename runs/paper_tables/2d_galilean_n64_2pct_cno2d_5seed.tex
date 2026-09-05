@@ -1,0 +1,18 @@
+\begin{table*}[t]
+\centering
+\small
+\caption{CNO2d reproduction on the 2\%-label N64 Galilean task over the same training seeds as the FNO comparison, \(\{23, 31, 47, 59, 71\}\). All rows use the same 2,667,743-parameter architecture. The augmentation and augmentation-plus-normalized-LOCO rows are matched at 12 batch-level model evaluations per epoch; optimizer and backward-pass counts differ and are shown. Entries are mean $\pm$ sample standard deviation. Latency and wall time remain available in the per-run manifest; these eight-thread CPU training runs are not used for cross-backbone efficiency comparisons. Baseline seed 23 and augmentation-plus-LOCO seed 59 were resumed from fully saved checkpoints after epochs 108 and 103, respectively. Their post-resume minibatch streams need not reproduce uninterrupted runs, and their segment-local wall times are excluded from timing summaries.}
+\label{tab:cno2d-backbone}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{lrrrrrr}
+\toprule
+Method & Steps/epoch & Model fwds., total & Bwd. passes, total & ID $L^2$ & Orbit OOD $L^2$ & Eq. defect \\
+\midrule
+CNO2d & 4 & 600 & 600 & \(0.3745\pm0.0206\) & \(0.4457\pm0.0233\) & \(0.3734\pm0.0213\) \\
+CNO2d + normalized LOCO & 4 & 1200 & 600 & \(0.2127\pm0.0098\) & \(0.2391\pm0.0062\) & \(0.1549\pm0.0075\) \\
+CNO2d + aug. & 6 & 1800 & 900 & \(0.1806\pm0.0101\) & \(0.2030\pm0.0112\) & \(0.1358\pm0.0123\) \\
+CNO2d + aug. + normalized LOCO & 4 & 1800 & 600 & \(\mathbf{0.1932\pm0.0132}\) & \(\mathbf{0.2156\pm0.0109}\) & \(\mathbf{0.1276\pm0.0087}\) \\
+\bottomrule
+\end{tabular}
+}
+\end{table*}

@@ -1,3 +1,5 @@
+import subprocess
+import sys
 from pathlib import Path
 
 import torch
@@ -5,7 +7,7 @@ import yaml
 from torch import nn
 from torch.utils.data import DataLoader
 
-from otno.config import load_config, recursive_update, set_by_path
+from otno.config import load_config, recursive_update, set_by_path, validate_config
 from otno.data.datasets import TensorDictDataset
 from otno.models import build_model
 from otno.symmetry.registry import build_transform
@@ -23,6 +25,9 @@ def test_all_experiment_configs_build_model_and_transform():
     assert paths
     for path in paths:
         cfg = load_config(path)
+        if "release_version" in cfg:
+            # Workflow registries are covered by test_release_reproduction.py.
+            continue
         if "experiments" in cfg:
             for entry in cfg["experiments"]:
                 base = load_config(root / entry["config"])
@@ -68,6 +73,67 @@ def test_run_matrix_uses_valid_config_paths():
         assert run_dir is not None
         run_dirs.append(run_dir)
     assert len(run_dirs) == len(set(run_dirs))
+
+
+def test_run_matrix_skip_completed_only_skips_finalized_job(tmp_path):
+    root = Path(__file__).resolve().parents[1]
+    run_dir = tmp_path / "seed_23"
+    run_dir.mkdir()
+    (run_dir / "test_metrics.json").write_text("{}", encoding="utf-8")
+    matrix_path = tmp_path / "matrix.yaml"
+    matrix_path.write_text(
+        yaml.safe_dump(
+            {
+                "experiments": [
+                    {
+                        "config": "unused.yaml",
+                        "seeds": [23],
+                        "overrides": {"runtime.run_dir": str(run_dir.parent)},
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    completed = subprocess.run(
+        [
+            sys.executable,
+            "scripts/run_matrix.py",
+            "--matrix",
+            str(matrix_path),
+            "--skip-completed",
+            "--dry-run",
+        ],
+        cwd=root,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    assert f"skipping completed matrix job: {run_dir}" in completed.stdout
+
+
+def test_aug_tangent_method_config_validates():
+    cfg = {
+        "seed": 1,
+        "dataset": {
+            "kind": "navier_stokes_vorticity2d_boosted",
+            "path": "data/test_aug_tangent.pt",
+            "n": 16,
+            "num_train": 4,
+            "num_val": 2,
+            "num_test": 2,
+            "final_time": 0.1,
+            "dt": 0.01,
+            "viscosity": 0.001,
+            "max_boost": 0.2,
+            "solver_batch_size": 2,
+        },
+        "model": {"name": "fno2d", "in_channels": 3, "out_channels": 1},
+        "symmetry": {"name": "navier_stokes2d_galilean", "max_boost": 0.1},
+        "training": {"method": "aug_tangent", "lambda_tangent": 0.1},
+        "runtime": {"run_dir": "runs/test_aug_tangent"},
+    }
+    validate_config(cfg)
 
 
 def test_evaluate_model_seed_is_reproducible():

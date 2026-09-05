@@ -29,7 +29,7 @@ from otno.symmetry.transforms import NavierStokes2DGalilean, TransformSample
 from otno.training.losses import relative_defect_per_sample, relative_l2_per_sample
 from otno.training.metrics import measure_inference_latency
 from otno.utils import dump_json, get_device
-from run_ood_severity_matrix import _format_value, _jobs, _symmetry_value
+from run_ood_severity_matrix import _jobs, _symmetry_value
 
 
 def _rng_context(seed: int | None, device: torch.device):

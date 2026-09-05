@@ -1,0 +1,37 @@
+experiments:
+  # Full four-method CNO2d reproduction of the FNO/DeepONet headline protocol.
+  # The primary pair is forward-count matched at 12 batch-level model evaluations
+  # per epoch (6 x 2 for augmentation versus 4 x 3 for augmentation plus LOCO).
+  - config: configs/pilot/2d_navier_stokes_galilean_cno2d.yaml
+    seeds: [23, 31, 47, 59, 71]
+    overrides:
+      training.method: baseline
+      training.steps_per_epoch: 4
+      runtime.overwrite: false
+      runtime.run_dir: runs/ablations/2d_galilean_n64_2pct_cno2d_5seed/fraction_0.02/baseline_steps_4
+
+  - config: configs/pilot/2d_navier_stokes_galilean_cno2d.yaml
+    seeds: [23, 31, 47, 59, 71]
+    overrides:
+      training.method: orbit
+      training.steps_per_epoch: 4
+      training.lambda_orbit: 0.05
+      runtime.overwrite: false
+      runtime.run_dir: runs/ablations/2d_galilean_n64_2pct_cno2d_5seed/fraction_0.02/orbit_lambda_0.05_steps_4
+
+  - config: configs/pilot/2d_navier_stokes_galilean_cno2d.yaml
+    seeds: [23, 31, 47, 59, 71]
+    overrides:
+      training.method: aug
+      training.steps_per_epoch: 6
+      runtime.overwrite: false
+      runtime.run_dir: runs/ablations/2d_galilean_n64_2pct_cno2d_5seed/fraction_0.02/aug_steps_6
+
+  - config: configs/pilot/2d_navier_stokes_galilean_cno2d.yaml
+    seeds: [23, 31, 47, 59, 71]
+    overrides:
+      training.method: aug_orbit
+      training.steps_per_epoch: 4
+      training.lambda_orbit: 0.10
+      runtime.overwrite: false
+      runtime.run_dir: runs/ablations/2d_galilean_n64_2pct_cno2d_5seed/fraction_0.02/aug_loco_lambda_0.1_steps_4

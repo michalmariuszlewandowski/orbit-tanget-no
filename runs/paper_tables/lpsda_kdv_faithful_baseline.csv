@@ -1,0 +1,4 @@
+source,method,samples,seeds,trajectory_nmse,trajectory_nmse_std,latency_ms_per_sample,latency_ms_per_sample_std,parameters
+LPSDA Table 3,Published KdV 40s FNO(AR),64,,0.1248,0.0108,,,
+LPSDA Table 3,"Published KdV 40s FNO(AR)+LPSDA, \(g_1g_2g_3g_4\)",64,,0.0606,0.004,,,
+ours independent,"FNO (AR), local calibration",64,5,0.1204847932457924,0.0035266952748949985,11.902949499781244,1.1099119847117336,10856084

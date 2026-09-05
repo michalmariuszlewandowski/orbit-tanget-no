@@ -46,6 +46,41 @@ def collect_run_rows(runs_dir: str | Path) -> list[dict[str, Any]]:
     return rows
 
 
+def validate_fresh_run_provenance(df: pd.DataFrame, *, source_root: str | Path) -> None:
+    """Validate fresh campaigns from a source archive, including archives without Git."""
+    from otno.utils import file_sha256, source_manifest, stable_json_hash
+
+    root = Path(source_root)
+    current_source = source_manifest(root)["source_sha256"]
+    dataset_hashes: dict[Path, str] = {}
+    campaign_dataset = None
+    for _, row in df.iterrows():
+        run_dir = root / str(row["run_dir"])
+        manifest_path = run_dir / "source_manifest.json"
+        try:
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        except (OSError, ValueError) as exc:
+            raise ValueError(f"Missing or invalid source manifest: {manifest_path}") from exc
+        recorded_source = row.get("source_sha256")
+        if (not isinstance(manifest, dict)
+                or not isinstance(manifest.get("files"), dict) or not manifest["files"]
+                or stable_json_hash(manifest["files"]) != manifest.get("source_sha256")
+                or recorded_source != manifest.get("source_sha256")
+                or recorded_source != current_source):
+            raise ValueError(f"Fresh run source_sha256 does not match the actual release source: {run_dir}")
+        if row.get("environment.torch_num_threads") != 1:
+            raise ValueError(f"Fresh campaign requires environment.torch_num_threads=1: {run_dir}")
+        dataset_path = root / str(row["config.dataset.path"])
+        if dataset_path not in dataset_hashes:
+            dataset_hashes[dataset_path] = file_sha256(dataset_path)
+        actual_dataset = dataset_hashes[dataset_path]
+        if row.get("dataset_sha256") != actual_dataset:
+            raise ValueError(f"Fresh run dataset_sha256 does not match the actual dataset: {run_dir}")
+        if campaign_dataset is not None and actual_dataset != campaign_dataset:
+            raise ValueError("Fresh campaign contains inconsistent dataset_sha256 values")
+        campaign_dataset = actual_dataset
+
+
 def aggregate_runs(df: pd.DataFrame, *, group_cols: list[str] | None = None) -> pd.DataFrame:
     if df.empty:
         return df

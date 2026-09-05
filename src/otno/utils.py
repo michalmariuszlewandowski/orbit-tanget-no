@@ -39,8 +39,26 @@ def make_torch_generator(seed: int, device: str | torch.device = "cpu") -> torch
 
 def seed_worker(worker_id: int) -> None:
     worker_seed = torch.initial_seed() % 2**32
-    np.random.seed(worker_seed + worker_id)
-    random.seed(worker_seed + worker_id)
+    np.random.seed(worker_seed)
+    random.seed(worker_seed)
+
+
+def capture_rng_state() -> dict[str, Any]:
+    """Capture every random stream used by training, on CPU for portable loading."""
+    return {
+        "python": random.getstate(),
+        "numpy": np.random.get_state(),
+        "torch_cpu": torch.get_rng_state(),
+        "torch_cuda": torch.cuda.get_rng_state_all() if torch.cuda.is_available() else [],
+    }
+
+
+def restore_rng_state(state: dict[str, Any]) -> None:
+    random.setstate(state["python"])
+    np.random.set_state(state["numpy"])
+    torch.set_rng_state(state["torch_cpu"].cpu())
+    if state.get("torch_cuda") and torch.cuda.is_available():
+        torch.cuda.set_rng_state_all([value.cpu() for value in state["torch_cuda"]])
 
 
 def get_device(requested: str | None = None) -> torch.device:
@@ -100,6 +118,27 @@ def get_git_commit(root: str | Path | None = None) -> str | None:
         return None
 
 
+def source_manifest(root: str | Path) -> dict[str, Any]:
+    """Identify the actual source tree, including edits not represented by HEAD."""
+    root = Path(root)
+    paths = sorted({
+        path
+        for folder in ("src", "scripts")
+        for path in (root / folder).rglob("*.py")
+        if "__pycache__" not in path.parts
+    } | {root / name for name in ("pyproject.toml", "uv.lock", "requirements.txt")})
+    files = {path.relative_to(root).as_posix(): file_sha256(path) for path in paths if path.is_file()}
+    try:
+        dirty = bool(subprocess.check_output(
+            ["git", "status", "--porcelain", "--untracked-files=normal"],
+            cwd=root, stderr=subprocess.DEVNULL, text=True,
+        ).strip())
+    except (OSError, subprocess.CalledProcessError):
+        dirty = None
+    return {"git_commit": get_git_commit(root), "git_dirty": dirty,
+            "source_sha256": stable_json_hash(files), "files": files}
+
+
 def environment_fingerprint(root: str | Path | None = None) -> dict[str, Any]:
     return {
         "python": platform.python_version(),
@@ -109,6 +148,10 @@ def environment_fingerprint(root: str | Path | None = None) -> dict[str, Any]:
         "cuda_version": torch.version.cuda,
         "cudnn_version": torch.backends.cudnn.version() if torch.backends.cudnn.is_available() else None,
         "git_commit": get_git_commit(root),
+        "numpy": np.__version__,
+        "torch_num_threads": torch.get_num_threads(),
+        "torch_num_interop_threads": torch.get_num_interop_threads(),
+        "device_names": [torch.cuda.get_device_name(i) for i in range(torch.cuda.device_count())],
     }
 
 

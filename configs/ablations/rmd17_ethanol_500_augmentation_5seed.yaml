@@ -1,0 +1,13 @@
+experiments:
+  # Augmentation reference for the normalized-LOCO portability control.
+  # Each update evaluates the original and transformed inputs, so 24 updates
+  # give 48 batch-level model-forward evaluations per epoch.
+  - config: configs/pilot/rmd17_ethanol_force_500.yaml
+    seeds: [23, 31, 47, 59, 71]
+    overrides:
+      dataset.source_path: data/rmd17/raw/rmd17/npz_data/rmd17_ethanol.npz
+      training.method: aug
+      training.steps_per_epoch: 24
+      runtime.run_dir: runs/appendix/rmd17_ethanol/forward_matched_500_5seed/aug_steps_24
+      runtime.overwrite: false
+      runtime.resume: false

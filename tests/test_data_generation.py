@@ -60,6 +60,33 @@ def test_generate_tiny_boosted_navier_stokes_dataset(tmp_path: Path):
     assert meta["kind"] == "navier_stokes_vorticity2d_boosted"
 
 
+def test_generate_tiny_heat1d_dirichlet_dataset(tmp_path: Path):
+    path = tmp_path / "tiny_heat_dirichlet.pt"
+    cfg = {
+        "dataset": {
+            "kind": "heat1d_dirichlet",
+            "path": str(path),
+            "n": 16,
+            "num_train": 4,
+            "num_val": 2,
+            "num_test": 2,
+            "final_time": 0.1,
+            "diffusivity": 0.01,
+            "modes": 4,
+            "seed": 123,
+        }
+    }
+    out = generate_dataset_from_config(cfg, path)
+    assert out.exists()
+    ds, meta = load_tensor_dataset(path, "train")
+    item = ds[0]
+    assert item["a"].shape == (16, 1)
+    assert item["u"].shape == (16, 1)
+    assert meta["kind"] == "heat1d_dirichlet"
+    assert abs(float(item["a"][0, 0])) < 1e-6
+    assert abs(float(item["a"][-1, 0])) < 1e-6
+
+
 def test_generate_tiny_rmd17_force_dataset(tmp_path: Path):
     source = tmp_path / "rmd17_ethanol.npz"
     coords = np.arange(12 * 3 * 3, dtype=np.float32).reshape(12, 3, 3)

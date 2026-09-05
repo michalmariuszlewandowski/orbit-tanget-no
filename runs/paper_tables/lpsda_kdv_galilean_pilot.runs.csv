@@ -1,0 +1,31 @@
+source,method,seed,samples,trajectory_nmse,orbit_ood_trajectory_nmse,equivariance_defect_relative,latency_ms_per_sample,run_dir
+ours (0.56M),FNO,23,64,0.35990365222096443,0.3945225076749921,0.2503618276678026,2.690854998945724,runs\external\lpsda_kdv_galilean\baseline\seed_23
+ours (0.56M),FNO,31,64,0.36575834080576897,0.4006486088037491,0.25110692996531725,2.223474999482278,runs\external\lpsda_kdv_galilean\baseline\seed_31
+ours (0.56M),FNO,47,64,0.3776705227792263,0.4152480801567435,0.2663692447822541,2.132968750083819,runs\external\lpsda_kdv_galilean\baseline\seed_47
+ours (0.56M),FNO,59,64,0.4062369801104069,0.44254625774919987,0.277313650585711,1.78549624979496,runs\external\lpsda_kdv_galilean\baseline\seed_59
+ours (0.56M),FNO,71,64,0.3602542616426945,0.3948619458824396,0.25350953452289104,2.2871662498801015,runs\external\lpsda_kdv_galilean\baseline\seed_71
+ours (0.56M),FNO + aug.,23,64,0.36872417479753494,0.3999896114692092,0.2470659795217216,2.5100487502641045,runs\external\lpsda_kdv_galilean\aug\seed_23
+ours (0.56M),FNO + aug.,31,64,0.3801348805427551,0.41239317599684,0.25249751238152385,2.3961825005244464,runs\external\lpsda_kdv_galilean\aug\seed_31
+ours (0.56M),FNO + aug.,47,64,0.39114293456077576,0.42516531236469746,0.2677443812135607,2.0100174995604903,runs\external\lpsda_kdv_galilean\aug\seed_47
+ours (0.56M),FNO + aug.,59,64,0.41853974014520645,0.45189529471099377,0.27755644964054227,2.0307300001149997,runs\external\lpsda_kdv_galilean\aug\seed_59
+ours (0.56M),FNO + aug.,71,64,0.37166136130690575,0.4032398955896497,0.2524813092313707,2.6144187489990145,runs\external\lpsda_kdv_galilean\aug\seed_71
+ours (0.56M),"FNO + LOCO, \(\lambda=0.20\)",23,64,0.36652420461177826,0.37960846722126007,0.2051031030714512,2.0676112500950694,runs\external\lpsda_kdv_galilean\orbit_lambda_0p2\seed_23
+ours (0.56M),"FNO + LOCO, \(\lambda=0.20\)",31,64,0.3741159811615944,0.39280114509165287,0.22176285227760673,2.2035612506442703,runs\external\lpsda_kdv_galilean\orbit_lambda_0p2\seed_31
+ours (0.56M),"FNO + LOCO, \(\lambda=0.20\)",47,64,0.389219019562006,0.40570114459842443,0.23433601227588952,2.0978512504370883,runs\external\lpsda_kdv_galilean\orbit_lambda_0p2\seed_47
+ours (0.56M),"FNO + LOCO, \(\lambda=0.20\)",59,64,0.4224556274712086,0.4400892723351717,0.2480863849632442,2.0721399996546097,runs\external\lpsda_kdv_galilean\orbit_lambda_0p2\seed_59
+ours (0.56M),"FNO + LOCO, \(\lambda=0.20\)",71,64,0.37005551159381866,0.3851703926920891,0.2196949734352529,2.0252012502169237,runs\external\lpsda_kdv_galilean\orbit_lambda_0p2\seed_71
+ours (0.56M),"FNO + aug. + LOCO, \(\lambda=0.20\)",23,64,0.37519538402557373,0.3949803523719311,0.22586999647319317,2.1471162501256913,runs\external\lpsda_kdv_galilean\aug_orbit_lambda_0p2\seed_23
+ours (0.56M),"FNO + aug. + LOCO, \(\lambda=0.20\)",31,64,0.3849599286913872,0.4093015184625983,0.24040680471807718,2.4501350009813905,runs\external\lpsda_kdv_galilean\aug_orbit_lambda_0p2\seed_31
+ours (0.56M),"FNO + aug. + LOCO, \(\lambda=0.20\)",47,64,0.3959660865366459,0.41962709557265043,0.25405018986202776,2.715156249178108,runs\external\lpsda_kdv_galilean\aug_orbit_lambda_0p2\seed_47
+ours (0.56M),"FNO + aug. + LOCO, \(\lambda=0.20\)",59,64,0.42743151634931564,0.4510983629152179,0.2640982330776751,2.450100000714883,runs\external\lpsda_kdv_galilean\aug_orbit_lambda_0p2\seed_59
+ours (0.56M),"FNO + aug. + LOCO, \(\lambda=0.20\)",71,64,0.37702565267682076,0.39847351610660553,0.2375332536175847,2.0944074989529327,runs\external\lpsda_kdv_galilean\aug_orbit_lambda_0p2\seed_71
+ours (1.09M),FNO,23,64,0.2845215629786253,0.3291245657019317,0.24440573272295296,2.8782062508980744,runs\external\lpsda_kdv_galilean_close\grid\baseline\seed_23
+ours (1.09M),FNO,31,64,0.267453633248806,0.3111124732531607,0.2395987482741475,9.454653751163278,runs\external\lpsda_kdv_galilean_close\grid\baseline\seed_31
+ours (1.09M),FNO,47,64,0.29992822371423244,0.35027535539120436,0.25841354997828603,16.07364750088891,runs\external\lpsda_kdv_galilean_close\grid\baseline\seed_47
+ours (1.09M),FNO,59,64,0.2824276387691498,0.3324572267010808,0.2573190787807107,10.739501249918249,runs\external\lpsda_kdv_galilean_close\grid\baseline\seed_59
+ours (1.09M),FNO,71,64,0.25496852211654186,0.3030038266442716,0.2396026966162026,9.3316024998785,runs\external\lpsda_kdv_galilean_close\grid\baseline\seed_71
+ours (1.09M),"FNO + LOCO, \(\lambda=0.10\)",23,64,0.2866096496582031,0.3171475203707814,0.21813151403330266,5.527541250921786,runs\external\lpsda_kdv_galilean_close\grid\orbit_lambda_0p10\seed_23
+ours (1.09M),"FNO + LOCO, \(\lambda=0.10\)",31,64,0.26941394805908203,0.29926112992689013,0.2111765006557107,7.400072499876842,runs\external\lpsda_kdv_galilean_close\grid\orbit_lambda_0p10\seed_31
+ours (1.09M),"FNO + LOCO, \(\lambda=0.10\)",47,64,0.3009960297495127,0.33479015808552504,0.2300019171088934,7.415169999876525,runs\external\lpsda_kdv_galilean_close\grid\orbit_lambda_0p10\seed_47
+ours (1.09M),"FNO + LOCO, \(\lambda=0.10\)",59,64,0.2843946423381567,0.3153912047855556,0.22117122006602585,6.072431249776855,runs\external\lpsda_kdv_galilean_close\grid\orbit_lambda_0p10\seed_59
+ours (1.09M),"FNO + LOCO, \(\lambda=0.10\)",71,64,0.25792250223457813,0.29159667575731874,0.21299455664120615,6.175947500742041,runs\external\lpsda_kdv_galilean_close\grid\orbit_lambda_0p10\seed_71

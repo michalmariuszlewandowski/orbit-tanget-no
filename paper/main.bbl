@@ -1,4 +1,4 @@
-\begin{thebibliography}{20}
+\begin{thebibliography}{26}
 \providecommand{\natexlab}[1]{#1}
 \providecommand{\url}[1]{\texttt{#1}}
 \expandafter\ifx\csname urlstyle\endcsname\relax
@@ -14,6 +14,27 @@ Tara Akhound-Sadegh, Laurence Perreault-Levasseur, Johannes Brandstetter, Max
   volume~36, 2023.
 \newblock URL
   \url{https://proceedings.neurips.cc/paper_files/paper/2023/hash/8493c860bec41705f7743d5764301b94-Abstract-Conference.html}.
+
+\bibitem[Batzner et~al.(2022)Batzner, Musaelian, Sun, Geiger, Mailoa,
+  Kornbluth, Molinari, Smidt, and Kozinsky]{batzner2022nequip}
+Simon Batzner, Albert Musaelian, Lixin Sun, Mario Geiger, Jonathan~P. Mailoa,
+  Mordechai Kornbluth, Nicola Molinari, Tess~E. Smidt, and Boris Kozinsky.
+\newblock {E(3)}-equivariant graph neural networks for data-efficient and
+  accurate interatomic potentials.
+\newblock \emph{Nature Communications}, 13:\penalty0 2453, 2022.
+\newblock \doi{10.1038/s41467-022-29939-5}.
+\newblock URL \url{https://doi.org/10.1038/s41467-022-29939-5}.
+
+\bibitem[Bonev et~al.(2023)Bonev, Kurth, Hundt, Pathak, Baust, Kashinath, and
+  Anandkumar]{bonev2023sfno}
+Boris Bonev, Thorsten Kurth, Christian Hundt, Jaideep Pathak, Maximilian Baust,
+  Karthik Kashinath, and Anima Anandkumar.
+\newblock Spherical {F}ourier neural operators: Learning stable dynamics on the
+  sphere.
+\newblock In \emph{Proceedings of the 40th International Conference on Machine
+  Learning}, volume 202 of \emph{Proceedings of Machine Learning Research},
+  pages 2806--2823. PMLR, 2023.
+\newblock URL \url{https://proceedings.mlr.press/v202/bonev23a.html}.
 
 \bibitem[Brandstetter et~al.(2022)Brandstetter, Welling, and
   Worrall]{brandstetter2022lpsda}
@@ -33,6 +54,23 @@ Gengxiang Chen, Xu~Liu, Qinglu Meng, Lu~Chen, Changqing Liu, and Yingguang Li.
 \newblock \doi{10.1360/nso/20240001}.
 \newblock URL \url{https://doi.org/10.1360/nso/20240001}.
 
+\bibitem[Christensen and von
+  Lilienfeld(2020{\natexlab{a}})]{christensen2020rmd17}
+Anders~S. Christensen and O.~Anatole von Lilienfeld.
+\newblock On the role of gradients for machine learning of molecular energies
+  and forces.
+\newblock \emph{Machine Learning: Science and Technology}, 1\penalty0
+  (4):\penalty0 045018, 2020{\natexlab{a}}.
+\newblock \doi{10.1088/2632-2153/abba6f}.
+\newblock URL \url{https://doi.org/10.1088/2632-2153/abba6f}.
+
+\bibitem[Christensen and von
+  Lilienfeld(2020{\natexlab{b}})]{christensen2020rmd17data}
+Anders~S. Christensen and O.~Anatole von Lilienfeld.
+\newblock Revised {MD17} dataset.
+\newblock Materials Cloud Archive 2020.82, 2020{\natexlab{b}}.
+\newblock URL \url{https://archive.materialscloud.org/record/2020.82}.
+
 \bibitem[Cohen and Welling(2016)]{cohen2016gcnn}
 Taco Cohen and Max Welling.
 \newblock Group equivariant convolutional networks.
@@ -51,6 +89,25 @@ Taco Cohen, Maurice Weiler, Berkay Kicanaoglu, and Max Welling.
   volume~97 of \emph{Proceedings of Machine Learning Research}, pages
   1321--1330. PMLR, 2019.
 \newblock URL \url{https://proceedings.mlr.press/v97/cohen19d.html}.
+
+\bibitem[Gopakumar et~al.(2024)Gopakumar, Pamela, Zanisi, Li, Gray, Brennand,
+  Bhatia, Stathopoulos, Kusner, Deisenroth, Anandkumar, {JOREK Team}, and {MAST
+  Team}]{gopakumar2024plasma}
+Vignesh Gopakumar, Stanislas Pamela, Lorenzo Zanisi, Zongyi Li, Ander Gray,
+  Daniel Brennand, Nitesh Bhatia, Gregory Stathopoulos, Matt~J. Kusner,
+  Marc~Peter Deisenroth, Anima Anandkumar, {JOREK Team}, and {MAST Team}.
+\newblock Plasma surrogate modelling using fourier neural operators.
+\newblock \emph{Nuclear Fusion}, 64\penalty0 (5):\penalty0 056025, 2024.
+\newblock \doi{10.1088/1741-4326/ad313a}.
+\newblock URL \url{https://doi.org/10.1088/1741-4326/ad313a}.
+
+\bibitem[Han et~al.(2023)Han, Zhou, and Xiao]{han2023equivariant}
+Jiequn Han, Xu-Hui Zhou, and Heng Xiao.
+\newblock An equivariant neural operator for developing nonlocal tensorial
+  constitutive models.
+\newblock \emph{Journal of Computational Physics}, 488:\penalty0 112243, 2023.
+\newblock \doi{10.1016/j.jcp.2023.112243}.
+\newblock URL \url{https://doi.org/10.1016/j.jcp.2023.112243}.
 
 \bibitem[Helwig et~al.(2023)Helwig, Zhang, Fu, Kurtin, Wojtowytsch, and
   Ji]{helwig2023gfno}

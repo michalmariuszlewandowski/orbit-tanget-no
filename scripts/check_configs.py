@@ -61,7 +61,11 @@ def _validate_matrix(path: Path) -> list[str]:
         if not run_dir:
             errors.append(f"{path} entry {idx}: missing runtime.run_dir after overrides")
         else:
-            run_dirs.append(run_dir)
+            seeds = entry.get("seeds", [None])
+            if not isinstance(seeds, list):
+                seeds = [seeds]
+            for seed in seeds:
+                run_dirs.append(f"{str(run_dir).rstrip('/')}/seed_{int(seed)}" if seed is not None else run_dir)
         try:
             validate_config(merged)
             _ = build_model(merged)
@@ -75,7 +79,7 @@ def _validate_matrix(path: Path) -> list[str]:
     return errors
 
 
-def _validate_adaptation_matrix(path: Path) -> list[str]:
+def _validate_adaptation_matrix(path: Path, *, require_checkpoints: bool = False) -> list[str]:
     errors: list[str] = []
     matrix = load_config(path)
     entries = matrix.get("adaptations", [])
@@ -108,7 +112,7 @@ def _validate_adaptation_matrix(path: Path) -> list[str]:
             checkpoint = merged.get("adaptation", {}).get("checkpoint")
             if not checkpoint:
                 errors.append(f"{path} entry {idx}: missing adaptation.checkpoint after overrides")
-            elif not allow_missing and not (ROOT / checkpoint).exists():
+            elif require_checkpoints and not allow_missing and not (ROOT / checkpoint).exists():
                 errors.append(f"{path} entry {idx}: missing adaptation checkpoint {checkpoint}")
             trainable = str(merged.get("adaptation", {}).get("trainable", "projector"))
             if trainable not in {"projector", "last_block", "all"}:
@@ -129,7 +133,7 @@ def _format_config_value(value: Any, context: dict[str, Any]) -> Any:
     return value
 
 
-def _validate_evaluation_matrix(path: Path) -> list[str]:
+def _validate_evaluation_matrix(path: Path, *, require_checkpoints: bool = False) -> list[str]:
     errors: list[str] = []
     matrix = load_config(path)
     entries = matrix.get("evaluations", [])
@@ -156,7 +160,7 @@ def _validate_evaluation_matrix(path: Path) -> list[str]:
                 out_dir = expanded.get("out_dir")
                 if not checkpoint:
                     errors.append(f"{path} entry {idx}: missing checkpoint")
-                elif not allow_missing and not (ROOT / checkpoint).exists():
+                elif require_checkpoints and not allow_missing and not (ROOT / checkpoint).exists():
                     errors.append(f"{path} entry {idx}: missing checkpoint {checkpoint}")
                 if not out_dir:
                     errors.append(f"{path} entry {idx}: missing out_dir")
@@ -175,17 +179,28 @@ def _validate_evaluation_matrix(path: Path) -> list[str]:
 def main() -> None:
     parser = argparse.ArgumentParser(description="Validate experiment configs and matrix files.")
     parser.add_argument("--root", default=str(ROOT))
+    parser.add_argument(
+        "--require-checkpoints", action="store_true",
+        help="Also require existing evaluation/adaptation checkpoints; omit before training.",
+    )
     args = parser.parse_args()
     root = Path(args.root)
     errors: list[str] = []
     for path in sorted((root / "configs").glob("**/*.yaml")):
         cfg = load_config(path)
-        if "experiments" in cfg:
+        if "release_version" in cfg:
+            from reproduce_release import load_registry
+
+            try:
+                load_registry(root, path.relative_to(root).as_posix())
+            except (ValueError, KeyError, FileNotFoundError) as exc:
+                errors.append(f"{path}: invalid release registry: {exc}")
+        elif "experiments" in cfg:
             errors.extend(_validate_matrix(path))
         elif "adaptations" in cfg:
-            errors.extend(_validate_adaptation_matrix(path))
+            errors.extend(_validate_adaptation_matrix(path, require_checkpoints=args.require_checkpoints))
         elif "evaluations" in cfg:
-            errors.extend(_validate_evaluation_matrix(path))
+            errors.extend(_validate_evaluation_matrix(path, require_checkpoints=args.require_checkpoints))
         else:
             errors.extend(_validate_single_config(path))
     if errors:

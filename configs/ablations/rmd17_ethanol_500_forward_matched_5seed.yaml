@@ -1,0 +1,25 @@
+experiments:
+  # Each augmentation update evaluates the original and augmented inputs, so
+  # 24 updates give 48 model forward passes per epoch. Each Aug.+LOCO update
+  # additionally evaluates the orbit-transformed input, so 16 updates give the
+  # same 48 batch-level forward passes per epoch (7,200 over 150 epochs).
+  - config: configs/pilot/rmd17_ethanol_force_500.yaml
+    seeds: [23, 31, 47, 59, 71]
+    overrides:
+      dataset.source_path: data/rmd17/raw/rmd17/npz_data/rmd17_ethanol.npz
+      training.method: aug
+      training.steps_per_epoch: 24
+      runtime.run_dir: runs/appendix/rmd17_ethanol/forward_matched_500_5seed/aug_steps_24
+      runtime.overwrite: false
+      runtime.resume: false
+
+  - config: configs/pilot/rmd17_ethanol_force_500.yaml
+    seeds: [23, 31, 47, 59, 71]
+    overrides:
+      dataset.source_path: data/rmd17/raw/rmd17/npz_data/rmd17_ethanol.npz
+      training.method: aug_orbit
+      training.steps_per_epoch: 16
+      training.lambda_orbit: 0.01
+      runtime.run_dir: runs/appendix/rmd17_ethanol/forward_matched_500_5seed/aug_orbit_lambda_0.01_steps_16
+      runtime.overwrite: false
+      runtime.resume: false

@@ -1,0 +1,27 @@
+augmentation_checkpoint: runs/ablations/2d_galilean_n64_label_efficiency_compute_matched/fraction_0.02/aug_steps_6/seed_23/checkpoints/best.pt
+loco_checkpoint: runs/ablations/2d_galilean_n64_2pct_lambda_robustness/fraction_0.02/aug_orbit_lambda_0.1_steps_4/seed_23/checkpoints/best.pt
+augmentation_checkpoint_sha256: ab15c20b6f86e91c61403a9c45724378c5799de9f72adfb4f6cbeb8f86c395e1
+loco_checkpoint_sha256: 4046d63cf0c97424e3ab7e16c354bc7656635a5290622a6519902f922c9b2b51
+dataset_sha256: defc9703dbc41494fabf9fcfe9e3408eb2e1c3890814e47fe03d0f6b849e3f50
+expected_run_spec:
+  seed: 23
+  data_fraction: 0.02
+  model_name: fno2d
+  augmentation_method: aug
+  augmentation_epochs: 150
+  augmentation_steps_per_epoch: 6
+  augmentation_lambda_aug: 1.0
+  loco_method: aug_orbit
+  loco_epochs: 150
+  loco_steps_per_epoch: 4
+  loco_lambda_aug: 1.0
+  loco_lambda_orbit: 0.10
+  loco_normalize_by_epsilon: true
+  loco_orbit_eta: 0.000001
+fixed_relative_boost: [0.50, 0.00]
+batch_size: 16
+device: cpu
+out_prefix: runs/figures/2d_galilean_n64_id_ood_fields
+diagnostics_out_prefix: runs/figures/2d_galilean_n64_fixed_stress_diagnostics
+equivariance_out_prefix: runs/figures/2d_galilean_n64_equivariance_residuals
+metadata_out: runs/paper_tables/2d_galilean_n64_id_ood_fields.json

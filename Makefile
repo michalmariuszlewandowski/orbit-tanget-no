@@ -37,5 +37,4 @@ format:
 	$(PYTHON) -m ruff format src scripts tests
 
 clean:
-	rm -rf runs/smoke runs/quality runs/paper_tables .pytest_cache .ruff_cache
-	find . -name '__pycache__' -type d -prune -exec rm -rf {} +
+	$(PYTHON) scripts/clean.py

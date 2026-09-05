@@ -11,6 +11,11 @@ _ALLOWED_DATASETS = {
     "1d_advection",
     "burgers1d",
     "1d_burgers",
+    "heat1d_dirichlet",
+    "dirichlet_heat1d",
+    "kdv1d",
+    "1d_kdv",
+    "lpsda_kdv1d",
     "navier_stokes_vorticity2d",
     "navier_stokes_vorticity2d_boosted",
     "boosted_navier_stokes_vorticity2d",
@@ -18,12 +23,17 @@ _ALLOWED_DATASETS = {
     "ns2d_boosted",
     "boosted_ns2d",
     "2d_navier_stokes",
+    "rmd17_force",
 }
 _ALLOWED_MODELS = {
     "fno1d",
     "fno_1d",
     "fno2d",
     "fno_2d",
+    "deeponet2d",
+    "deeponet_2d",
+    "cno2d",
+    "cno_2d",
     "canonical_fno1d",
     "canonical_fno_1d",
     "translation_canonical_fno1d",
@@ -35,6 +45,13 @@ _ALLOWED_MODELS = {
     "observable_galilean_canonical_fno2d",
     "galilean_canonical_fno2d",
     "pace_style_fno2d",
+    "d4_gfno2d",
+    "d4_gfno_2d",
+    "gfno2d",
+    "g_fno2d",
+    "g-fno2d",
+    "molecule_mlp",
+    "molecular_mlp",
 }
 _ALLOWED_METHODS = {
     "baseline",
@@ -48,19 +65,41 @@ _ALLOWED_METHODS = {
     "aug_orbit_shuffled",
     "aug_orbit_no_output",
     "aug_orbit_input_only",
+    "semi_aug_orbit",
+    "mixed_semi_aug_orbit",
+    "split_semi_aug_orbit",
+    "tangent",
+    "tangent_prop",
+    "tangent_propagation",
+    "aug_tangent",
+    "tangent_aug",
 }
 _ALLOWED_TRANSFORMS = {
     "translation1d",
     "translation_1d",
+    "nonperiodic_translation1d",
+    "nonperiodic_translation_1d",
+    "dirichlet_translation1d",
     "translation2d",
     "translation_2d",
     "burgers1d_galilean",
     "galilean1d",
     "burgers_galilean",
+    "kdv1d_galilean",
+    "kdv_galilean",
     "navier_stokes2d_galilean",
     "ns2d_galilean",
     "galilean2d",
     "vorticity2d_galilean",
+    "d4_scalar2d",
+    "d4_scalar_2d",
+    "d4_pseudoscalar2d",
+    "d4_pseudoscalar_2d",
+    "d4_vorticity2d",
+    "d4_vorticity_2d",
+    "molecular_rigid_motion",
+    "rigid_motion3d",
+    "se3_molecular",
 }
 
 
@@ -187,6 +226,9 @@ def validate_config(config: dict[str, Any], *, require_dataset: bool = True) -> 
         if kind in {
             "burgers1d",
             "1d_burgers",
+            "kdv1d",
+            "1d_kdv",
+            "lpsda_kdv1d",
             "navier_stokes_vorticity2d",
             "navier_stokes_vorticity2d_boosted",
             "boosted_navier_stokes_vorticity2d",
@@ -224,8 +266,29 @@ def validate_config(config: dict[str, Any], *, require_dataset: bool = True) -> 
         "boost_y_channel",
         "n_atoms",
         "atoms",
+        "grid_size",
+        "grid_height",
+        "grid_width",
+        "branch_fc_hidden",
+        "trunk_hidden",
+        "trunk_depth",
+        "latent_dim",
+        "coordinate_modes",
+        "n_layers",
+        "n_res",
+        "n_res_neck",
+        "channel_multiplier",
+        "lift_project_channels",
+        "resample_halo",
     ):
         _check_positive_int(model, "model", key)
+    _check_nonnegative_float(model, "model", "negative_slope")
+    if "branch_channels" in model:
+        channels = model["branch_channels"]
+        if not isinstance(channels, (list, tuple)) or not channels:
+            raise ValueError("model.branch_channels must be a non-empty sequence")
+        if any(int(channel) < 1 for channel in channels):
+            raise ValueError("model.branch_channels values must be positive integers")
 
     training = config.get("training", {})
     method = str(training.get("method", "baseline")).lower()
@@ -245,7 +308,7 @@ def validate_config(config: dict[str, Any], *, require_dataset: bool = True) -> 
     data_fraction = float(training.get("data_fraction", 1.0))
     if data_fraction <= 0 or data_fraction > 1:
         raise ValueError("training.data_fraction must lie in (0, 1]")
-    for key in ("lr", "weight_decay", "lambda_orbit", "lambda_aug", "orbit_eta"):
+    for key in ("lr", "weight_decay", "lambda_orbit", "lambda_aug", "lambda_tangent", "orbit_eta"):
         _check_nonnegative_float(training, "training", key)
     orbit_control = str(training.get("orbit_control", "physical")).lower()
     if orbit_control not in {
@@ -274,6 +337,14 @@ def validate_config(config: dict[str, Any], *, require_dataset: bool = True) -> 
         "aug_orbit_shuffled",
         "aug_orbit_no_output",
         "aug_orbit_input_only",
+        "semi_aug_orbit",
+        "mixed_semi_aug_orbit",
+        "split_semi_aug_orbit",
+        "tangent",
+        "tangent_prop",
+        "tangent_propagation",
+        "aug_tangent",
+        "tangent_aug",
     } and not symmetry:
         raise ValueError(f"training.method={method!r} requires a symmetry section")
     if symmetry:

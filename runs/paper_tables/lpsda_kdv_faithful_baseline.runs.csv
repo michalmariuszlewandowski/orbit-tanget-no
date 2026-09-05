@@ -1,0 +1,6 @@
+source,method,seed,samples,rollout_time_steps,trajectory_nmse,trajectory_nmse_within_seed_std,trajectory_nmse_cumulative,latency_ms_per_sample,parameters,train_wall_seconds,run_dir
+ours independent,"FNO (AR), local calibration",23,64,100,0.11489646911621093,0.0373583722114563,11.489646911621094,12.781707500107586,10856084,13545.291866999934,runs\external\lpsda_kdv_faithful\baseline\seed_23
+ours independent,"FNO (AR), local calibration",31,64,100,0.1245376467704773,0.00039678003638982773,12.453764915466309,11.165266874741064,10856084,15794.775142000057,runs\external\lpsda_kdv_faithful\baseline\seed_31
+ours independent,"FNO (AR), local calibration",47,64,100,0.12158741056919098,0.00039477713406085965,12.158740043640137,11.620834374480182,10856084,15258.152717899997,runs\external\lpsda_kdv_faithful\baseline\seed_47
+ours independent,"FNO (AR), local calibration",59,64,100,0.12007436901330948,0.0003910264745354652,12.007437705993652,13.300438124861103,10856084,15419.936202800018,runs\external\lpsda_kdv_faithful\baseline\seed_59
+ours independent,"FNO (AR), local calibration",71,64,100,0.12132807075977325,0.0004018009454011917,12.132804870605469,10.646500624716282,10856084,17123.559654299985,runs\external\lpsda_kdv_faithful\baseline\seed_71

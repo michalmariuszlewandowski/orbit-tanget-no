@@ -278,11 +278,42 @@ def _estimate_forward_multiplier(method: str) -> int:
     return count
 
 
+def _supervised_examples_processed(
+    train_rows: list[dict[str, Any]],
+    *,
+    num_train: int,
+    data_fraction: float,
+    batch_size: int,
+) -> tuple[int, int]:
+    selected_examples = max(1, int(round(num_train * data_fraction)))
+    full_batches, remainder = divmod(selected_examples, batch_size)
+    batch_sizes = [batch_size] * full_batches
+    if remainder:
+        batch_sizes.append(remainder)
+    if not batch_sizes:
+        batch_sizes = [selected_examples]
+    examples_processed = 0
+    for row in train_rows:
+        steps = int(row.get("train_supervised_steps", 0))
+        examples_processed += sum(batch_sizes[index % len(batch_sizes)] for index in range(steps))
+    return selected_examples, examples_processed
+
+
 def _compute_row(record: dict[str, Any], root: Path) -> dict[str, Any]:
     run_dir = root / str(record["run_dir"])
     train_rows = _read_jsonl(run_dir / "train_metrics.jsonl")
     method = str(record.get("method", record.get("config.training.method", ""))).lower()
     batch_size = int(float(record.get("config.training.batch_size", record.get("batch_size", 0))))
+    num_train = int(float(record.get("config.dataset.num_train", 0)))
+    data_fraction = float(
+        record.get("data_fraction", record.get("config.training.data_fraction", 1.0))
+    )
+    selected_examples, supervised_examples = _supervised_examples_processed(
+        train_rows,
+        num_train=num_train,
+        data_fraction=data_fraction,
+        batch_size=batch_size,
+    )
     supervised_steps = int(sum(int(row.get("train_supervised_steps", 0)) for row in train_rows))
     optimizer_steps = supervised_steps
     forward_multiplier = _estimate_forward_multiplier(method)
@@ -308,12 +339,13 @@ def _compute_row(record: dict[str, Any], root: Path) -> dict[str, Any]:
         "data_fraction": record.get("data_fraction"),
         "steps_per_epoch": record.get("steps_per_epoch"),
         "lambda_orbit": record.get("lambda_orbit"),
+        "selected_labeled_examples": selected_examples,
         "epochs_logged": len(train_rows),
         "optimizer_steps": optimizer_steps,
         "model_forward_passes_est": model_forward_passes,
         "backward_passes_est": optimizer_steps,
-        "augmented_labeled_samples_est": augmentation_batches * batch_size,
-        "orbit_consistency_samples_est": orbit_batches * batch_size,
+        "augmented_labeled_samples_est": supervised_examples if augmentation_batches else 0,
+        "orbit_consistency_samples_est": supervised_examples if orbit_batches else 0,
         "eval_seconds": record.get("eval_seconds"),
         "latency_ms_per_sample": record.get("latency_ms_per_sample"),
         "train_wall_minutes_est": wall_seconds / 60.0 if np.isfinite(wall_seconds) else math.nan,

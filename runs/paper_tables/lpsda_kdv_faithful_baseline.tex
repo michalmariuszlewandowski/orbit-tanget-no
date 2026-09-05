@@ -1,0 +1,15 @@
+\begin{table}[t]
+\centering
+\small
+\caption{Independent LPSDA-aligned KdV 40s FNO(AR) baseline calibration at 64 training samples. Published rows are transcribed from Brandstetter et al., Table 3, and are not local reruns. Our row aggregates completed seeds from an independent implementation aligned to the released protocol, using the same local Radau data-generation protocol, five Fourier blocks, 32 modes, width 256, and the LPSDA normalized unrolled MSE averaged over rollout time steps. Published uncertainty is the reported bootstrap $\pm2$ SD interval; local uncertainty is sample standard deviation across training seeds.}
+\label{tab:lpsda-kdv-faithful-baseline}
+\begin{tabular}{llrrrr}
+\toprule
+Source & Method & Seeds & Samples & ID NMSE & Latency ms/sample \\
+\midrule
+LPSDA Table 3 & Published KdV 40s FNO(AR) & -- & 64 & \(0.1248\pm0.0108\) & -- \\
+LPSDA Table 3 & Published KdV 40s FNO(AR)+LPSDA, \(g_1g_2g_3g_4\) & -- & 64 & \(0.0606\pm0.0040\) & -- \\
+ours independent & FNO (AR), local calibration & 5 & 64 & \(0.1205\pm0.0035\) & \(11.90\pm1.11\) \\
+\bottomrule
+\end{tabular}
+\end{table}

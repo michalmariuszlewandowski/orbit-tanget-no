@@ -46,6 +46,39 @@ def relative_l2_loss(
     return relative_l2_per_sample(pred, target, mask=mask, eps=eps).mean()
 
 
+def trajectory_nmse_per_sample(
+    pred: torch.Tensor,
+    target: torch.Tensor,
+    *,
+    mask: torch.Tensor | None = None,
+    eps: float = 1e-8,
+) -> torch.Tensor:
+    """LPSDA-style average over time of spatial normalized MSE."""
+    if pred.shape != target.shape:
+        raise ValueError(f"pred and target shapes differ: {tuple(pred.shape)} vs {tuple(target.shape)}")
+    if pred.ndim != 3:
+        return relative_l2_per_sample(pred, target, mask=mask, eps=eps).pow(2)
+    diff = pred - target
+    ref = target
+    if mask is not None:
+        m = _broadcast_mask(mask, diff)
+        diff = diff * m
+        ref = ref * m
+    diff_sq = diff.pow(2).sum(dim=1)
+    ref_sq = ref.pow(2).sum(dim=1).clamp_min(eps)
+    return (diff_sq / ref_sq).mean(dim=-1)
+
+
+def trajectory_nmse_loss(
+    pred: torch.Tensor,
+    target: torch.Tensor,
+    *,
+    mask: torch.Tensor | None = None,
+    eps: float = 1e-8,
+) -> torch.Tensor:
+    return trajectory_nmse_per_sample(pred, target, mask=mask, eps=eps).mean()
+
+
 def relative_defect_per_sample(
     pred_t: torch.Tensor,
     pred_equiv: torch.Tensor,
@@ -130,6 +163,42 @@ def orbit_consistency_loss(
     return loss, stats
 
 
+def tangent_propagation_loss(
+    model: torch.nn.Module,
+    a: torch.Tensor,
+    transform: BaseTransform,
+    *,
+    sample: TransformSample | None = None,
+    normalize_by_epsilon: bool = True,
+    eta: float = 1e-6,
+) -> tuple[torch.Tensor, dict[str, float]]:
+    """Penalize the infinitesimal equivariance defect with an input JVP."""
+    if sample is None:
+        sample = transform.sample_tangent(a.shape[0], a.device, a.dtype)
+    input_tangent = transform.input_tangent(a, sample)
+    base_pred, pred_tangent = torch.autograd.functional.jvp(
+        lambda x: model(x),
+        (a,),
+        (input_tangent,),
+        create_graph=True,
+        strict=False,
+    )
+    target_tangent = transform.output_tangent(base_pred, sample)
+    mask = transform.output_mask(base_pred, sample)
+    per_sample = mean_squared_per_sample(pred_tangent - target_tangent, mask=mask)
+    if normalize_by_epsilon:
+        per_sample = per_sample / (sample.epsilon.pow(2) + eta)
+    loss = per_sample.mean()
+    defect = relative_defect_per_sample(pred_tangent, target_tangent, mask=mask)
+    stats = {
+        "tangent_loss": float(loss.detach().cpu()),
+        "tangent_defect_relative": float(defect.detach().mean().cpu()),
+        "tangent_epsilon_mean": float(sample.epsilon.detach().mean().cpu()),
+        "tangent_epsilon_max": float(sample.epsilon.detach().max().cpu()),
+    }
+    return loss, stats
+
+
 def augmented_supervised_loss(
     model: torch.nn.Module,
     a: torch.Tensor,
@@ -137,10 +206,11 @@ def augmented_supervised_loss(
     transform: BaseTransform,
     *,
     sample: TransformSample | None = None,
+    loss_fn=relative_l2_loss,
 ) -> torch.Tensor:
     if sample is None:
         sample = transform.sample(a.shape[0], a.device, a.dtype)
     a_t = transform.apply_input(a, sample)
     u_t = transform.apply_output(u, sample)
     mask = transform.output_mask(u_t, sample)
-    return relative_l2_loss(model(a_t), u_t, mask=mask)
+    return loss_fn(model(a_t), u_t, mask=mask)

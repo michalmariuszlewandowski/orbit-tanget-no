@@ -1,0 +1,18 @@
+experiments:
+  # True normalized LOCO check on the non-Fourier molecular MLP.  The rigid-motion
+  # transform records epsilon = |angle| + ||translation||_2 (angle in radians,
+  # translation in Angstrom).  lambda=0.03 is a rounded leading-order scale match
+  # to the completed raw finite-consistency coefficient 0.01 because
+  # E[epsilon^2] is approximately 3.3 under the configured action distribution.
+  - config: configs/pilot/rmd17_ethanol_force_500.yaml
+    seeds: [23, 31, 47, 59, 71]
+    overrides:
+      dataset.source_path: data/rmd17/raw/rmd17/npz_data/rmd17_ethanol.npz
+      training.method: aug_orbit
+      training.steps_per_epoch: 16
+      training.lambda_orbit: 0.03
+      training.normalize_by_epsilon: true
+      training.orbit_eta: 0.001
+      runtime.run_dir: runs/appendix/rmd17_ethanol/normalized_loco_500_5seed/aug_loco_lambda_0.03_steps_16
+      runtime.overwrite: false
+      runtime.resume: false

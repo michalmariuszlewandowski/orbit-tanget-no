@@ -1,0 +1,389 @@
+# The PDF, not the older root paper sources, defines this release inventory.
+# Stages are executed only with --execute. Existing evidence inputs are protected.
+release_version: 1
+manuscript: TMLR rebuttal v11 (30 pages)
+datasets:
+  galilean:
+    path: data/2d_ns_vorticity_galilean_n64.pt
+    config: configs/pilot/2d_navier_stokes_galilean.yaml
+    paper_sha256: defc9703dbc41494fabf9fcfe9e3408eb2e1c3890814e47fe03d0f6b849e3f50
+  d4:
+    path: data/2d_ns_vorticity_n64.pt
+    config: configs/pilot/2d_navier_stokes_translation_d4.yaml
+    paper_sha256: defade883926ad6ba6ef469bf1e6ba69b3f7d57e743e4f53c83a05acb88a8f7e
+  burgers:
+    path: data/1d_burgers_n128.pt
+    config: configs/pilot/1d_burgers_translation_galilean.yaml
+    paper_sha256: 1753fa2e5ca4fb474f93fc8cdef5732daea94b7d36d7537113b38f9e3d029758
+  heat:
+    path: data/1d_heat_dirichlet_n64.pt
+    config: configs/pilot/1d_heat_dirichlet_nonperiodic.yaml
+    paper_sha256: 7427ec21304ae8879e700653e65ee2393416b2daa8bc4b27756c1cae1ff09b2d
+  rmd17:
+    path: data/rmd17/rmd17_ethanol_force_500.pt
+    config: configs/pilot/rmd17_ethanol_force_500.yaml
+    paper_sha256: fb5515b3355651459c2ad9078e7cfb5bb63dce96e55e7c36956cbe9ff25e5472
+    preserved: true
+    required_sha256: fb5515b3355651459c2ad9078e7cfb5bb63dce96e55e7c36956cbe9ff25e5472
+suites:
+  main:
+    paper: Tables 2, 4 (1/2/5%), 7, 8 (privileged), 9, 17; Figures 1-5
+    datasets:
+    - galilean
+    training:
+    - matrix: configs/ablations/2d_galilean_n64_2pct_headline_5seed.yaml
+    - matrix: configs/ablations/2d_galilean_n64_2pct_lambda_0p1_5seed.yaml
+    - matrix: configs/ablations/2d_galilean_n64_label_efficiency_compute_matched.yaml
+      include_run_dir: fraction_0\.(01|05)/aug_steps_6/
+    - matrix: configs/ablations/2d_galilean_n64_1pct_lambda_0p1.yaml
+    - matrix: configs/ablations/2d_galilean_n64_5pct_lambda_0p1.yaml
+    - matrix: configs/ablations/2d_galilean_n64_2pct_lambda_robustness.yaml
+      include_run_dir: aug_orbit_lambda_0\.01_steps_4/
+    - matrix: configs/ablations/2d_galilean_n64_2pct_lambda_high_probe.yaml
+    evaluations:
+    - matrix: configs/ablations/2d_galilean_n64_label_efficiency_2pct_ood_severity.yaml
+      script: scripts/run_ood_severity_matrix.py
+      out_prefix: runs/paper_tables/2d_galilean_n64_label_efficiency_2pct_ood_severity
+    - matrix: configs/ablations/2d_galilean_n64_2pct_lambda_0p1_ood_severity.yaml
+      script: scripts/run_ood_severity_matrix.py
+      out_prefix: runs/paper_tables/2d_galilean_n64_2pct_lambda_0p1_ood_severity
+    - matrix: configs/ablations/2d_galilean_n64_2pct_oracle_canonicalization.yaml
+      script: scripts/run_ood_severity_matrix.py
+      out_prefix: runs/paper_tables/2d_galilean_n64_2pct_oracle_canonicalization
+    reports:
+    - command:
+      - scripts/reproduce_paper_artifacts.py
+      - --skip-figures
+      outputs:
+      - runs/paper_tables/2d_galilean_n64_2pct_headline_lambda_0p1.runs.csv
+      - runs/paper_tables/2d_galilean_n64_2pct_headline_lambda_0p1.aggregate.csv
+      - runs/paper_tables/2d_galilean_n64_label_efficiency_lambda_0p1.runs.csv
+      - runs/paper_tables/2d_galilean_n64_label_efficiency_lambda_0p1.aggregate.csv
+      - runs/paper_tables/2d_galilean_n64_2pct_lambda_robustness.runs.csv
+      - runs/paper_tables/2d_galilean_n64_2pct_lambda_robustness.aggregate.csv
+      - runs/paper_tables/2d_galilean_n64_2pct_lambda_extended.runs.csv
+      - runs/paper_tables/2d_galilean_n64_2pct_lambda_extended.aggregate.csv
+      - runs/paper_tables/2d_galilean_n64_2pct_ood_severity_lambda_0p1.runs.csv
+      - runs/paper_tables/2d_galilean_n64_2pct_ood_severity_lambda_0p1.aggregate.csv
+      - runs/paper_tables/2d_galilean_n64_2pct_oracle_canonicalization.runs.csv
+      - runs/paper_tables/2d_galilean_n64_2pct_oracle_canonicalization.aggregate.csv
+    figures:
+    - command:
+      - scripts/plot_galilean_n64_paper_figures.py
+      requires:
+      - runs/paper_tables/2d_galilean_n64_2pct_headline_lambda_0p1.aggregate.csv
+      - runs/paper_tables/2d_galilean_n64_label_efficiency_lambda_0p1.aggregate.csv
+      - runs/paper_tables/2d_galilean_n64_2pct_lambda_robustness.aggregate.csv
+      - runs/paper_tables/2d_galilean_n64_2pct_lambda_extended.aggregate.csv
+      - runs/paper_tables/2d_galilean_n64_2pct_ood_severity_lambda_0p1.aggregate.csv
+    - command:
+      - scripts/plot_navier_stokes_qualitative.py
+      - --figure-config
+      - figure_specs/2d_galilean_n64_id_ood_seed23.yaml
+      sources:
+      - figure_specs/2d_galilean_n64_id_ood_seed23.yaml
+      requires:
+      - data/2d_ns_vorticity_galilean_n64.pt
+      - runs/ablations/2d_galilean_n64_label_efficiency_compute_matched/fraction_0.02/aug_steps_6/seed_23/checkpoints/best.pt
+      - runs/ablations/2d_galilean_n64_2pct_lambda_robustness/fraction_0.02/aug_orbit_lambda_0.1_steps_4/seed_23/checkpoints/best.pt
+  deeponet:
+    paper: Table 3
+    datasets: &id001
+    - galilean
+    depends_on:
+    - main
+    training:
+    - matrix: configs/ablations/2d_galilean_n64_2pct_deeponet_5seed.yaml
+    reports:
+    - command:
+      - scripts/make_deeponet_backbone_table.py
+      requires:
+      - runs/paper_tables/2d_galilean_n64_2pct_headline_lambda_0p1.runs.csv
+      outputs:
+      - runs/paper_tables/2d_galilean_n64_2pct_deeponet_5seed.aggregate.csv
+      - runs/paper_tables/2d_galilean_n64_2pct_deeponet_5seed.paired.csv
+      fresh_report: true
+  cno2d:
+    paper: Table 15
+    datasets: *id001
+    depends_on:
+    - main
+    training:
+    - matrix: configs/ablations/2d_galilean_n64_2pct_cno2d_5seed.yaml
+      overrides:
+        runtime.source_snapshot: null
+        runtime.source_snapshot_sha256: null
+    reports:
+    - command:
+      - scripts/make_cno2d_backbone_table.py
+      requires:
+      - runs/paper_tables/2d_galilean_n64_2pct_headline_lambda_0p1.runs.csv
+      outputs:
+      - runs/paper_tables/2d_galilean_n64_2pct_cno2d_5seed.aggregate.csv
+      - runs/paper_tables/2d_galilean_n64_2pct_cno2d_5seed.paired.csv
+      fresh_report: true
+  burgers:
+    paper: Table 5 and Appendix A.1
+    datasets:
+    - burgers
+    depends_on: &id002 []
+    training:
+    - matrix: configs/ablations/1d_final_four_method_seeds.yaml
+    reports:
+    - command:
+      - scripts/make_paper_tables.py
+      - --runs
+      - runs/final_1d/four_method
+      - --out-prefix
+      - runs/paper_tables/1d_final_four_method
+      - --group-cols
+      - method,model_name,dataset_kind
+      outputs:
+      - runs/paper_tables/1d_final_four_method.runs.csv
+      - runs/paper_tables/1d_final_four_method.aggregate.csv
+      - runs/paper_tables/1d_final_four_method.aggregate.tex
+  controls:
+    paper: Tables 4 (10%), 5, 6; action mismatch
+    datasets: *id001
+    depends_on:
+    - main
+    - burgers
+    training:
+    - matrix: configs/ablations/2d_galilean_n64_10pct_lambda_0p1.yaml
+    - matrix: configs/ablations/2d_galilean_n64_2pct_wrong_symmetry.yaml
+    - matrix: configs/ablations/2d_galilean_n64_2pct_no_output_control.yaml
+    reports:
+    - command:
+      - scripts/make_paper_tables.py
+      - --runs
+      - runs/ablations/2d_galilean_n64_10pct_lambda_0p1
+      - --out-prefix
+      - runs/paper_tables/2d_galilean_n64_10pct_lambda_0p1
+      - --group-cols
+      - method,data_fraction,steps_per_epoch
+      outputs:
+      - runs/paper_tables/2d_galilean_n64_10pct_lambda_0p1.runs.csv
+      - runs/paper_tables/2d_galilean_n64_10pct_lambda_0p1.aggregate.csv
+      - runs/paper_tables/2d_galilean_n64_10pct_lambda_0p1.aggregate.tex
+    - command:
+      - scripts/make_paper_tables.py
+      - --runs
+      - runs/ablations/2d_galilean_n64_2pct_wrong_symmetry
+      - --out-prefix
+      - runs/paper_tables/2d_galilean_n64_2pct_wrong_symmetry
+      - --group-cols
+      - method,data_fraction,steps_per_epoch
+      outputs:
+      - runs/paper_tables/2d_galilean_n64_2pct_wrong_symmetry.runs.csv
+      - runs/paper_tables/2d_galilean_n64_2pct_wrong_symmetry.aggregate.csv
+      - runs/paper_tables/2d_galilean_n64_2pct_wrong_symmetry.aggregate.tex
+    - command:
+      - scripts/make_paper_tables.py
+      - --runs
+      - runs/ablations/2d_galilean_n64_2pct_no_output_control
+      - --out-prefix
+      - runs/paper_tables/2d_galilean_n64_2pct_no_output_control
+      - --group-cols
+      - method,data_fraction,steps_per_epoch
+      outputs:
+      - runs/paper_tables/2d_galilean_n64_2pct_no_output_control.runs.csv
+      - runs/paper_tables/2d_galilean_n64_2pct_no_output_control.aggregate.csv
+      - runs/paper_tables/2d_galilean_n64_2pct_no_output_control.aggregate.tex
+    - command:
+      - scripts/make_reviewer_tables.py
+      requires:
+      - runs/paper_tables/2d_galilean_n64_2pct_headline_lambda_0p1.runs.csv
+      - runs/paper_tables/2d_galilean_n64_label_efficiency_lambda_0p1.runs.csv
+      - runs/paper_tables/2d_galilean_n64_label_efficiency_lambda_0p1.aggregate.csv
+      - runs/paper_tables/2d_galilean_n64_2pct_lambda_extended.runs.csv
+      - runs/paper_tables/1d_final_four_method.runs.csv
+      outputs:
+      - runs/paper_tables/2d_galilean_n64_reviewer.paired.csv
+      - runs/paper_tables/2d_galilean_n64_reviewer.absolute_label_efficiency.csv
+      - runs/paper_tables/2d_galilean_n64_reviewer.wrong_symmetry.csv
+  canonicalization:
+    paper: Tables 8 (observable) and 13
+    datasets:
+    - galilean
+    depends_on:
+    - main
+    evaluations:
+    - matrix: configs/ablations/2d_galilean_n64_label_efficiency_2pct_ood_severity.yaml
+      script: scripts/run_observable_canonicalization_matrix.py
+      out_prefix: runs/paper_tables/2d_galilean_n64_2pct_observable_canonicalization
+      metric_file: observable_canonicalization/metrics.json
+    - matrix: configs/ablations/2d_galilean_n64_2pct_lambda_0p1_ood_severity.yaml
+      script: scripts/run_observable_canonicalization_matrix.py
+      out_prefix: runs/paper_tables/2d_galilean_n64_2pct_lambda_0p1_observable_canonicalization
+      metric_file: observable_canonicalization/metrics.json
+  objectives:
+    paper: Table 14; Appendix D tangent and stabilizer/radius controls
+    datasets: *id001
+    depends_on:
+    - main
+    training:
+    - matrix: configs/ablations/2d_galilean_n64_2pct_tangent_baseline.yaml
+    - matrix: configs/ablations/2d_galilean_n64_2pct_plain_finite_baseline.yaml
+    - matrix: configs/ablations/2d_galilean_n64_2pct_eta_epsilon_sensitivity.yaml
+    reports:
+    - command:
+      - scripts/make_paper_tables.py
+      - --runs
+      - runs/ablations/2d_galilean_n64_2pct_tangent_baseline
+      - --out-prefix
+      - runs/paper_tables/2d_galilean_n64_2pct_tangent_baseline
+      - --group-cols
+      - method,data_fraction,steps_per_epoch,config.training.lambda_tangent
+      outputs:
+      - runs/paper_tables/2d_galilean_n64_2pct_tangent_baseline.runs.csv
+      - runs/paper_tables/2d_galilean_n64_2pct_tangent_baseline.aggregate.csv
+      - runs/paper_tables/2d_galilean_n64_2pct_tangent_baseline.aggregate.tex
+    - command:
+      - scripts/make_paper_tables.py
+      - --runs
+      - runs/ablations/2d_galilean_n64_2pct_plain_finite_baseline
+      - --out-prefix
+      - runs/paper_tables/2d_galilean_n64_2pct_plain_finite_baseline
+      - --group-cols
+      - method,data_fraction,steps_per_epoch,config.training.lambda_orbit,config.training.normalize_by_epsilon
+      outputs:
+      - runs/paper_tables/2d_galilean_n64_2pct_plain_finite_baseline.runs.csv
+      - runs/paper_tables/2d_galilean_n64_2pct_plain_finite_baseline.aggregate.csv
+      - runs/paper_tables/2d_galilean_n64_2pct_plain_finite_baseline.aggregate.tex
+    - command:
+      - scripts/make_finite_objective_comparison.py
+      requires:
+      - runs/paper_tables/2d_galilean_n64_2pct_headline_lambda_0p1.runs.csv
+      outputs:
+      - runs/paper_tables/2d_galilean_n64_2pct_finite_objective_comparison.aggregate.csv
+    - command:
+      - scripts/make_eta_epsilon_sensitivity_table.py
+      requires:
+      - runs/paper_tables/2d_galilean_n64_2pct_headline_lambda_0p1.runs.csv
+      outputs:
+      - runs/paper_tables/2d_galilean_n64_2pct_eta_epsilon_sensitivity.aggregate.csv
+  d4:
+    paper: Table 16
+    datasets:
+    - d4
+    training:
+    - matrix: configs/ablations/2d_d4_focused_low_label_pilot.yaml
+      include_run_dir: fraction_0\.01/aug_steps_4/
+    - matrix: configs/ablations/2d_d4_focused_lambda_refinement.yaml
+      include_run_dir: aug_orbit_lambda_0\.2_steps_4/
+    - matrix: configs/ablations/2d_d4_focused_seed_replication.yaml
+    - matrix: configs/ablations/2d_d4_gfno_baseline.yaml
+    - matrix: configs/ablations/2d_d4_five_seed_completion.yaml
+    reports:
+    - command:
+      - scripts/make_paper_tables.py
+      - --runs
+      - runs
+      - --out-prefix
+      - runs/paper_tables/2d_d4_rotation_with_gfno_5seed
+      - --group-cols
+      - method,model_name,data_fraction,steps_per_epoch,lambda_orbit
+      - --include-run-dir
+      - ^(?:runs/ablations/2d_d4_focused_low_label_pilot/fraction_0\.01/aug_steps_4/seed_23|runs/ablations/2d_d4_focused_lambda_refinement/fraction_0\.01/aug_orbit_lambda_0\.2_steps_4/seed_23|runs/ablations/2d_d4_focused_seed_replication/fraction_0\.01/aug_steps_4/seed_31|runs/ablations/2d_d4_focused_seed_replication/fraction_0\.01/aug_steps_4/seed_47|runs/ablations/2d_d4_focused_seed_replication/fraction_0\.01/aug_orbit_lambda_0\.2_steps_4/seed_31|runs/ablations/2d_d4_focused_seed_replication/fraction_0\.01/aug_orbit_lambda_0\.2_steps_4/seed_47|runs/ablations/2d_d4_gfno_baseline/fraction_0\.01/d4_gfno2d_steps_4/seed_23|runs/ablations/2d_d4_gfno_baseline/fraction_0\.01/d4_gfno2d_steps_4/seed_31|runs/ablations/2d_d4_gfno_baseline/fraction_0\.01/d4_gfno2d_steps_4/seed_47|runs/ablations/2d_d4_five_seed_completion/fraction_0\.01/aug_steps_4/seed_59|runs/ablations/2d_d4_five_seed_completion/fraction_0\.01/aug_steps_4/seed_71|runs/ablations/2d_d4_five_seed_completion/fraction_0\.01/aug_orbit_lambda_0\.2_steps_4/seed_59|runs/ablations/2d_d4_five_seed_completion/fraction_0\.01/aug_orbit_lambda_0\.2_steps_4/seed_71|runs/ablations/2d_d4_five_seed_completion/fraction_0\.01/d4_gfno2d_steps_4/seed_59|runs/ablations/2d_d4_five_seed_completion/fraction_0\.01/d4_gfno2d_steps_4/seed_71)$
+      outputs:
+      - runs/paper_tables/2d_d4_rotation_with_gfno_5seed.runs.csv
+      - runs/paper_tables/2d_d4_rotation_with_gfno_5seed.aggregate.csv
+      - runs/paper_tables/2d_d4_rotation_with_gfno_5seed.aggregate.tex
+  rmd17:
+    paper: Table 11 (three seeds, five methods; unnormalized historical objective)
+    datasets:
+    - rmd17
+    depends_on: *id002
+    training:
+    - matrix: configs/ablations/rmd17_ethanol_500_controls.yaml
+    - matrix: configs/ablations/rmd17_ethanol_500_hard_gate.yaml
+    reports:
+    - command:
+      - scripts/make_rmd17_tables.py
+      - --expected-seeds
+      - 23,31,47
+      outputs:
+      - runs/paper_tables/rmd17_ethanol_500_mechanism.runs.csv
+      - runs/paper_tables/rmd17_ethanol_500_mechanism.aggregate.csv
+      - runs/paper_tables/rmd17_ethanol_500_mechanism.paired.csv
+  boundary:
+    paper: Appendix D fixed-wall common-support diagnostic
+    datasets:
+    - heat
+    depends_on: *id002
+    training:
+    - matrix: configs/ablations/1d_heat_dirichlet_boundary_mask.yaml
+    reports: []
+    evaluations:
+    - matrix: configs/ablations/1d_heat_dirichlet_common_mask_evaluation.yaml
+      script: scripts/run_ood_severity_matrix.py
+      out_prefix: runs/paper_tables/1d_heat_dirichlet_common_mask_evaluation
+  unlabeled:
+    paper: Table 10; Appendix A.1 semi-supervised training
+    datasets: *id001
+    depends_on:
+    - main
+    training:
+    - matrix: configs/ablations/2d_galilean_n64_2pct_semi_supervised_joint.yaml
+    reports:
+    - command:
+      - scripts/make_paper_tables.py
+      - --runs
+      - runs/ablations/2d_galilean_n64_2pct_semi_supervised_joint
+      - --out-prefix
+      - runs/paper_tables/2d_galilean_n64_2pct_semi_supervised_joint
+      - --group-cols
+      - method,data_fraction,steps_per_epoch
+      outputs:
+      - runs/paper_tables/2d_galilean_n64_2pct_semi_supervised_joint.runs.csv
+      - runs/paper_tables/2d_galilean_n64_2pct_semi_supervised_joint.aggregate.csv
+      - runs/paper_tables/2d_galilean_n64_2pct_semi_supervised_joint.aggregate.tex
+    - command:
+      - scripts/make_adaptation_tables.py
+      - --runs
+      - runs/adaptation/2d_galilean_n64_2pct_target_boost
+      - --out-prefix
+      - runs/paper_tables/2d_galilean_n64_2pct_target_adaptation
+      outputs:
+      - runs/paper_tables/2d_galilean_n64_2pct_target_adaptation.aggregate.csv
+    adaptations:
+    - matrix: configs/ablations/2d_galilean_n64_2pct_target_adaptation.yaml
+      script: scripts/run_adapt_matrix.py
+  closure:
+    paper: Table 1; solver validation at training and stress radii
+    datasets:
+    - galilean
+    - burgers
+    reports:
+    - command:
+      - scripts/make_solver_closure_tables.py
+      - --config
+      - configs/pilot/2d_navier_stokes_galilean.yaml
+      - --dataset-path
+      - data/2d_ns_vorticity_galilean_n64.pt
+      - --num-samples
+      - '32'
+      - --seed
+      - '2027'
+      - --max-boosts
+      - 0.25,0.35,0.50
+      - --out-prefix
+      - runs/paper_tables/2d_galilean_n64_solver_closure
+      requires:
+      - data/2d_ns_vorticity_galilean_n64.pt
+    - command:
+      - scripts/make_solver_closure_tables.py
+      - --config
+      - configs/pilot/1d_burgers_translation_galilean.yaml
+      - --dataset-path
+      - data/1d_burgers_n128.pt
+      - --num-samples
+      - '32'
+      - --seed
+      - '2027'
+      - --max-boosts
+      - 0.35,0.525,0.70,1.05
+      - --out-prefix
+      - runs/paper_tables/1d_burgers_solver_closure
+      requires:
+      - data/1d_burgers_n128.pt

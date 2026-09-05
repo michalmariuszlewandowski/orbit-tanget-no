@@ -1,11 +1,14 @@
 .venv/
+.deps/
+.cache/
+.ruff_cache/
 .pytest_cache/
 __pycache__/
 *.py[cod]
 *.egg-info/
 
 # Large/generated experiment artifacts.
-data/
+/data/
 runs/*
 !runs/paper_tables/
 !runs/paper_tables/**
@@ -22,6 +25,7 @@ runs/*
 # Local build and editor noise.
 build/
 dist/
+tmp/
 *.log
 *.aux
 *.out

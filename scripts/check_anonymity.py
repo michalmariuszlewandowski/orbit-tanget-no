@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import fnmatch
 import re
+from collections.abc import Iterable
 from pathlib import Path
 
 
@@ -15,6 +16,7 @@ TEXT_SUFFIXES = {
     ".csv",
     ".ini",
     ".json",
+    ".jsonl",
     ".md",
     ".ps1",
     ".py",
@@ -29,6 +31,7 @@ TEXT_SUFFIXES = {
 DEFAULT_EXCLUDES = {
     ".git/**",
     ".venv/**",
+    ".deps/**",
     ".mypy_cache/**",
     ".pytest_cache/**",
     "__pycache__/**",
@@ -36,10 +39,17 @@ DEFAULT_EXCLUDES = {
     "paper/related_work.bib",
 }
 
+# Attribution of an external baseline is required and does not identify the
+# authors of this artifact. Keep this exception exact, rather than allowing
+# arbitrary code-host links.
+PUBLIC_REFERENCE_URLS = {
+    "https://github.com/camlab-ethz/ConvolutionalNeuralOperator",
+}
+
 PATTERNS: list[tuple[str, re.Pattern[str]]] = [
     (
         "local user path",
-        re.compile(r"(?:[A-Za-z]:)?[/\\]Users[/\\][^/\\\s]+|C:[/\\]Users[/\\]", re.IGNORECASE),
+        re.compile(r"(?:[A-Za-z]:)?[/\\]Users[/\\][^/\\\s]+|/home/[^/\s]+", re.IGNORECASE),
     ),
     (
         "email address",
@@ -51,11 +61,17 @@ PATTERNS: list[tuple[str, re.Pattern[str]]] = [
     ),
     (
         "affiliation metadata",
-        re.compile(r"\b(?:affiliation|affiliations|orcid|acknowledg(?:e|ment|ments)|funded by|grant)\b", re.IGNORECASE),
+        re.compile(
+            r"\b(?:affiliation|affiliations|orcid|acknowledg(?:e|ment|ments)|funded by|grant)\b",
+            re.IGNORECASE,
+        ),
     ),
     (
         "public code host URL",
-        re.compile(r"\b(?:https?://)?(?:www\.)?(?:github|gitlab)\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", re.IGNORECASE),
+        re.compile(
+            r"\b(?:https?://)?(?:www\.)?(?:github|gitlab)\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+",
+            re.IGNORECASE,
+        ),
     ),
 ]
 
@@ -96,28 +112,51 @@ def _iter_text_files(root: Path, excludes: set[str]):
             yield path, rel
 
 
-def check(root: Path) -> list[str]:
+def check(root: Path, files: Iterable[tuple[Path, str]] | None = None) -> list[str]:
+    """Scan a workspace, or exactly the selected release payload when supplied."""
     excludes = DEFAULT_EXCLUDES | _load_submission_excludes(root)
     findings: list[str] = []
-    for path, rel in _iter_text_files(root, excludes):
+    selected = files if files is not None else _iter_text_files(root, excludes)
+    for path, rel in selected:
+        if rel == "scripts/check_anonymity.py":
+            continue
+        if path.suffix.lower() not in TEXT_SUFFIXES and path.name != "Makefile":
+            continue
         try:
             text = path.read_text(encoding="utf-8")
         except UnicodeDecodeError:
             continue
         for line_no, line in enumerate(text.splitlines(), start=1):
+            scanned_line = line
+            for public_url in PUBLIC_REFERENCE_URLS:
+                scanned_line = re.sub(re.escape(public_url) + r"(?![\w./-])", "", scanned_line)
             for label, pattern in PATTERNS:
-                if pattern.search(line):
+                if pattern.search(scanned_line):
                     findings.append(f"{rel}:{line_no}: {label}: {line.strip()}")
     return findings
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Scan anonymous submission files for identifying metadata.")
+    parser = argparse.ArgumentParser(
+        description="Scan anonymous submission files for identifying metadata."
+    )
     parser.add_argument("--root", default=".", help="Repository root to scan.")
+    parser.add_argument(
+        "--all-files",
+        action="store_true",
+        help="Scan the broader workspace instead of the curated release.",
+    )
     args = parser.parse_args()
 
     root = Path(args.root).resolve()
-    findings = check(root)
+    if args.all_files:
+        findings = check(root)
+    else:
+        from make_anonymous_submission import release_files
+
+        findings = check(
+            root, release_files(root, root / "dist/local_orbit_consistency_anonymous.zip")
+        )
     if findings:
         print("Potential anonymity issues:")
         for finding in findings:

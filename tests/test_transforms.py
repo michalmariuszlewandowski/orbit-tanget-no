@@ -8,6 +8,7 @@ from otno.symmetry.transforms import (
     D4Scalar2D,
     MolecularRigidMotion,
     NavierStokes2DGalilean,
+    NonPeriodicTranslation1D,
     Translation1D,
     TransformSample,
     periodic_shift_1d,
@@ -37,6 +38,22 @@ def test_translation1d_shapes():
     y = transform.apply_input(x, sample)
     assert y.shape == x.shape
     assert sample.epsilon.shape == (5,)
+
+
+def test_nonperiodic_translation1d_mask_excludes_shifted_boundary():
+    transform = NonPeriodicTranslation1D(max_shift=0.2, use_mask=True)
+    x = torch.ones(1, 8, 1)
+    sample = TransformSample(
+        params={"shift": torch.tensor([0.25])},
+        epsilon=torch.tensor([0.25]),
+        name="nonperiodic_translation1d",
+    )
+    y = transform.apply_output(x, sample)
+    mask = transform.output_mask(y, sample)
+    assert y.shape == x.shape
+    assert mask is not None
+    assert mask[0, 0].item() == 0
+    assert mask[0, -1].item() == 1
 
 
 def test_burgers_galilean_shapes():

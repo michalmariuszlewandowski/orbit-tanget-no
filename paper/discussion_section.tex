@@ -1,0 +1,34 @@
+\section{Discussion and Limitations}
+\label{sec:discussion}
+
+The evidence supports a narrow conclusion: on the solver-validated periodic N64
+Galilean task, LOCO improves the tested FNO's symmetry-shifted error and
+equivariance defect, with the largest observed gains at low label counts.  Burgers
+and D4 are supporting checks rather than equally strong replications.  The
+five-seed, near-capacity-matched DeepONet reproduction gives the same direction
+for ID error, orbit OOD error, and defect on the same dataset.  Its predictive
+reductions are 7.2\% and 7.0\%, compared with 26.6\% and 25.1\% for FNO, while
+its 29.6\% defect reduction is close to FNO's 29.8\%.  This is one fixed-grid,
+non-FNO branch--trunk operator check, not evidence across operator families and
+equations.  The normalized molecular MLP experiment is a secondary
+cross-domain mechanism check, but it is neither a neural operator nor a
+competitive atomistic architecture.  Conversely, the D4 G-FNO illustrates
+backbone dependence: a hard equivariant architecture already saturates the
+same-group defect and leaves no meaningful consistency signal.  Further
+non-Fourier operator families, resolutions, and datasets remain future work.
+
+The tangent and raw finite-transform controls isolate only the tested
+coefficients and schedules.  They distinguish explicit identity-tangent
+regularization from finite group evaluations, and test the leading-order role of
+step normalization, but they do not exhaustively tune every objective.  Likewise,
+matching batch-level forward evaluations does not match backward passes or all
+transformation overhead.  LOCO adds training work; its deployment claim is only
+that it adds no inference-time module, parameter, or additional operator call.
+
+Finally, the method is only as sound as the action supplied to it.  Exact use
+requires closure of the equation, geometry, coefficients, forcing and boundary
+data, state representation, and observation map under the transformation.  The
+Dirichlet heat diagnostic shows that a spatial mask can localize an approximate
+constraint but cannot restore a broken global symmetry.  Applying LOCO to a
+plausible but invalid action may degrade predictive accuracy, so solver-level
+identity checks and boundary diagnostics should precede long training runs.

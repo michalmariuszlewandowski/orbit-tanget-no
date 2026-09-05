@@ -1,0 +1,16 @@
+\begin{table*}[t]
+\centering
+\small
+\caption{rMD17 ethanol force prediction at 500 labeled conformations under matched batch-level forward-evaluation budgets. The transformed test uses the same rigid-motion action distribution as training, not a wider-severity OOD distribution.}
+\label{tab:rmd17-ethanol-500-forward-matched}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{lrrrrrr}
+\toprule
+Method & Force MAE & Transformed force MAE & Eq. defect & ID $L^2$ & Transformed $L^2$ & Seeds \\
+\midrule
+MLP + aug. & \(19.9135\pm0.0895\) & \(20.0535\pm0.0812\) & \(0.7372\pm0.0139\) & \(0.9817\pm0.0046\) & \(0.9848\pm0.0045\) & 5 \\
+MLP + aug. + LOCO & \(19.4272\pm0.1316\) & \(19.5252\pm0.1274\) & \(0.2383\pm0.0039\) & \(0.9546\pm0.0068\) & \(0.9568\pm0.0065\) & 5 \\
+\bottomrule
+\end{tabular}
+}
+\end{table*}
