@@ -3,17 +3,6 @@
 LOCO trains neural operators to give consistent predictions under symmetry
 transformations. It adds a training loss without changing the inference model.
 
-At 2% labels on the N64 Galilean benchmark, the five-seed FNO results are:
-
-| Method | Orbit OOD relative L2 | Equivariance defect |
-| --- | ---: | ---: |
-| Supervised augmentation | 0.5276 ± 0.0525 | 0.3816 ± 0.0322 |
-| Augmentation + LOCO, weight 0.10 | 0.3950 ± 0.0334 | 0.2677 ± 0.0174 |
-| Augmentation + LOCO, weight 0.30 | 0.3416 ± 0.0289 | 0.2044 ± 0.0160 |
-
-Values are means ± sample standard deviations. Weight 0.30 gives the main
-result; label-efficiency, severity, and backbone comparisons use weight 0.10.
-
 ## Install
 
 Use Python 3.11. From the repository root:
