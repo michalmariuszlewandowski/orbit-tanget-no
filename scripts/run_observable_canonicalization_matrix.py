@@ -28,7 +28,11 @@ from otno.training.losses import relative_defect_per_sample, relative_l2_per_sam
 from otno.training.metrics import _add_stats, _finalize, _rng_context, measure_inference_latency
 from otno.utils import get_device
 from run_ood_severity_matrix import (
-    _evaluation_metadata, _jobs, _read_cached_metrics, _symmetry_value, _write_metrics,
+    _evaluation_metadata,
+    _jobs,
+    _read_cached_metrics,
+    _symmetry_value,
+    _write_metrics,
 )
 
 
@@ -99,7 +103,13 @@ def evaluate_observable_canonicalization(
             base_sample = _observed_boost_sample(a, transform)
             canonical_pred = model(_canonicalize_input(a, transform))
             observed_pred = transform.apply_output(canonical_pred, base_sample)
-            _add_stats("observable_canonical_relative_l2", relative_l2_per_sample(observed_pred, u), sums, sumsqs, counts)
+            _add_stats(
+                "observable_canonical_relative_l2",
+                relative_l2_per_sample(observed_pred, u),
+                sums,
+                sumsqs,
+                counts,
+            )
             _add_stats("observed_boost_norm", base_sample.epsilon, sums, sumsqs, counts)
             num_samples += a.shape[0]
             num_batches += 1
@@ -113,7 +123,13 @@ def evaluate_observable_canonicalization(
                 canonical_pred = model(_canonicalize_input(a_t, transform))
                 restored_pred = transform.apply_output(canonical_pred, total_sample)
                 mask = transform.output_mask(u_t, delta_sample)
-                _add_stats("orbit_ood_relative_l2", relative_l2_per_sample(direct_pred, u_t, mask=mask), sums, sumsqs, counts)
+                _add_stats(
+                    "orbit_ood_relative_l2",
+                    relative_l2_per_sample(direct_pred, u_t, mask=mask),
+                    sums,
+                    sumsqs,
+                    counts,
+                )
                 _add_stats(
                     "observable_canonical_ood_relative_l2",
                     relative_l2_per_sample(restored_pred, u_t, mask=mask),
@@ -141,7 +157,13 @@ def evaluate_observable_canonicalization(
             metrics[target] = metrics.pop(source)
             metrics[f"{target}_std"] = metrics.pop(f"{source}_std")
             metrics[f"{target}_stderr"] = metrics.pop(f"{source}_stderr")
-    metrics.update({"num_samples": num_samples, "num_batches": num_batches, "eval_seconds": time.perf_counter() - start})
+    metrics.update(
+        {
+            "num_samples": num_samples,
+            "num_batches": num_batches,
+            "eval_seconds": time.perf_counter() - start,
+        }
+    )
     return metrics
 
 
@@ -177,17 +199,25 @@ def _aggregate(rows: list[dict[str, Any]]) -> pd.DataFrame:
         "orbit_ood_relative_l2_mean",
         "observable_canonical_ood_relative_l2_mean",
     }.issubset(aggregate.columns):
-        aggregate["observable_canonical_delta_pct"] = 100.0 * (
-            aggregate["observable_canonical_ood_relative_l2_mean"]
-            - aggregate["orbit_ood_relative_l2_mean"]
-        ) / aggregate["orbit_ood_relative_l2_mean"].clip(lower=1e-12)
+        aggregate["observable_canonical_delta_pct"] = (
+            100.0
+            * (
+                aggregate["observable_canonical_ood_relative_l2_mean"]
+                - aggregate["orbit_ood_relative_l2_mean"]
+            )
+            / aggregate["orbit_ood_relative_l2_mean"].clip(lower=1e-12)
+        )
     return aggregate
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Evaluate observable Galilean canonicalization on OOD severity jobs.")
+    parser = argparse.ArgumentParser(
+        description="Evaluate observable Galilean canonicalization on OOD severity jobs."
+    )
     parser.add_argument("--matrix", required=True)
-    parser.add_argument("--out-prefix", default="runs/paper_tables/2d_galilean_n64_observable_canonicalization")
+    parser.add_argument(
+        "--out-prefix", default="runs/paper_tables/2d_galilean_n64_observable_canonicalization"
+    )
     parser.add_argument("--device", default="auto")
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--overwrite", action="store_true")
@@ -214,16 +244,29 @@ def main() -> None:
             if cfg is None:
                 raise KeyError(f"Checkpoint missing config/base_config: {checkpoint}")
             metadata = _evaluation_metadata(
-                job, cfg["dataset"]["path"], ROOT, str(device),
+                job,
+                cfg["dataset"]["path"],
+                ROOT,
+                str(device),
                 expected_dataset_sha256=ckpt.get("meta", {}).get("dataset_sha256"),
             )
             model = build_model(cfg).to(device)
             model.load_state_dict(ckpt["model"])
-            dataset, _ = load_tensor_dataset(ROOT / cfg["dataset"]["path"], str(job.get("split", "test")))
-            loader = DataLoader(dataset, batch_size=int(job.get("batch_size", cfg.get("training", {}).get("batch_size", 32))), shuffle=False)
+            dataset, _ = load_tensor_dataset(
+                ROOT / cfg["dataset"]["path"], str(job.get("split", "test"))
+            )
+            loader = DataLoader(
+                dataset,
+                batch_size=int(
+                    job.get("batch_size", cfg.get("training", {}).get("batch_size", 32))
+                ),
+                shuffle=False,
+            )
             transform = build_transform({"symmetry": job["symmetry"]})
             if not isinstance(transform, NavierStokes2DGalilean):
-                raise TypeError(f"Observable canonicalization requires NavierStokes2DGalilean, got {type(transform).__name__}")
+                raise TypeError(
+                    f"Observable canonicalization requires NavierStokes2DGalilean, got {type(transform).__name__}"
+                )
             metrics = evaluate_observable_canonicalization(
                 model,
                 loader,
@@ -234,7 +277,9 @@ def main() -> None:
             )
             first_batch = next(iter(loader))["a"].to(device)
             training_cfg = cfg.get("training", {})
-            latency_repeats = int(job.get("latency_repeats", training_cfg.get("latency_repeats", 20)))
+            latency_repeats = int(
+                job.get("latency_repeats", training_cfg.get("latency_repeats", 20))
+            )
             latency_warmup = int(job.get("latency_warmup", training_cfg.get("latency_warmup", 5)))
             direct_latency = measure_inference_latency(
                 model,
@@ -264,9 +309,9 @@ def main() -> None:
             )
             direct_ms = metrics["direct_latency_ms_per_sample"]
             canonical_ms = metrics["observable_canonical_latency_ms_per_sample"]
-            metrics["observable_canonical_latency_overhead_pct"] = 100.0 * (
-                canonical_ms - direct_ms
-            ) / max(direct_ms, 1e-12)
+            metrics["observable_canonical_latency_overhead_pct"] = (
+                100.0 * (canonical_ms - direct_ms) / max(direct_ms, 1e-12)
+            )
             _write_metrics(metrics, out_path, metadata)
         row = {
             "checkpoint": str(checkpoint.relative_to(ROOT)),
@@ -284,18 +329,16 @@ def main() -> None:
         return
 
     out_prefix.parent.mkdir(parents=True, exist_ok=True)
-    runs = pd.DataFrame(rows).sort_values(["severity_scale", "method", "seed"]) if rows else pd.DataFrame()
+    runs = (
+        pd.DataFrame(rows).sort_values(["severity_scale", "method", "seed"])
+        if rows
+        else pd.DataFrame()
+    )
     aggregate = _aggregate(rows)
     runs.to_csv(out_prefix.with_suffix(".runs.csv"), index=False)
     aggregate.to_csv(out_prefix.with_suffix(".aggregate.csv"), index=False)
-    with out_prefix.with_suffix(".aggregate.tex").open("w", encoding="utf-8") as f:
-        if aggregate.empty:
-            f.write("% No observable canonicalization evaluations found.\n")
-        else:
-            f.write(aggregate.to_latex(index=False, escape=False, float_format=lambda value: f"{value:.4f}"))
     print(f"wrote {out_prefix.with_suffix('.runs.csv')}")
     print(f"wrote {out_prefix.with_suffix('.aggregate.csv')}")
-    print(f"wrote {out_prefix.with_suffix('.aggregate.tex')}")
 
 
 if __name__ == "__main__":

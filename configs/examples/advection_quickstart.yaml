@@ -1,0 +1,60 @@
+# Run from the repository root:
+#   python scripts/train.py --config configs/examples/advection_quickstart.yaml
+# A small CPU demonstration of u_t + c u_x = 0 on the periodic unit interval.
+# See docs/code-guide.md for the complete output tree and equations.
+seed: 7  # Model initialization, shuffling, and training transformation sampling.
+
+dataset:
+  kind: advection1d  # Input a = u(x, 0); target u = u(x, final_time).
+  path: runs/examples/advection/data.pt  # Separate from manuscript datasets.
+  generate_if_missing: true  # Generate train/val/test splits on the first run.
+  n: 32  # Uniform points x=j/n on [0,1); the endpoint is not repeated.
+  num_train: 16  # Independent labeled training fields.
+  num_val: 4  # Used to select best.pt, never for optimizer updates.
+  num_test: 4  # Used once for the final checkpoint evaluation.
+  final_time: 0.25  # Target time; exact Fourier shift, with no time-step dt.
+  velocity: 0.7  # c; the target is a(x - c*final_time).
+  modes: 4  # Initial-field Fourier frequencies, below the grid Nyquist limit.
+  amplitude: 0.8  # Scale of each standardized initial field.
+  seed: 7  # Data-generation seed, independent of the top-level training seed.
+
+model:
+  name: fno1d  # Channels-last Fourier neural operator.
+  in_channels: 1  # Initial scalar field.
+  out_channels: 1  # Final scalar field.
+  width: 8  # Hidden features per grid point.
+  modes: 6  # Retained rFFT modes; at most n//2+1.
+  depth: 2  # Spectral/pointwise blocks.
+  add_grid: false  # Do not append absolute coordinates to the model input.
+
+symmetry:
+  name: translation1d  # Same periodic shift on inputs and outputs.
+  max_shift: 0.1  # Per-example shifts sampled uniformly from [-0.1,0.1].
+  length: 1.0  # Must match the generated unit domain.
+
+training:
+  method: aug_orbit  # Supervision + lambda_aug*augmentation + lambda_orbit*LOCO.
+  loss: relative_l2  # Mean of per-example ||prediction-target|| / ||target||.
+  epochs: 3  # A runnable demonstration, not a converged accuracy benchmark.
+  batch_size: 4  # Four examples per optimizer update.
+  lr: 0.002  # AdamW initial learning rate; cosine schedule over epochs.
+  weight_decay: 0.0001  # AdamW weight decay.
+  lambda_aug: 0.5  # Weight on supervision using transformed inputs and labels.
+  lambda_orbit: 0.05  # Weight on prediction consistency, without labels.
+  normalize_by_epsilon: true  # Divide each mean-square defect by epsilon^2+eta.
+  orbit_eta: 0.000001  # eta stabilizes small sampled transformation magnitudes.
+  data_fraction: 1.0  # Use all training labels.
+  eval_every: 1  # Validate after every epoch.
+  eval_orbit_samples: 2  # Sample two transformations per example at evaluation.
+  eval_seed: 100007  # Fixed validation transformations; preserve training RNG.
+  test_eval_seed: 200007  # Separate fixed stream for final test transformations.
+  num_workers: 0  # Load in the main process, including on Windows.
+  grad_clip: 1.0  # Clip the total gradient norm before optimizer.step().
+  latency_repeats: 2  # Short inference-timing demonstration.
+  latency_warmup: 1  # Untimed warmup forward pass.
+
+runtime:
+  device: cpu  # This example requires no GPU.
+  deterministic: true  # Request deterministic PyTorch kernels.
+  overwrite: false  # Protect a completed or partial run from replacement.
+  run_dir: runs/examples/advection/run  # Logs, provenance, and checkpoints.

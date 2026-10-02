@@ -77,7 +77,9 @@ def _row(path: Path, root: Path) -> dict[str, Any]:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Collect adaptation metrics and write table drafts.")
+    parser = argparse.ArgumentParser(
+        description="Collect adaptation metrics and write table drafts."
+    )
     parser.add_argument("--runs", default="runs/adaptation")
     parser.add_argument("--out-prefix", default="runs/paper_tables/adaptation")
     parser.add_argument(
@@ -126,14 +128,8 @@ def main() -> None:
             .reset_index()
         )
     aggregate.to_csv(out_prefix.with_suffix(".aggregate.csv"), index=False)
-    with out_prefix.with_suffix(".aggregate.tex").open("w", encoding="utf-8") as f:
-        if aggregate.empty:
-            f.write("% No adaptation runs found.\n")
-        else:
-            f.write(aggregate.to_latex(index=False, escape=False))
     print(f"wrote {out_prefix.with_suffix('.runs.csv')}")
     print(f"wrote {out_prefix.with_suffix('.aggregate.csv')}")
-    print(f"wrote {out_prefix.with_suffix('.aggregate.tex')}")
 
 
 if __name__ == "__main__":

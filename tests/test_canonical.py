@@ -2,7 +2,6 @@ import torch
 from torch import nn
 
 from otno.data.solvers1d import random_fourier_field_1d
-
 from otno.models.canonical import (
     CanonicalFNO1d,
     ObservableGalileanCanonicalFNO2d,
@@ -42,7 +41,9 @@ def test_translation_canonical_wrapper_identity_base_is_identity():
 
 
 def test_canonical_model_shape():
-    model = CanonicalFNO1d(width=8, modes=4, depth=2, canonicalizers=["galilean_mean", "translation_first_mode"])
+    model = CanonicalFNO1d(
+        width=8, modes=4, depth=2, canonicalizers=["galilean_mean", "translation_first_mode"]
+    )
     x = torch.randn(2, 32, 1)
     y = model(x)
     assert y.shape == x.shape

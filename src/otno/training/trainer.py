@@ -1,11 +1,18 @@
+"""Experiment lifecycle: prepare data, train epochs, checkpoint, and evaluate.
+
+Scientific objective assembly lives in :mod:`otno.training.objectives`; this
+module owns the run files and the complete state needed for exact continuation.
+"""
+
 from __future__ import annotations
 
-import os
 import copy
 import json
 import math
+import os
 import sys
 import time
+from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
 
@@ -18,14 +25,9 @@ from otno.data.datasets import load_tensor_dataset
 from otno.data.generators import generate_dataset_from_config, validate_existing_dataset
 from otno.models import build_model
 from otno.symmetry.registry import build_transform
-from otno.training.losses import (
-    augmented_supervised_loss,
-    orbit_consistency_loss,
-    relative_l2_loss,
-    tangent_propagation_loss,
-    trajectory_nmse_loss,
-)
+from otno.symmetry.transforms import BaseTransform
 from otno.training.metrics import evaluate_model, measure_inference_latency
+from otno.training.objectives import TrainingObjective, build_training_objective, compute_batch_loss
 from otno.utils import (
     append_jsonl,
     capture_rng_state,
@@ -47,6 +49,7 @@ from otno.utils import (
 
 
 def _prepare_dataset(config: dict[str, Any]) -> Path:
+    """Generate a missing cache or verify that its parameters match the run."""
     dataset_cfg = config["dataset"]
     path = Path(dataset_cfg["path"])
     if not path.exists():
@@ -68,12 +71,15 @@ def _loader(
     batch_size_override: int | None = None,
     seed_offset_override: int | None = None,
 ) -> DataLoader:
+    """Select a labeled fraction and attach a split-specific sampler RNG."""
     training_cfg = config.get("training", {})
     if fraction_override is not None:
         fraction = float(fraction_override)
     else:
         fraction = float(training_cfg.get("data_fraction", 1.0)) if split == "train" else 1.0
-    dataset, _ = load_tensor_dataset(path, split, fraction=fraction, seed=int(config.get("seed", 0)))
+    dataset, _ = load_tensor_dataset(
+        path, split, fraction=fraction, seed=int(config.get("seed", 0))
+    )
     split_offset = (
         int(seed_offset_override)
         if seed_offset_override is not None
@@ -92,9 +98,17 @@ def _loader(
 
 
 _RUN_OUTPUTS = (
-    "config.yaml", "meta.json", "source_manifest.json", "train_metrics.jsonl",
-    "val_metrics.jsonl", "test_metrics.json", "partial_metrics.json",
-    "rng_state_initial.pt", "rng_state_final.pt", "checkpoints/best.pt", "checkpoints/last.pt",
+    "config.yaml",
+    "meta.json",
+    "source_manifest.json",
+    "train_metrics.jsonl",
+    "val_metrics.jsonl",
+    "test_metrics.json",
+    "partial_metrics.json",
+    "rng_state_initial.pt",
+    "rng_state_final.pt",
+    "checkpoints/best.pt",
+    "checkpoints/last.pt",
 )
 
 
@@ -118,6 +132,7 @@ def _rewind_epoch_log(path: Path, completed_epoch: int) -> None:
 
 
 def _resume_config_hash(config: dict[str, Any]) -> str:
+    """Ignore location and interruption controls when comparing experiments."""
     config = copy.deepcopy(config)
     for key in ("resume", "overwrite", "run_dir", "device"):
         config.get("runtime", {}).pop(key, None)
@@ -127,6 +142,7 @@ def _resume_config_hash(config: dict[str, Any]) -> str:
 
 
 def _torch_save_atomic(payload: Any, path: Path, *, attempts: int = 20) -> None:
+    """Commit a whole checkpoint, retrying transient filesystem failures."""
     ensure_dir(path.parent)
     last_error: BaseException | None = None
     for attempt in range(attempts):
@@ -147,84 +163,270 @@ def _torch_save_atomic(payload: Any, path: Path, *, attempts: int = 20) -> None:
     raise last_error
 
 
+def _build_loaders(
+    config: dict[str, Any],
+    dataset_path: Path,
+    *,
+    method: str,
+) -> dict[str, DataLoader]:
+    """Give each split its own RNG stream; semi-supervised data has a fourth."""
+    loaders = {
+        "train": _loader(dataset_path, "train", config, shuffle=True),
+        "val": _loader(dataset_path, "val", config, shuffle=False),
+        "test": _loader(dataset_path, "test", config, shuffle=False),
+    }
+    if method == "semi_aug_orbit":
+        training = config.get("training", {})
+        # This full-data loader contributes inputs only to the orbit loss.
+        loaders["orbit"] = _loader(
+            dataset_path,
+            "train",
+            config,
+            shuffle=True,
+            fraction_override=float(training.get("orbit_data_fraction", 1.0)),
+            batch_size_override=int(
+                training.get("orbit_batch_size", training.get("batch_size", 32))
+            ),
+            seed_offset_override=40_000,
+        )
+    return loaders
+
+
+def _load_resume_checkpoint(
+    config: dict[str, Any],
+    run_dir: Path,
+    *,
+    dataset_sha256: str,
+) -> dict[str, Any]:
+    """Validate all resumable state before changing existing run outputs."""
+    best_path = run_dir / "checkpoints" / "best.pt"
+    last_path = run_dir / "checkpoints" / "last.pt"
+    resume_path = last_path if last_path.exists() else best_path
+    if not resume_path.exists():
+        raise FileNotFoundError(f"runtime.resume=true but no checkpoint exists in {run_dir}")
+    checkpoint = torch.load(resume_path, map_location="cpu", weights_only=False)
+    if "rng_state" not in checkpoint or "loader_rng_states" not in checkpoint:
+        raise ValueError(
+            "This legacy checkpoint lacks complete RNG state; exact resume is unavailable. "
+            "Start a fresh run in a new directory."
+        )
+    required = {"model", "optimizer", "scheduler", "config", "epoch", "best_val", "meta"}
+    missing = required - checkpoint.keys()
+    if missing:
+        raise ValueError(
+            f"Checkpoint lacks state required for resume: {', '.join(sorted(missing))}"
+        )
+    if _resume_config_hash(config) != _resume_config_hash(checkpoint["config"]):
+        raise ValueError("Resume config changes experiment parameters; start a new run instead.")
+    if checkpoint.get("meta", {}).get("dataset_sha256") != dataset_sha256:
+        raise ValueError("Resume dataset SHA-256 differs from the checkpoint.")
+    if math.isfinite(float(checkpoint["best_val"])) and not best_path.exists():
+        raise FileNotFoundError(f"Resume requires the validation-selected checkpoint: {best_path}")
+    return checkpoint
+
+
+def _prepare_run_outputs(
+    config: dict[str, Any],
+    run_dir: Path,
+    *,
+    meta: dict[str, Any],
+    source: dict[str, Any],
+    loaders: dict[str, DataLoader],
+    resume_checkpoint: dict[str, Any] | None,
+) -> None:
+    """Restore sampler state and committed logs, or initialize a fresh run."""
+    resume = bool(config.get("runtime", {}).get("resume", False))
+    if resume_checkpoint is not None:
+        for name, loader in loaders.items():
+            loader.generator.set_state(resume_checkpoint["loader_rng_states"][name].cpu())
+        restore_rng_state(resume_checkpoint["rng_state"])
+        last_path = run_dir / "checkpoints" / "last.pt"
+        if not last_path.exists():
+            _torch_save_atomic(resume_checkpoint, last_path)
+        completed_epoch = int(resume_checkpoint["epoch"])
+        for filename in ("train_metrics.jsonl", "val_metrics.jsonl"):
+            _rewind_epoch_log(run_dir / filename, completed_epoch)
+        for filename in ("test_metrics.json", "partial_metrics.json", "rng_state_final.pt"):
+            (run_dir / filename).unlink(missing_ok=True)
+    else:
+        prepare_run_directory(
+            run_dir,
+            output_files=_RUN_OUTPUTS,
+            overwrite=bool(config.get("runtime", {}).get("overwrite", True)),
+        )
+    save_config(config, run_dir / "config.yaml")
+    dump_json(meta, run_dir / "meta.json")
+    dump_json(source, run_dir / "source_manifest.json")
+    if not resume or not (run_dir / "rng_state_initial.pt").exists():
+        torch.save(capture_rng_state(), run_dir / "rng_state_initial.pt")
+
+
+def _next_batch(loader: DataLoader, iterator: Iterator) -> tuple[dict[str, torch.Tensor], Iterator]:
+    """Cycle a loader when an epoch requests more steps than it contains."""
+    try:
+        return next(iterator), iterator
+    except StopIteration:
+        iterator = iter(loader)
+        return next(iterator), iterator
+
+
+def _train_epoch(
+    model: torch.nn.Module,
+    optimizer: torch.optim.Optimizer,
+    loaders: dict[str, DataLoader],
+    objective: TrainingObjective,
+    *,
+    device: torch.device,
+    transform: BaseTransform | None,
+    epoch: int,
+    training: dict[str, Any],
+) -> dict[str, Any]:
+    """Take joint optimizer steps and report their mean losses.
+
+    Labeled batches cycle independently of the optional orbit-input batches.
+    Iterator creation and the order of loss evaluation are part of the saved
+    RNG contract, including epochs with fewer steps than a full loader pass.
+    """
+    epoch_wall_start = time.perf_counter()
+    model.train()
+    train_loader = loaders["train"]
+    orbit_loader = loaders.get("orbit")
+    steps = int(training.get("steps_per_epoch", len(train_loader)))
+    if orbit_loader is not None:
+        steps = int(training.get("orbit_steps_per_epoch", len(orbit_loader)))
+    progress = tqdm(
+        total=steps,
+        desc=f"epoch {epoch}/{int(training.get('epochs', 100))}",
+        leave=False,
+        disable=not sys.stderr.isatty(),
+    )
+    train_iterator = iter(train_loader)
+    orbit_iterator = iter(orbit_loader) if orbit_loader is not None else None
+
+    def next_orbit_inputs() -> torch.Tensor:
+        nonlocal orbit_iterator
+        assert orbit_loader is not None and orbit_iterator is not None
+        batch, orbit_iterator = _next_batch(orbit_loader, orbit_iterator)
+        return batch["a"].to(device)
+
+    total_loss = 0.0
+    totals: dict[str, float] = {}
+    num_batches = 0
+    try:
+        for step in range(steps):
+            progress.update(1)
+            batch, train_iterator = _next_batch(train_loader, train_iterator)
+            inputs, targets = batch["a"].to(device), batch["u"].to(device)
+            optimizer.zero_grad(set_to_none=True)
+            loss, logs = compute_batch_loss(
+                model,
+                inputs,
+                targets,
+                objective,
+                transform=transform,
+                orbit_inputs=next_orbit_inputs if orbit_loader is not None else None,
+            )
+            if not torch.isfinite(loss.detach()).item():
+                raise FloatingPointError(
+                    f"Non-finite training loss at epoch {epoch}, batch {step + 1}; "
+                    "check dataset values, solver stability, and loss settings."
+                )
+            loss.backward()
+            if training.get("grad_clip") is not None:
+                torch.nn.utils.clip_grad_norm_(model.parameters(), float(training["grad_clip"]))
+            optimizer.step()
+            total_loss += float(loss.detach().cpu())
+            for key, value in logs.items():
+                totals[key] = totals.get(key, 0.0) + float(value)
+            num_batches += 1
+            progress.set_postfix(loss=total_loss / num_batches)
+    finally:
+        progress.close()
+
+    record = {
+        "epoch": epoch,
+        "train_loss": total_loss / max(1, num_batches),
+        "train_supervised_steps": steps,
+        "train_epoch_seconds": time.perf_counter() - epoch_wall_start,
+        **{f"train_{key}": value / max(1, num_batches) for key, value in totals.items()},
+    }
+    if orbit_loader is not None:
+        record["train_unlabeled_orbit_steps"] = 0  # Joint loss; no separate optimizer steps.
+    return record
+
+
+def _evaluate_best_model(
+    config: dict[str, Any],
+    model: torch.nn.Module,
+    loaders: dict[str, DataLoader],
+    *,
+    device: torch.device,
+    transform: BaseTransform | None,
+    best_path: Path,
+) -> dict[str, Any]:
+    """Evaluate the validation-selected weights and their inference latency."""
+    if best_path.exists():
+        checkpoint = torch.load(best_path, map_location=device, weights_only=False)
+        model.load_state_dict(checkpoint["model"])
+    training = config.get("training", {})
+    test_metrics = evaluate_model(
+        model,
+        loaders["test"],
+        device=device,
+        transform=transform,
+        n_orbit_samples=int(training.get("eval_orbit_samples", 4)),
+        seed=int(training.get("test_eval_seed", int(config.get("seed", 0)) + 200_000)),
+    )
+    first_batch = next(iter(loaders["test"]))["a"].to(device)
+    latency = measure_inference_latency(
+        model,
+        first_batch,
+        repeats=int(training.get("latency_repeats", 20)),
+        warmup=int(training.get("latency_warmup", 5)),
+    )
+    return {**test_metrics, **latency}
+
+
 def train_from_config(config: dict[str, Any]) -> dict[str, Any]:
+    """Train or resume one experiment, then evaluate its best validation model.
+
+    Dataset and resume compatibility are checked before replacing run outputs.
+    Every epoch commits the model, optimizer, scheduler, and all RNG streams to
+    ``last.pt``; ``best.pt`` is selected solely by validation relative L2 error.
+    ``stop_after_epochs`` returns partial results that can be resumed exactly.
+    """
     validate_config(config)
-    training_cfg = config.get("training", {})
-    method = str(training_cfg.get("method", "baseline")).lower()
-    if method == "semi_aug_orbit" and int(training_cfg.get("unlabeled_orbit_steps_per_epoch", 0)) != 0:
-        raise ValueError("Separate unlabeled optimizer steps are unsupported; use joint semi_aug_orbit with orbit_steps_per_epoch.")
+    training = config.get("training", {})
+    method = str(training.get("method", "baseline")).lower()
+    if method == "semi_aug_orbit" and int(training.get("unlabeled_orbit_steps_per_epoch", 0)) != 0:
+        raise ValueError(
+            "Separate unlabeled optimizer steps are unsupported; "
+            "use joint semi_aug_orbit with orbit_steps_per_epoch."
+        )
     seed = int(config.get("seed", 0))
-    runtime_cfg = config.get("runtime", {})
-    deterministic = bool(runtime_cfg.get("deterministic", False))
+    runtime = config.get("runtime", {})
+    deterministic = bool(runtime.get("deterministic", False))
     set_seed(seed, deterministic=deterministic)
-    device = get_device(runtime_cfg.get("device", "auto"))
-    run_dir = Path(runtime_cfg.get("run_dir", "runs/default"))
-    resume = bool(runtime_cfg.get("resume", False))
+    device = get_device(runtime.get("device", "auto"))
+    run_dir = Path(runtime.get("run_dir", "runs/default"))
+    resume = bool(runtime.get("resume", False))
     if not resume:
         check_run_directory(
-            run_dir, output_files=_RUN_OUTPUTS,
-            overwrite=bool(runtime_cfg.get("overwrite", True)),
+            run_dir,
+            output_files=_RUN_OUTPUTS,
+            overwrite=bool(runtime.get("overwrite", True)),
         )
 
     dataset_path = _prepare_dataset(config)
-    lr = float(training_cfg.get("lr", 1e-3))
-    weight_decay = float(training_cfg.get("weight_decay", 1e-4))
-    epochs = int(training_cfg.get("epochs", 100))
-    stop_after_epochs = training_cfg.get("stop_after_epochs", None)
-    lambda_orbit = float(training_cfg.get("lambda_orbit", 1.0))
-    lambda_tangent = float(training_cfg.get("lambda_tangent", lambda_orbit))
-    lambda_aug = float(training_cfg.get("lambda_aug", 1.0))
-    normalize_by_epsilon = bool(training_cfg.get("normalize_by_epsilon", True))
-    loss_name = str(training_cfg.get("loss", "relative_l2")).lower()
-    if loss_name in {"relative_l2", "rel_l2"}:
-        supervised_loss_fn = relative_l2_loss
-    elif loss_name in {"trajectory_nmse", "lpsda_nmse", "nmse"}:
-        supervised_loss_fn = trajectory_nmse_loss
-    else:
-        raise ValueError(f"Unknown training.loss={loss_name!r}")
-    eta = float(training_cfg.get("orbit_eta", 1e-6))
-    orbit_control = str(training_cfg.get("orbit_control", "physical")).lower()
-    eval_every = int(training_cfg.get("eval_every", 5))
-    grad_clip = training_cfg.get("grad_clip", None)
-    aug_methods = {
-        "aug",
-        "augmentation",
-        "aug_orbit",
-        "orbit_aug",
-        "aug_orbit_shuffle",
-        "aug_orbit_shuffled",
-        "aug_orbit_no_output",
-        "aug_orbit_input_only",
-        "aug_tangent",
-        "tangent_aug",
-        "semi_aug_orbit",
-    }
-    orbit_methods = {
-        "orbit",
-        "orb",
-        "aug_orbit",
-        "orbit_aug",
-        "aug_orbit_shuffle",
-        "aug_orbit_shuffled",
-        "aug_orbit_no_output",
-        "aug_orbit_input_only",
-        "semi_aug_orbit",
-    }
-    tangent_methods = {
-        "tangent",
-        "tangent_prop",
-        "tangent_propagation",
-        "aug_tangent",
-        "tangent_aug",
-    }
-    if method in {"aug_orbit_shuffle", "aug_orbit_shuffled"} and orbit_control == "physical":
-        orbit_control = "shuffle_output"
-    if method in {"aug_orbit_no_output", "aug_orbit_input_only"} and orbit_control == "physical":
-        orbit_control = "no_output_transform"
-
+    objective = build_training_objective(training)
+    epochs = int(training.get("epochs", 100))
     model = build_model(config).to(device)
     transform = build_transform(config.get("symmetry"))
-    optimizer = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=weight_decay)
+    optimizer = torch.optim.AdamW(
+        model.parameters(),
+        lr=float(training.get("lr", 1e-3)),
+        weight_decay=float(training.get("weight_decay", 1e-4)),
+    )
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=max(1, epochs))
 
     source = source_manifest(Path(__file__).resolve().parents[3])
@@ -233,7 +435,7 @@ def train_from_config(config: dict[str, Any]) -> dict[str, Any]:
         "parameters": count_parameters(model),
         "parameters_total": sum(p.numel() for p in model.parameters()),
         "method": method,
-        "orbit_control": orbit_control,
+        "orbit_control": objective.orbit_control,
         "model_name": str(config.get("model", {}).get("name", "fno1d")),
         "dataset_kind": str(config.get("dataset", {}).get("kind", "")),
         "dataset_path": str(dataset_path),
@@ -246,87 +448,37 @@ def train_from_config(config: dict[str, Any]) -> dict[str, Any]:
         "git_dirty": source["git_dirty"],
     }
 
-    best_val = float("inf")
     best_path = run_dir / "checkpoints" / "best.pt"
     last_path = run_dir / "checkpoints" / "last.pt"
-
-    start_epoch = 1
-    prior_wall_seconds = 0.0
+    best_val, start_epoch, prior_wall_seconds = float("inf"), 1, 0.0
     resume_checkpoint = None
     if resume:
-        resume_path = last_path if last_path.exists() else best_path
-        if not resume_path.exists():
-            raise FileNotFoundError(f"runtime.resume=true but no checkpoint exists in {run_dir}")
-        ckpt = torch.load(resume_path, map_location="cpu", weights_only=False)
-        if "rng_state" not in ckpt or "loader_rng_states" not in ckpt:
-            raise ValueError("This legacy checkpoint lacks complete RNG state; exact resume is unavailable. Start a fresh run in a new directory.")
-        missing = {"model", "optimizer", "scheduler", "config", "epoch", "best_val", "meta"} - ckpt.keys()
-        if missing:
-            raise ValueError(f"Checkpoint lacks state required for resume: {', '.join(sorted(missing))}")
-        if _resume_config_hash(config) != _resume_config_hash(ckpt["config"]):
-            raise ValueError("Resume config changes experiment parameters; start a new run instead.")
-        if ckpt.get("meta", {}).get("dataset_sha256") != meta["dataset_sha256"]:
-            raise ValueError("Resume dataset SHA-256 differs from the checkpoint.")
-        model.load_state_dict(ckpt["model"])
-        optimizer.load_state_dict(ckpt["optimizer"])
-        scheduler.load_state_dict(ckpt["scheduler"])
-        best_val = float(ckpt["best_val"])
-        if math.isfinite(best_val) and not best_path.exists():
-            raise FileNotFoundError(f"Resume requires the validation-selected checkpoint: {best_path}")
-        start_epoch = int(ckpt.get("epoch", 0)) + 1
-        resume_checkpoint = ckpt
-        prior_wall_seconds = float(ckpt.get("train_wall_seconds", 0.0))
+        resume_checkpoint = _load_resume_checkpoint(
+            config, run_dir, dataset_sha256=meta["dataset_sha256"]
+        )
+        model.load_state_dict(resume_checkpoint["model"])
+        optimizer.load_state_dict(resume_checkpoint["optimizer"])
+        scheduler.load_state_dict(resume_checkpoint["scheduler"])
+        best_val = float(resume_checkpoint["best_val"])
+        start_epoch = int(resume_checkpoint["epoch"]) + 1
+        prior_wall_seconds = float(resume_checkpoint.get("train_wall_seconds", 0.0))
 
-    train_loader = _loader(
-        dataset_path,
-        "train",
+    loaders = _build_loaders(config, dataset_path, method=method)
+    _prepare_run_outputs(
         config,
-        shuffle=True,
+        run_dir,
+        meta=meta,
+        source=source,
+        loaders=loaders,
+        resume_checkpoint=resume_checkpoint,
     )
-    val_loader = _loader(dataset_path, "val", config, shuffle=False)
-    test_loader = _loader(dataset_path, "test", config, shuffle=False)
-    loaders = {"train": train_loader, "val": val_loader, "test": test_loader}
-    # The independent full-data loader contributes inputs only to the orbit loss.
-    orbit_loader = None
-    if method == "semi_aug_orbit":
-        orbit_loader = _loader(
-            dataset_path, "train", config, shuffle=True,
-            fraction_override=float(training_cfg.get("orbit_data_fraction", 1.0)),
-            batch_size_override=int(training_cfg.get("orbit_batch_size", training_cfg.get("batch_size", 32))),
-            seed_offset_override=40_000,
-        )
-        loaders["orbit"] = orbit_loader
-    if resume_checkpoint is not None:
-        for name, loader in loaders.items():
-            loader.generator.set_state(resume_checkpoint["loader_rng_states"][name].cpu())
-        restore_rng_state(resume_checkpoint["rng_state"])
-        if not last_path.exists():
-            _torch_save_atomic(resume_checkpoint, last_path)
-        for filename in ("train_metrics.jsonl", "val_metrics.jsonl"):
-            _rewind_epoch_log(run_dir / filename, start_epoch - 1)
-        for filename in ("test_metrics.json", "partial_metrics.json", "rng_state_final.pt"):
-            (run_dir / filename).unlink(missing_ok=True)
-    else:
-        prepare_run_directory(
-            run_dir, output_files=_RUN_OUTPUTS,
-            overwrite=bool(runtime_cfg.get("overwrite", True)),
-        )
-    save_config(config, run_dir / "config.yaml")
-    dump_json(meta, run_dir / "meta.json")
-    dump_json(source, run_dir / "source_manifest.json")
-    if not resume or not (run_dir / "rng_state_initial.pt").exists():
-        torch.save(capture_rng_state(), run_dir / "rng_state_initial.pt")
-    steps_per_epoch = int(training_cfg.get("steps_per_epoch", len(train_loader)))
-    if orbit_loader is not None:
-        steps_per_epoch = int(training_cfg.get("orbit_steps_per_epoch", len(orbit_loader)))
-
     target_epoch = epochs
-    if stop_after_epochs is not None:
-        target_epoch = min(epochs, start_epoch + int(stop_after_epochs) - 1)
-
+    if training.get("stop_after_epochs") is not None:
+        target_epoch = min(epochs, start_epoch + int(training["stop_after_epochs"]) - 1)
     train_wall_start = time.perf_counter()
 
     def checkpoint_state(epoch: int) -> dict[str, Any]:
+        """Capture the complete continuation state without advancing any RNG."""
         return {
             "model": model.state_dict(),
             "optimizer": optimizer.state_dict(),
@@ -337,127 +489,45 @@ def train_from_config(config: dict[str, Any]) -> dict[str, Any]:
             "best_val": best_val,
             "torch_rng": torch.get_rng_state(),
             "rng_state": capture_rng_state(),
-            "loader_rng_states": {name: loader.generator.get_state() for name, loader in loaders.items()},
+            "loader_rng_states": {
+                name: loader.generator.get_state() for name, loader in loaders.items()
+            },
             "train_wall_seconds": prior_wall_seconds + time.perf_counter() - train_wall_start,
         }
 
     for epoch in range(start_epoch, target_epoch + 1):
-        epoch_wall_start = time.perf_counter()
-        model.train()
-        supervised_steps = steps_per_epoch
-        progress = tqdm(
-            total=supervised_steps,
-            desc=f"epoch {epoch}/{epochs}",
-            leave=False,
-            disable=not sys.stderr.isatty(),
+        train_record = _train_epoch(
+            model,
+            optimizer,
+            loaders,
+            objective,
+            device=device,
+            transform=transform,
+            epoch=epoch,
+            training=training,
         )
-        train_iter = iter(train_loader)
-        orbit_iter = iter(orbit_loader) if orbit_loader is not None else None
-        epoch_loss = 0.0
-        epoch_logs: dict[str, float] = {}
-        num_batches = 0
-
-        for _ in range(supervised_steps):
-            progress.update(1)
-            try:
-                batch = next(train_iter)
-            except StopIteration:
-                train_iter = iter(train_loader)
-                batch = next(train_iter)
-            a = batch["a"].to(device)
-            u = batch["u"].to(device)
-            optimizer.zero_grad(set_to_none=True)
-            pred = model(a)
-            loss = supervised_loss_fn(pred, u)
-            logs = {"supervised_loss": float(loss.detach().cpu())}
-
-            if method in aug_methods:
-                if transform is None:
-                    raise ValueError("Augmentation method requires a symmetry transform")
-                aug_loss = augmented_supervised_loss(model, a, u, transform, loss_fn=supervised_loss_fn)
-                loss = loss + lambda_aug * aug_loss
-                logs["aug_loss"] = float(aug_loss.detach().cpu())
-
-            if method in orbit_methods:
-                if transform is None:
-                    raise ValueError("Orbit method requires a symmetry transform")
-                orbit_a, orbit_base_pred = a, pred
-                if orbit_iter is not None:
-                    try:
-                        orbit_batch = next(orbit_iter)
-                    except StopIteration:
-                        orbit_iter = iter(orbit_loader)
-                        orbit_batch = next(orbit_iter)
-                    orbit_a = orbit_batch["a"].to(device)
-                    orbit_base_pred = model(orbit_a)
-                orb_loss, orb_stats = orbit_consistency_loss(
-                    model,
-                    orbit_a,
-                    transform,
-                    base_pred=orbit_base_pred,
-                    normalize_by_epsilon=normalize_by_epsilon,
-                    eta=eta,
-                    target_mode=orbit_control,
-                )
-                loss = loss + lambda_orbit * orb_loss
-                logs.update(orb_stats)
-
-            if method in tangent_methods:
-                if transform is None:
-                    raise ValueError("Tangent method requires a symmetry transform")
-                tangent_loss, tangent_stats = tangent_propagation_loss(
-                    model,
-                    a,
-                    transform,
-                    normalize_by_epsilon=normalize_by_epsilon,
-                    eta=eta,
-                )
-                loss = loss + lambda_tangent * tangent_loss
-                logs.update(tangent_stats)
-
-            loss.backward()
-            if grad_clip is not None:
-                torch.nn.utils.clip_grad_norm_(model.parameters(), float(grad_clip))
-            optimizer.step()
-            epoch_loss += float(loss.detach().cpu())
-            for key, value in logs.items():
-                epoch_logs[key] = epoch_logs.get(key, 0.0) + float(value)
-            num_batches += 1
-            progress.set_postfix(loss=epoch_loss / num_batches)
-
-        progress.close()
-
         scheduler.step()
-        train_record = {
-            "epoch": epoch,
-            "train_loss": epoch_loss / max(1, num_batches),
-            "lr": scheduler.get_last_lr()[0],
-            "train_supervised_steps": supervised_steps,
-            "train_epoch_seconds": time.perf_counter() - epoch_wall_start,
-            **{f"train_{k}": v / max(1, num_batches) for k, v in epoch_logs.items()},
-        }
-        if orbit_loader is not None:
-            train_record["train_unlabeled_orbit_steps"] = 0  # Joint loss, no separate optimizer steps.
+        train_record["lr"] = scheduler.get_last_lr()[0]
         append_jsonl(train_record, run_dir / "train_metrics.jsonl")
 
-        if epoch % eval_every == 0 or epoch == epochs:
+        if epoch % int(training.get("eval_every", 5)) == 0 or epoch == epochs:
             val_metrics = evaluate_model(
                 model,
-                val_loader,
+                loaders["val"],
                 device=device,
                 transform=transform,
-                n_orbit_samples=int(training_cfg.get("eval_orbit_samples", 1)),
-                seed=int(training_cfg.get("eval_seed", seed + 100_000 + epoch)),
+                n_orbit_samples=int(training.get("eval_orbit_samples", 1)),
+                seed=int(training.get("eval_seed", seed + 100_000 + epoch)),
             )
-            val_record = {"epoch": epoch, **{f"val_{k}": v for k, v in val_metrics.items()}}
+            val_record = {
+                "epoch": epoch,
+                **{f"val_{key}": value for key, value in val_metrics.items()},
+            }
             append_jsonl(val_record, run_dir / "val_metrics.jsonl")
             val_key = val_metrics["relative_l2"]
             if val_key < best_val:
                 best_val = val_key
-                _torch_save_atomic(
-                    checkpoint_state(epoch),
-                    best_path,
-                )
+                _torch_save_atomic(checkpoint_state(epoch), best_path)
             print(
                 f"epoch {epoch}/{epochs} "
                 f"train_loss={train_record['train_loss']:.6g} "
@@ -465,11 +535,7 @@ def train_from_config(config: dict[str, Any]) -> dict[str, Any]:
                 f"best_val={best_val:.6g}",
                 flush=True,
             )
-
-        _torch_save_atomic(
-            checkpoint_state(epoch),
-            last_path,
-        )
+        _torch_save_atomic(checkpoint_state(epoch), last_path)
 
     if target_epoch < epochs:
         results = {
@@ -483,31 +549,20 @@ def train_from_config(config: dict[str, Any]) -> dict[str, Any]:
         dump_json(results, run_dir / "partial_metrics.json")
         return results
 
-    if best_path.exists():
-        ckpt = torch.load(best_path, map_location=device, weights_only=False)
-        model.load_state_dict(ckpt["model"])
-
-    test_metrics = evaluate_model(
+    test_metrics = _evaluate_best_model(
+        config,
         model,
-        test_loader,
+        loaders,
         device=device,
         transform=transform,
-        n_orbit_samples=int(training_cfg.get("eval_orbit_samples", 4)),
-        seed=int(training_cfg.get("test_eval_seed", seed + 200_000)),
+        best_path=best_path,
     )
-    first_batch = next(iter(test_loader))["a"].to(device)
-    latency = measure_inference_latency(
-        model,
-        first_batch,
-        repeats=int(training_cfg.get("latency_repeats", 20)),
-        warmup=int(training_cfg.get("latency_warmup", 5)),
-    )
-    results = {"best_val_relative_l2": best_val, **test_metrics, **latency, **meta}
+    results = {"best_val_relative_l2": best_val, **test_metrics, **meta}
     results["train_wall_seconds"] = prior_wall_seconds + time.perf_counter() - train_wall_start
     dump_json(results, run_dir / "test_metrics.json")
     (run_dir / "partial_metrics.json").unlink(missing_ok=True)
     torch.save(capture_rng_state(), run_dir / "rng_state_final.pt")
-    # Evaluation uses best.pt; last.pt must retain the final model/optimizer pair.
+    # Evaluation uses best.pt; last.pt retains the final model/optimizer pair.
     last_checkpoint = torch.load(last_path, map_location="cpu", weights_only=False)
     last_checkpoint["results"] = results
     _torch_save_atomic(last_checkpoint, last_path)

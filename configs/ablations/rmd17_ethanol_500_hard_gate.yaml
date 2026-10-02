@@ -1,11 +1,11 @@
 experiments:
-  - config: configs/pilot/rmd17_ethanol_force_500.yaml
+  - config: configs/problems/rmd17_ethanol_force_500.yaml
     seeds: [23, 31, 47]
     overrides:
       training.method: aug
       runtime.run_dir: runs/appendix/rmd17_ethanol/labels_500/aug
       runtime.overwrite: false
-  - config: configs/pilot/rmd17_ethanol_force_500.yaml
+  - config: configs/problems/rmd17_ethanol_force_500.yaml
     seeds: [23, 31, 47]
     overrides:
       training.method: aug_orbit

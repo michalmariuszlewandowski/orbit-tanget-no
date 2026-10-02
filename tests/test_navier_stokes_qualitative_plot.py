@@ -7,6 +7,12 @@ from pathlib import Path
 import pytest
 import torch
 
+from otno.plotting.field_analysis import (
+    gradient_binned_mae,
+    gradient_magnitude,
+    relative_defects,
+)
+
 
 def _load_module():
     path = Path(__file__).resolve().parents[1] / "scripts" / "plot_navier_stokes_qualitative.py"
@@ -19,19 +25,17 @@ def _load_module():
 
 
 def test_gradient_magnitude_is_zero_for_a_constant_periodic_field():
-    module = _load_module()
     target = torch.ones(3, 8, 8, 1)
-    gradient = module._gradient_magnitude(target)
+    gradient = gradient_magnitude(target)
     assert gradient.shape == (3, 8, 8)
     assert torch.count_nonzero(gradient) == 0
 
 
 def test_gradient_binned_mae_uses_per_example_absolute_errors():
-    module = _load_module()
     generator = torch.Generator().manual_seed(7)
     target = torch.randn(4, 8, 8, 1, generator=generator)
     prediction = target + 2.0
-    result = module._gradient_binned_mae(target, prediction, bins=5)
+    result = gradient_binned_mae(target, prediction, bins=5)
     assert result["percentile_midpoints"] == pytest.approx([10, 30, 50, 70, 90])
     assert result["mean_absolute_error"] == pytest.approx([2.0] * 5)
     assert result["normal_approximation_ci95_half_width"] == pytest.approx([0.0] * 5)
@@ -39,14 +43,13 @@ def test_gradient_binned_mae_uses_per_example_absolute_errors():
 
 
 def test_relative_defects_compare_direct_and_transformed_predictions():
-    module = _load_module()
     fields = {
         "aug_ood": torch.full((2, 4, 4, 1), 2.0),
         "aug_equiv": torch.ones(2, 4, 4, 1),
         "loco_ood": torch.ones(2, 4, 4, 1),
         "loco_equiv": torch.ones(2, 4, 4, 1),
     }
-    defects = module._relative_defects(fields)
+    defects = relative_defects(fields)
     assert defects["aug"].tolist() == pytest.approx([1.0, 1.0])
     assert defects["loco"].tolist() == pytest.approx([0.0, 0.0])
 

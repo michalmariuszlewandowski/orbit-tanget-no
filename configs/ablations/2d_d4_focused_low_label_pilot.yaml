@@ -2,7 +2,7 @@ experiments:
   # D4-only vorticity comparison at low label fractions. Excluding translations
   # isolates the pseudoscalar D4 action; FNOs without grid features already
   # commute with periodic grid translations.
-  - config: configs/pilot/2d_navier_stokes_translation_d4.yaml
+  - config: configs/problems/2d_navier_stokes_translation_d4.yaml
     seeds: [23]
     overrides:
       symmetry.transforms:
@@ -14,7 +14,7 @@ experiments:
       runtime.overwrite: false
       runtime.run_dir: runs/ablations/2d_d4_focused_low_label_pilot/fraction_0.01/aug_steps_4
 
-  - config: configs/pilot/2d_navier_stokes_translation_d4.yaml
+  - config: configs/problems/2d_navier_stokes_translation_d4.yaml
     seeds: [23]
     overrides:
       symmetry.transforms:
@@ -27,7 +27,7 @@ experiments:
       runtime.overwrite: false
       runtime.run_dir: runs/ablations/2d_d4_focused_low_label_pilot/fraction_0.01/aug_orbit_lambda_0.05_steps_4
 
-  - config: configs/pilot/2d_navier_stokes_translation_d4.yaml
+  - config: configs/problems/2d_navier_stokes_translation_d4.yaml
     seeds: [23]
     overrides:
       symmetry.transforms:
@@ -39,7 +39,7 @@ experiments:
       runtime.overwrite: false
       runtime.run_dir: runs/ablations/2d_d4_focused_low_label_pilot/fraction_0.02/aug_steps_4
 
-  - config: configs/pilot/2d_navier_stokes_translation_d4.yaml
+  - config: configs/problems/2d_navier_stokes_translation_d4.yaml
     seeds: [23]
     overrides:
       symmetry.transforms:

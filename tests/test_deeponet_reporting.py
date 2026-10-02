@@ -72,11 +72,7 @@ def test_deeponet_loads_exact_shared_fno_seed_set(tmp_path):
 def test_deeponet_rejects_inconsistent_fno_seed_sets(tmp_path):
     module = _load_module()
     rows = _fno_reference_rows(module)
-    rows = [
-        row
-        for row in rows
-        if not (row["method"] == "aug_orbit" and row["seed"] == 71)
-    ]
+    rows = [row for row in rows if not (row["method"] == "aug_orbit" and row["seed"] == 71)]
     path = tmp_path / "fno.runs.csv"
     pd.DataFrame(rows).to_csv(path, index=False)
     with pytest.raises(module.DeepONetProtocolError, match="shared FNO seeds"):
@@ -103,30 +99,20 @@ def test_deeponet_primary_pair_uses_candidate_minus_reference():
     assert bool(paired.loc["relative_l2", "ci_excludes_zero"])
 
 
-def test_deeponet_table_discloses_forward_and_backward_counts():
+def test_deeponet_csv_summary_discloses_forward_and_backward_counts():
     module = _load_module()
     rows = []
     for spec in module.METHOD_SPECS:
-        row = {
-            "method": spec.method,
-            "method_label": spec.label,
-            "steps_per_epoch": spec.steps_per_epoch,
-            "model_forwards_total": spec.model_forwards_per_epoch * 150,
-            "backward_passes_total": spec.steps_per_epoch * 150,
-            "seeds": ",".join(str(seed) for seed in module.EXPECTED_SEEDS),
-        }
-        for metric in module.AGGREGATE_METRICS:
-            row[f"{metric}_mean"] = 0.4
-            row[f"{metric}_std"] = 0.01
-        rows.append(row)
-    tex = module.latex_table(pd.DataFrame(rows))
-    assert "Model fwds., total" in tex
-    assert "Bwd. passes, total" in tex
-    assert "DeepONet + aug. + normalized LOCO" in tex
-    assert "same training seeds as the FNO comparison" in tex
-    assert r"\(\{23, 31, 47, 59, 71\}\)" in tex
-    assert r"\mathbf{0.4000\pm0.0100}" in tex
-    assert "Latency ms/sample" not in tex
+        for row in _valid_method_rows(module, spec):
+            row["method"] = spec.method
+            rows.append(row)
+    aggregate = module.aggregate_runs(pd.DataFrame(rows)).set_index("method")
+    for spec in module.METHOD_SPECS:
+        row = aggregate.loc[spec.method]
+        assert row["model_forwards_total"] == spec.model_forwards_per_epoch * 150
+        assert row["backward_passes_total"] == spec.steps_per_epoch * 150
+        assert row["seeds"] == ",".join(str(seed) for seed in module.EXPECTED_SEEDS)
+        assert row["method_label"] == spec.label
 
 
 @pytest.mark.parametrize(
@@ -141,9 +127,7 @@ def test_deeponet_table_discloses_forward_and_backward_counts():
         ("environment.torch", "different"),
     ],
 )
-def test_deeponet_method_validation_rejects_protocol_drift(
-    monkeypatch, column, bad_value
-):
+def test_deeponet_method_validation_rejects_protocol_drift(monkeypatch, column, bad_value):
     module = _load_module()
     spec = module.METHOD_SPECS[-1]
     rows = _valid_method_rows(module, spec)
@@ -185,9 +169,7 @@ def test_deeponet_method_validation_accepts_consistent_alternate_software(monkey
         ("config.training.stop_after_epochs", 20),
     ],
 )
-def test_deeponet_method_validation_rejects_resumed_or_chunked_runs(
-    monkeypatch, column, value
-):
+def test_deeponet_method_validation_rejects_resumed_or_chunked_runs(monkeypatch, column, value):
     module = _load_module()
     spec = module.METHOD_SPECS[-1]
     rows = _valid_method_rows(module, spec)
@@ -233,9 +215,15 @@ def _fresh_campaign(tmp_path, monkeypatch):
             run_dir = run_root / spec.relative_dir / f"seed_{row['seed']}"
             run_dir.mkdir(parents=True)
             (run_dir / "source_manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
-            row.update({"run_dir": str(run_dir), "source_sha256": manifest["source_sha256"],
-                        "environment.git_commit": None, "environment.torch_num_threads": 1,
-                        "dataset_sha256": file_sha256(dataset)})
+            row.update(
+                {
+                    "run_dir": str(run_dir),
+                    "source_sha256": manifest["source_sha256"],
+                    "environment.git_commit": None,
+                    "environment.torch_num_threads": 1,
+                    "dataset_sha256": file_sha256(dataset),
+                }
+            )
         method_rows[spec.relative_dir] = rows
     monkeypatch.setattr(module, "ROOT", tmp_path)
     monkeypatch.setattr(module, "collect_run_rows", lambda path: method_rows[Path(path).name])
@@ -272,5 +260,7 @@ def test_deeponet_fresh_campaign_rejects_provenance_drift(tmp_path, monkeypatch,
         path.write_text(json.dumps(manifest), encoding="utf-8")
     else:
         row["environment.torch_num_threads"] = 4
-    with pytest.raises(module.DeepONetProtocolError, match="source_sha256|dataset_sha256|torch_num_threads"):
+    with pytest.raises(
+        module.DeepONetProtocolError, match="source_sha256|dataset_sha256|torch_num_threads"
+    ):
         module.build_run_frame(run_root, fresh_runs=True)

@@ -1,7 +1,7 @@
 experiments:
   # N64 Galilean control at 2% labels with the physical output action omitted.
   # The transformed input prediction G(T_g a) is matched to G(a), not T_g G(a).
-  - config: configs/pilot/2d_navier_stokes_galilean.yaml
+  - config: configs/problems/2d_navier_stokes_galilean.yaml
     seeds: [23, 31, 47]
     overrides:
       training.method: aug_orbit_no_output

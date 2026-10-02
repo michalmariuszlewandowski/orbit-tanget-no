@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 from __future__ import annotations
+
 import sys
 from pathlib import Path
 
@@ -17,9 +18,7 @@ from otno.reporting import aggregate_runs, collect_run_rows, drop_empty_config_c
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(
-        description="Collect run metrics and write CSV and LaTeX tables."
-    )
+    parser = argparse.ArgumentParser(description="Collect run metrics and write CSV tables.")
     parser.add_argument("--runs", default="runs")
     parser.add_argument("--out-prefix", default="runs/paper_tables/main")
     parser.add_argument(
@@ -63,14 +62,8 @@ def main() -> None:
         raise SystemExit(f"Unknown --group-cols entries: {', '.join(missing_cols)}")
     agg = aggregate_runs(df, group_cols=group_cols)
     agg.to_csv(out_prefix.with_suffix(".aggregate.csv"), index=False)
-    with out_prefix.with_suffix(".aggregate.tex").open("w", encoding="utf-8") as f:
-        if agg.empty:
-            f.write("% No completed runs found.\n")
-        else:
-            f.write(agg.to_latex(index=False, escape=False))
     print(f"wrote {out_prefix.with_suffix('.runs.csv')}")
     print(f"wrote {out_prefix.with_suffix('.aggregate.csv')}")
-    print(f"wrote {out_prefix.with_suffix('.aggregate.tex')}")
 
 
 if __name__ == "__main__":

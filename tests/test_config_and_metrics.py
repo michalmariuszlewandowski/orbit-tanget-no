@@ -94,7 +94,9 @@ def test_run_matrix_uses_valid_config_paths():
     for entry in matrix["experiments"]:
         assert (root / entry["config"]).exists()
         cfg = load_config(root / entry["config"])
-        run_dir = entry.get("overrides", {}).get("runtime.run_dir", cfg.get("runtime", {}).get("run_dir"))
+        run_dir = entry.get("overrides", {}).get(
+            "runtime.run_dir", cfg.get("runtime", {}).get("run_dir")
+        )
         assert run_dir is not None
         run_dirs.append(run_dir)
     assert len(run_dirs) == len(set(run_dirs))
@@ -105,8 +107,15 @@ def test_run_matrix_skip_completed_only_skips_finalized_job(tmp_path):
     run_dir = tmp_path / "seed_23"
     run_dir.mkdir()
     metrics = dict.fromkeys(
-        ["relative_l2", "orbit_ood_relative_l2", "equivariance_defect_relative",
-         "latency_ms_per_sample", "best_val_relative_l2", "parameters"], 1.0,
+        [
+            "relative_l2",
+            "orbit_ood_relative_l2",
+            "equivariance_defect_relative",
+            "latency_ms_per_sample",
+            "best_val_relative_l2",
+            "parameters",
+        ],
+        1.0,
     )
     metrics["method"] = "baseline"
     metrics_path = run_dir / "test_metrics.json"
@@ -174,19 +183,22 @@ def test_aug_tangent_method_config_validates():
     validate_config(cfg)
 
 
-@pytest.mark.parametrize(("key", "value"), [
-    ("training.lr", float("nan")),
-    ("training.lr", float("inf")),
-    ("training.epochs", 1.5),
-    ("training.epochs", True),
-    ("training.data_fraction", float("nan")),
-    ("training.orbit_data_fraction", -0.1),
-    ("training.orbit_batch_size", 0),
-    ("training.orbit_steps_per_epoch", 0),
-    ("model.branch_channels", [4, 2.5]),
-    ("symmetry.enabled", False),
-    ("symmetry.transforms", []),
-])
+@pytest.mark.parametrize(
+    ("key", "value"),
+    [
+        ("training.lr", float("nan")),
+        ("training.lr", float("inf")),
+        ("training.epochs", 1.5),
+        ("training.epochs", True),
+        ("training.data_fraction", float("nan")),
+        ("training.orbit_data_fraction", -0.1),
+        ("training.orbit_batch_size", 0),
+        ("training.orbit_steps_per_epoch", 0),
+        ("model.branch_channels", [4, 2.5]),
+        ("symmetry.enabled", False),
+        ("symmetry.transforms", []),
+    ],
+)
 def test_invalid_training_settings_are_rejected(key, value):
     cfg = {
         "dataset": {"kind": "advection1d", "path": "unused.pt"},
@@ -217,8 +229,12 @@ def test_evaluate_model_seed_is_reproducible():
     cfg = {"name": "translation1d", "max_shift": 0.2}
     transform = build_transform(cfg)
     model = ZeroModel()
-    a = evaluate_model(model, loader, device=torch.device("cpu"), transform=transform, n_orbit_samples=3, seed=101)
-    b = evaluate_model(model, loader, device=torch.device("cpu"), transform=transform, n_orbit_samples=3, seed=101)
+    a = evaluate_model(
+        model, loader, device=torch.device("cpu"), transform=transform, n_orbit_samples=3, seed=101
+    )
+    b = evaluate_model(
+        model, loader, device=torch.device("cpu"), transform=transform, n_orbit_samples=3, seed=101
+    )
     assert a["epsilon_mean"] == b["epsilon_mean"]
     assert a["oracle_canonical_ood_relative_l2"] == b["oracle_canonical_ood_relative_l2"]
 
@@ -227,8 +243,12 @@ def test_evaluate_model_seed_is_reproducible():
 def test_seeded_cpu_evaluation_preserves_all_cuda_rng_streams(monkeypatch, evaluation):
     cuda_generators = [torch.Generator().manual_seed(100 + index) for index in range(2)]
     monkeypatch.setattr(torch.cuda, "device_count", lambda: len(cuda_generators))
-    monkeypatch.setattr(torch.cuda, "get_rng_state", lambda device: cuda_generators[device].get_state())
-    monkeypatch.setattr(torch.cuda, "set_rng_state", lambda state, device: cuda_generators[device].set_state(state))
+    monkeypatch.setattr(
+        torch.cuda, "get_rng_state", lambda device: cuda_generators[device].get_state()
+    )
+    monkeypatch.setattr(
+        torch.cuda, "set_rng_state", lambda state, device: cuda_generators[device].set_state(state)
+    )
 
     def seed_cuda(seed):
         for generator in cuda_generators:
@@ -252,7 +272,11 @@ def test_seeded_cpu_evaluation_preserves_all_cuda_rng_streams(monkeypatch, evalu
 
     if evaluation == "observable":
         evaluate_observable_canonicalization(
-            model, loader, device=torch.device("cpu"), seed=202, n_orbit_samples=1,
+            model,
+            loader,
+            device=torch.device("cpu"),
+            seed=202,
+            n_orbit_samples=1,
             transform=build_transform({"name": "navier_stokes2d_galilean", "max_boost": 0.01}),
         )
     else:

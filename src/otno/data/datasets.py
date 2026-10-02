@@ -1,3 +1,5 @@
+"""Load channels-last input/target pairs and reproducible labeled subsets."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -8,6 +10,8 @@ from torch.utils.data import Dataset
 
 
 class TensorDictDataset(Dataset):
+    """Expose inputs as ``a`` and targets as ``u`` without changing sample order."""
+
     def __init__(self, a: torch.Tensor, u: torch.Tensor):
         if a.shape[0] != u.shape[0]:
             raise ValueError("Input and output tensors must have the same first dimension")
@@ -28,6 +32,7 @@ def load_tensor_dataset(
     fraction: float = 1.0,
     seed: int = 0,
 ) -> tuple[TensorDictDataset, dict[str, Any]]:
+    """Load one split, optionally selecting a seeded fraction of its examples."""
     if not 0 < fraction <= 1:
         raise ValueError("fraction must lie in (0, 1]")
     payload = torch.load(Path(path), map_location="cpu", weights_only=False)

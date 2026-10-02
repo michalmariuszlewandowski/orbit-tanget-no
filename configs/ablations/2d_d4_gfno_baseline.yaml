@@ -1,6 +1,6 @@
 experiments:
   # Supervised D4-equivariant baseline using p4m/D4 group Fourier layers.
-  - config: configs/pilot/2d_navier_stokes_translation_d4.yaml
+  - config: configs/problems/2d_navier_stokes_translation_d4.yaml
     seeds: [23, 31, 47]
     overrides:
       model.name: d4_gfno2d

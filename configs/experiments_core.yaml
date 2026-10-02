@@ -1,10 +1,10 @@
 experiments:
   # Advection translation-equivariance diagnostic.
-  - config: configs/pilot/1d_advection_translation.yaml
+  - config: configs/problems/1d_advection_translation.yaml
     overrides:
       training.method: baseline
       runtime.run_dir: runs/core/exact_advection/baseline
-  - config: configs/pilot/1d_advection_translation.yaml
+  - config: configs/problems/1d_advection_translation.yaml
     overrides:
       training.method: orbit
       runtime.run_dir: runs/core/exact_advection/orbit
@@ -12,24 +12,24 @@ experiments:
   # 1D Burgers translation and Galilean pilot suite.
   - config: configs/baselines/1d_burgers_baseline.yaml
   - config: configs/baselines/1d_burgers_aug.yaml
-  - config: configs/pilot/1d_burgers_translation_galilean.yaml
+  - config: configs/problems/1d_burgers_translation_galilean.yaml
   - config: configs/baselines/1d_burgers_aug_orbit.yaml
   - config: configs/baselines/1d_burgers_canonical.yaml
 
   # 2D periodic vorticity experiment.
-  - config: configs/pilot/2d_navier_stokes_translation_d4.yaml
+  - config: configs/problems/2d_navier_stokes_translation_d4.yaml
     overrides:
       training.method: baseline
       runtime.run_dir: runs/core/2d_ns/baseline
-  - config: configs/pilot/2d_navier_stokes_translation_d4.yaml
+  - config: configs/problems/2d_navier_stokes_translation_d4.yaml
     overrides:
       training.method: aug
       runtime.run_dir: runs/core/2d_ns/aug
-  - config: configs/pilot/2d_navier_stokes_translation_d4.yaml
+  - config: configs/problems/2d_navier_stokes_translation_d4.yaml
     overrides:
       training.method: orbit
       runtime.run_dir: runs/core/2d_ns/orbit
-  - config: configs/pilot/2d_navier_stokes_translation_d4.yaml
+  - config: configs/problems/2d_navier_stokes_translation_d4.yaml
     overrides:
       training.method: aug_orbit
       runtime.run_dir: runs/core/2d_ns/aug_orbit

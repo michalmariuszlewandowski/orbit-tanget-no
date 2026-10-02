@@ -1,13 +1,16 @@
 #!/usr/bin/env python
 """Remove disposable validation caches, preserving all experiment evidence."""
-from pathlib import Path
+
 import shutil
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 
 
 def main() -> None:
-    targets = [ROOT / name for name in ("runs/smoke", "runs/quality", ".pytest_cache", ".ruff_cache")]
+    targets = [
+        ROOT / name for name in ("runs/smoke", "runs/quality", ".pytest_cache", ".ruff_cache")
+    ]
     for folder in ("src", "scripts", "tests"):
         targets.extend((ROOT / folder).rglob("__pycache__"))
     for target in targets:

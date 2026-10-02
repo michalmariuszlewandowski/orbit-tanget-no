@@ -1,4 +1,16 @@
+"""Neural operator backbones and the configuration-based model factory.
+
+The factory accepts either a full experiment config or its model section. Name
+aliases share one architecture; construction never rewrites the input config.
+"""
+
 from __future__ import annotations
+
+from typing import Any
+
+from torch import nn
+
+from otno.definitions import MODEL_ALIASES, canonical_name, canonicalizer_names
 
 from .canonical import CanonicalFNO1d, ObservableGalileanCanonicalFNO2d
 from .cno import CNO2d
@@ -8,18 +20,16 @@ from .gfno import D4GFNO2d
 from .molecular import MoleculeMLP
 
 
-def _canonicalizers(value) -> list[str]:
-    if value is None:
-        return ["translation_first_mode"]
-    if isinstance(value, str):
-        return [value]
-    return list(value)
+def build_model(config: dict[str, Any]) -> nn.Module:
+    """Construct the configured architecture with its historical defaults.
 
-
-def build_model(config: dict):
+    Operator inputs/outputs use channels last: ``[batch, n, channels]`` in 1D,
+    ``[batch, h, w, channels]`` in 2D, and ``[batch, atoms, channels]`` for molecules.
+    Call :func:`otno.config.validate_config` before preparing a training run.
+    """
     model_cfg = config.get("model", config)
-    name = str(model_cfg.get("name", "fno1d")).lower()
-    if name in {"fno1d", "fno_1d"}:
+    name = canonical_name(model_cfg.get("name", "fno1d"), MODEL_ALIASES, "model.name")
+    if name == "fno1d":
         return FNO1d(
             in_channels=int(model_cfg.get("in_channels", 1)),
             out_channels=int(model_cfg.get("out_channels", 1)),
@@ -28,7 +38,7 @@ def build_model(config: dict):
             depth=int(model_cfg.get("depth", 4)),
             add_grid=bool(model_cfg.get("add_grid", True)),
         )
-    if name in {"canonical_fno1d", "canonical_fno_1d"}:
+    if name == "canonical_fno1d":
         return CanonicalFNO1d(
             in_channels=int(model_cfg.get("in_channels", 1)),
             out_channels=int(model_cfg.get("out_channels", 1)),
@@ -36,19 +46,13 @@ def build_model(config: dict):
             modes=int(model_cfg.get("modes", 16)),
             depth=int(model_cfg.get("depth", 4)),
             add_grid=bool(model_cfg.get("add_grid", True)),
-            canonicalizers=_canonicalizers(model_cfg.get("canonicalizers")),
+            canonicalizers=canonicalizer_names(model_cfg.get("canonicalizers")),
             canonical_channel=int(model_cfg.get("canonical_channel", 0)),
             translation_mode=int(model_cfg.get("translation_mode", 1)),
             length=float(model_cfg.get("length", 1.0)),
             final_time=float(model_cfg.get("final_time", 0.5)),
         )
-    if name in {
-        "canonical_fno2d",
-        "canonical_fno_2d",
-        "observable_galilean_canonical_fno2d",
-        "galilean_canonical_fno2d",
-        "pace_style_fno2d",
-    }:
+    if name == "canonical_fno2d":
         return ObservableGalileanCanonicalFNO2d(
             in_channels=int(model_cfg.get("in_channels", 3)),
             out_channels=int(model_cfg.get("out_channels", 1)),
@@ -63,7 +67,7 @@ def build_model(config: dict):
             final_time=float(model_cfg.get("final_time", 0.5)),
             boost_reduction=str(model_cfg.get("boost_reduction", "mean")),
         )
-    if name in {"fno2d", "fno_2d"}:
+    if name == "fno2d":
         return FNO2d(
             in_channels=int(model_cfg.get("in_channels", 1)),
             out_channels=int(model_cfg.get("out_channels", 1)),
@@ -73,20 +77,22 @@ def build_model(config: dict):
             depth=int(model_cfg.get("depth", 4)),
             add_grid=bool(model_cfg.get("add_grid", True)),
         )
-    if name in {"deeponet2d", "deeponet_2d"}:
+    if name == "deeponet2d":
         return DeepONet2d(
             in_channels=int(model_cfg.get("in_channels", 1)),
             out_channels=int(model_cfg.get("out_channels", 1)),
             grid_height=int(model_cfg.get("grid_height", model_cfg.get("grid_size", 64))),
             grid_width=int(model_cfg.get("grid_width", model_cfg.get("grid_size", 64))),
-            branch_channels=tuple(model_cfg.get("branch_channels", (32, 64, 128, 256))),
+            branch_channels=tuple(
+                int(channel) for channel in model_cfg.get("branch_channels", (32, 64, 128, 256))
+            ),
             branch_fc_hidden=int(model_cfg.get("branch_fc_hidden", 480)),
             trunk_hidden=int(model_cfg.get("trunk_hidden", 256)),
             trunk_depth=int(model_cfg.get("trunk_depth", 3)),
             latent_dim=int(model_cfg.get("latent_dim", 256)),
             coordinate_modes=int(model_cfg.get("coordinate_modes", 12)),
         )
-    if name in {"cno2d", "cno_2d"}:
+    if name == "cno2d":
         return CNO2d(
             in_channels=int(model_cfg.get("in_channels", 1)),
             out_channels=int(model_cfg.get("out_channels", 1)),
@@ -99,7 +105,7 @@ def build_model(config: dict):
             resample_halo=int(model_cfg.get("resample_halo", 8)),
             negative_slope=float(model_cfg.get("negative_slope", 0.01)),
         )
-    if name in {"d4_gfno2d", "d4_gfno_2d", "gfno2d", "g_fno2d", "g-fno2d"}:
+    if name == "d4_gfno2d":
         return D4GFNO2d(
             in_channels=int(model_cfg.get("in_channels", 1)),
             out_channels=int(model_cfg.get("out_channels", 1)),
@@ -111,7 +117,7 @@ def build_model(config: dict):
             input_pseudoscalar=bool(model_cfg.get("input_pseudoscalar", True)),
             output_pseudoscalar=bool(model_cfg.get("output_pseudoscalar", True)),
         )
-    if name in {"molecule_mlp", "molecular_mlp"}:
+    if name == "molecule_mlp":
         return MoleculeMLP(
             n_atoms=int(model_cfg.get("n_atoms", model_cfg.get("atoms", 9))),
             in_channels=int(model_cfg.get("in_channels", 4)),

@@ -14,7 +14,7 @@ experiments:
       runtime.overwrite: false
       runtime.run_dir: runs/final_1d/four_method/aug
 
-  - config: configs/pilot/1d_burgers_translation_galilean.yaml
+  - config: configs/problems/1d_burgers_translation_galilean.yaml
     seeds: [23, 31, 47]
     overrides:
       training.data_fraction: 1.0

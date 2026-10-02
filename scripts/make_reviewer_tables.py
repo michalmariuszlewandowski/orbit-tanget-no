@@ -20,19 +20,6 @@ METRICS = [
     ("equivariance_defect_relative", "Eq. defect"),
 ]
 
-def _fmt(value: float) -> str:
-    if abs(value) < 0.01 and value != 0:
-        return f"{value:.2e}"
-    return f"{value:.4f}"
-
-
-def _fmt_pm(mean: float, std: float) -> str:
-    return rf"\({_fmt(mean)}\pm{_fmt(std)}\)"
-
-
-def _tex_text(value: object) -> str:
-    return str(value).replace("%", r"\%")
-
 
 def _paired_rows(
     path: Path,
@@ -148,34 +135,6 @@ def write_paired_table(out_prefix: Path, table_dir: Path) -> pd.DataFrame:
     )
     df = pd.DataFrame(rows)
     df.to_csv(out_prefix.with_suffix(".paired.csv"), index=False)
-    with out_prefix.with_suffix(".paired.tex").open("w", encoding="utf-8") as f:
-        f.write(
-            "\\begin{table*}[t]\n"
-            "\\centering\n"
-            "\\small\n"
-            "\\caption{Paired seed differences for central comparisons. "
-            "Delta is candidate minus reference, so negative values indicate improvement.}\n"
-            "\\label{tab:paired-reviewer-comparisons}\n"
-            "\\resizebox{\\textwidth}{!}{%\n"
-            "\\begin{tabular}{llrrrr}\n"
-            "\\toprule\n"
-            "Setting & Metric & Seeds & Reference & Candidate & Paired delta [95\\% CI] \\\\\n"
-            "\\midrule\n"
-        )
-        for row in rows:
-            setting = _tex_text(row["setting"])
-            f.write(
-                f"{setting} & {row['metric']} & {row['seed_count']} & "
-                f"\\({_fmt(row['reference_mean'])}\\) & \\({_fmt(row['candidate_mean'])}\\) & "
-                f"\\({_fmt(row['paired_delta_mean'])}\\,[{_fmt(row['paired_delta_ci95_low'])},"
-                f"{_fmt(row['paired_delta_ci95_high'])}]\\) \\\\\n"
-            )
-        f.write(
-            "\\bottomrule\n"
-            "\\end{tabular}\n"
-            "}\n"
-            "\\end{table*}\n"
-        )
     return df
 
 
@@ -201,36 +160,6 @@ def write_absolute_label_table(out_prefix: Path, table_dir: Path) -> pd.DataFram
         "relative_l2_count",
     ]
     df[columns].to_csv(out_prefix.with_suffix(".absolute_label_efficiency.csv"), index=False)
-    with out_prefix.with_suffix(".absolute_label_efficiency.tex").open("w", encoding="utf-8") as f:
-        f.write(
-            "\\begin{table*}[t]\n"
-            "\\centering\n"
-            "\\small\n"
-            "\\caption{Absolute N64 Galilean label-efficiency metrics. "
-            "This table complements percentage reductions with the underlying values.}\n"
-            "\\label{tab:n64-label-efficiency-absolute}\n"
-            "\\resizebox{\\textwidth}{!}{%\n"
-            "\\begin{tabular}{llrrrrr}\n"
-            "\\toprule\n"
-            "Labels & Method & ID L2 & OOD L2 & Eq. defect & Latency ms/sample & Seeds \\\\\n"
-            "\\midrule\n"
-        )
-        for _, row in df.iterrows():
-            method = "FNO + aug." if row["method"] == "aug" else "FNO + aug. + orbit"
-            f.write(
-                f"{100 * float(row['data_fraction']):.0f}\\% & {method} & "
-                f"{_fmt_pm(row['relative_l2_mean'], row['relative_l2_std'])} & "
-                f"{_fmt_pm(row['orbit_ood_relative_l2_mean'], row['orbit_ood_relative_l2_std'])} & "
-                f"{_fmt_pm(row['equivariance_defect_relative_mean'], row['equivariance_defect_relative_std'])} & "
-                f"{_fmt_pm(row['latency_ms_per_sample_mean'], row['latency_ms_per_sample_std'])} & "
-                f"{int(row['relative_l2_count'])} \\\\\n"
-            )
-        f.write(
-            "\\bottomrule\n"
-            "\\end{tabular}\n"
-            "}\n"
-            "\\end{table*}\n"
-        )
     return df[columns]
 
 
@@ -246,7 +175,9 @@ def write_wrong_symmetry_table(out_prefix: Path, table_dir: Path) -> pd.DataFram
     rows = []
     aug = headline[(headline["method"] == "aug") & (headline["seed"].isin(seed_set))].copy()
     aug["control_label"] = "FNO + aug."
-    physical = headline[(headline["method"] == "aug_orbit") & (headline["seed"].isin(seed_set))].copy()
+    physical = headline[
+        (headline["method"] == "aug_orbit") & (headline["seed"].isin(seed_set))
+    ].copy()
     physical["control_label"] = "FNO + aug. + orbit"
     shuffled = wrong[wrong["seed"].isin(seed_set)].copy()
     shuffled["control_label"] = "FNO + aug. + shuffled orbit"
@@ -264,33 +195,6 @@ def write_wrong_symmetry_table(out_prefix: Path, table_dir: Path) -> pd.DataFram
         rows.append(row)
     df = pd.DataFrame(rows)
     df.to_csv(out_prefix.with_suffix(".wrong_symmetry.csv"), index=False)
-    with out_prefix.with_suffix(".wrong_symmetry.tex").open("w", encoding="utf-8") as f:
-        f.write(
-            "\\begin{table}[t]\n"
-            "\\centering\n"
-            "\\small\n"
-            "\\caption{Wrong-symmetry control at 2\\% labels over matched seeds. "
-            "The no-output row removes the physical output action, while the shuffled-orbit row "
-            "pairs each transformed prediction with the wrong orbit target in the minibatch.}\n"
-            "\\label{tab:n64-wrong-symmetry-control}\n"
-            "\\begin{tabular}{lrrrr}\n"
-            "\\toprule\n"
-            "Method & ID L2 & OOD L2 & Eq. defect & Seeds \\\\\n"
-            "\\midrule\n"
-        )
-        for _, row in df.iterrows():
-            f.write(
-                f"{row['control_label']} & "
-                f"{_fmt_pm(row['relative_l2_mean'], row['relative_l2_std'])} & "
-                f"{_fmt_pm(row['orbit_ood_relative_l2_mean'], row['orbit_ood_relative_l2_std'])} & "
-                f"{_fmt_pm(row['equivariance_defect_relative_mean'], row['equivariance_defect_relative_std'])} & "
-                f"{int(row['seed_count'])} \\\\\n"
-            )
-        f.write(
-            "\\bottomrule\n"
-            "\\end{tabular}\n"
-            "\\end{table}\n"
-        )
     return df
 
 
@@ -306,11 +210,8 @@ def main() -> None:
     absolute = write_absolute_label_table(out_prefix, table_dir)
     wrong = write_wrong_symmetry_table(out_prefix, table_dir)
     print(f"wrote {out_prefix.with_suffix('.paired.csv')}")
-    print(f"wrote {out_prefix.with_suffix('.paired.tex')}")
     print(f"wrote {out_prefix.with_suffix('.absolute_label_efficiency.csv')}")
-    print(f"wrote {out_prefix.with_suffix('.absolute_label_efficiency.tex')}")
     print(f"wrote {out_prefix.with_suffix('.wrong_symmetry.csv')}")
-    print(f"wrote {out_prefix.with_suffix('.wrong_symmetry.tex')}")
     print(paired.to_string(index=False))
     print(absolute.to_string(index=False))
     print(wrong.to_string(index=False))

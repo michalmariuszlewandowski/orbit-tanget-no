@@ -5,23 +5,23 @@ manuscript: Local Orbit Consistency for Symmetry-Robust Neural Operators
 datasets:
   galilean:
     path: data/2d_ns_vorticity_galilean_n64.pt
-    config: configs/pilot/2d_navier_stokes_galilean.yaml
+    config: configs/problems/2d_navier_stokes_galilean.yaml
     paper_sha256: defc9703dbc41494fabf9fcfe9e3408eb2e1c3890814e47fe03d0f6b849e3f50
   d4:
     path: data/2d_ns_vorticity_n64.pt
-    config: configs/pilot/2d_navier_stokes_translation_d4.yaml
+    config: configs/problems/2d_navier_stokes_translation_d4.yaml
     paper_sha256: defade883926ad6ba6ef469bf1e6ba69b3f7d57e743e4f53c83a05acb88a8f7e
   burgers:
     path: data/1d_burgers_n128.pt
-    config: configs/pilot/1d_burgers_translation_galilean.yaml
+    config: configs/problems/1d_burgers_translation_galilean.yaml
     paper_sha256: 1753fa2e5ca4fb474f93fc8cdef5732daea94b7d36d7537113b38f9e3d029758
   heat:
     path: data/1d_heat_dirichlet_n64.pt
-    config: configs/pilot/1d_heat_dirichlet_nonperiodic.yaml
+    config: configs/problems/1d_heat_dirichlet_nonperiodic.yaml
     paper_sha256: 7427ec21304ae8879e700653e65ee2393416b2daa8bc4b27756c1cae1ff09b2d
   rmd17:
     path: data/rmd17/rmd17_ethanol_force_500.pt
-    config: configs/pilot/rmd17_ethanol_force_500.yaml
+    config: configs/problems/rmd17_ethanol_force_500.yaml
     paper_sha256: fb5515b3355651459c2ad9078e7cfb5bb63dce96e55e7c36956cbe9ff25e5472
     preserved: true
     required_sha256: fb5515b3355651459c2ad9078e7cfb5bb63dce96e55e7c36956cbe9ff25e5472
@@ -67,15 +67,36 @@ suites:
       - runs/paper_tables/2d_galilean_n64_2pct_ood_severity_lambda_0p1.aggregate.csv
       - runs/paper_tables/2d_galilean_n64_2pct_oracle_canonicalization.runs.csv
       - runs/paper_tables/2d_galilean_n64_2pct_oracle_canonicalization.aggregate.csv
+      - runs/paper_tables/2d_galilean_n64_training_compute.runs.csv
+      - runs/paper_tables/2d_galilean_n64_training_compute.aggregate.csv
     figures:
     - command:
       - scripts/plot_galilean_n64_paper_figures.py
       requires:
-      - runs/paper_tables/2d_galilean_n64_2pct_headline_lambda_0p1.aggregate.csv
-      - runs/paper_tables/2d_galilean_n64_label_efficiency_lambda_0p1.aggregate.csv
-      - runs/paper_tables/2d_galilean_n64_2pct_lambda_robustness.aggregate.csv
-      - runs/paper_tables/2d_galilean_n64_2pct_lambda_extended.aggregate.csv
-      - runs/paper_tables/2d_galilean_n64_2pct_ood_severity_lambda_0p1.aggregate.csv
+      - runs/paper_tables/2d_galilean_n64_label_efficiency_lambda_0p1.runs.csv
+      - runs/paper_tables/2d_galilean_n64_2pct_ood_severity_lambda_0p1.runs.csv
+      outputs:
+      - runs/figures/2d_galilean_n64_label_efficiency_lambda_0p1.png
+      - runs/figures/2d_galilean_n64_label_efficiency_lambda_0p1.pdf
+      - runs/figures/2d_galilean_n64_2pct_ood_severity_lambda_0p1.png
+      - runs/figures/2d_galilean_n64_2pct_ood_severity_lambda_0p1.pdf
+    - command:
+      - scripts/make_paper_diagnostics.py
+      - --cached-compute
+      requires:
+      - runs/paper_tables/2d_galilean_n64_2pct_headline_lambda_0p1.runs.csv
+      - runs/paper_tables/2d_galilean_n64_label_efficiency_lambda_0p1.runs.csv
+      - runs/paper_tables/2d_galilean_n64_2pct_lambda_robustness.runs.csv
+      - runs/paper_tables/2d_galilean_n64_2pct_ood_severity_lambda_0p1.runs.csv
+      - runs/paper_tables/2d_galilean_n64_2pct_oracle_canonicalization.runs.csv
+      - runs/paper_tables/2d_galilean_n64_training_compute.runs.csv
+      - runs/paper_tables/2d_galilean_n64_training_compute.aggregate.csv
+      outputs:
+      - runs/figures/2d_galilean_n64_defect_ood_correlation.png
+      - runs/figures/2d_galilean_n64_defect_ood_correlation.pdf
+      - runs/paper_tables/2d_galilean_n64_defect_ood_correlation.runs.csv
+      - runs/paper_tables/2d_galilean_n64_defect_ood_correlation.csv
+      - runs/paper_tables/2d_galilean_n64_2pct_oracle_canonicalization_summary.csv
     - command:
       - scripts/plot_navier_stokes_qualitative.py
       - --figure-config
@@ -83,9 +104,22 @@ suites:
       sources:
       - figure_specs/2d_galilean_n64_id_ood_seed23.yaml
       requires:
+      - figure_specs/2d_galilean_n64_id_ood_seed23.yaml
       - data/2d_ns_vorticity_galilean_n64.pt
       - runs/ablations/2d_galilean_n64_label_efficiency_compute_matched/fraction_0.02/aug_steps_6/seed_23/checkpoints/best.pt
       - runs/ablations/2d_galilean_n64_2pct_lambda_robustness/fraction_0.02/aug_orbit_lambda_0.1_steps_4/seed_23/checkpoints/best.pt
+      input_sha256:
+        data/2d_ns_vorticity_galilean_n64.pt: defc9703dbc41494fabf9fcfe9e3408eb2e1c3890814e47fe03d0f6b849e3f50
+        runs/ablations/2d_galilean_n64_label_efficiency_compute_matched/fraction_0.02/aug_steps_6/seed_23/checkpoints/best.pt: ab15c20b6f86e91c61403a9c45724378c5799de9f72adfb4f6cbeb8f86c395e1
+        runs/ablations/2d_galilean_n64_2pct_lambda_robustness/fraction_0.02/aug_orbit_lambda_0.1_steps_4/seed_23/checkpoints/best.pt: 4046d63cf0c97424e3ab7e16c354bc7656635a5290622a6519902f922c9b2b51
+      outputs:
+      - runs/figures/2d_galilean_n64_id_ood_fields.png
+      - runs/figures/2d_galilean_n64_id_ood_fields.pdf
+      - runs/figures/2d_galilean_n64_fixed_stress_diagnostics.png
+      - runs/figures/2d_galilean_n64_fixed_stress_diagnostics.pdf
+      - runs/figures/2d_galilean_n64_equivariance_residuals.png
+      - runs/figures/2d_galilean_n64_equivariance_residuals.pdf
+      - runs/paper_tables/2d_galilean_n64_id_ood_fields.json
   deeponet:
     paper: Table 3
     datasets: &id001
@@ -138,7 +172,6 @@ suites:
       outputs:
       - runs/paper_tables/1d_final_four_method.runs.csv
       - runs/paper_tables/1d_final_four_method.aggregate.csv
-      - runs/paper_tables/1d_final_four_method.aggregate.tex
   controls:
     paper: Tables 4 (10%), 5, 6; action mismatch
     datasets: *id001
@@ -161,7 +194,6 @@ suites:
       outputs:
       - runs/paper_tables/2d_galilean_n64_10pct_lambda_0p1.runs.csv
       - runs/paper_tables/2d_galilean_n64_10pct_lambda_0p1.aggregate.csv
-      - runs/paper_tables/2d_galilean_n64_10pct_lambda_0p1.aggregate.tex
     - command:
       - scripts/make_paper_tables.py
       - --runs
@@ -173,7 +205,6 @@ suites:
       outputs:
       - runs/paper_tables/2d_galilean_n64_2pct_wrong_symmetry.runs.csv
       - runs/paper_tables/2d_galilean_n64_2pct_wrong_symmetry.aggregate.csv
-      - runs/paper_tables/2d_galilean_n64_2pct_wrong_symmetry.aggregate.tex
     - command:
       - scripts/make_paper_tables.py
       - --runs
@@ -185,7 +216,6 @@ suites:
       outputs:
       - runs/paper_tables/2d_galilean_n64_2pct_no_output_control.runs.csv
       - runs/paper_tables/2d_galilean_n64_2pct_no_output_control.aggregate.csv
-      - runs/paper_tables/2d_galilean_n64_2pct_no_output_control.aggregate.tex
     - command:
       - scripts/make_reviewer_tables.py
       requires:
@@ -234,7 +264,6 @@ suites:
       outputs:
       - runs/paper_tables/2d_galilean_n64_2pct_tangent_baseline.runs.csv
       - runs/paper_tables/2d_galilean_n64_2pct_tangent_baseline.aggregate.csv
-      - runs/paper_tables/2d_galilean_n64_2pct_tangent_baseline.aggregate.tex
     - command:
       - scripts/make_paper_tables.py
       - --runs
@@ -246,7 +275,6 @@ suites:
       outputs:
       - runs/paper_tables/2d_galilean_n64_2pct_plain_finite_baseline.runs.csv
       - runs/paper_tables/2d_galilean_n64_2pct_plain_finite_baseline.aggregate.csv
-      - runs/paper_tables/2d_galilean_n64_2pct_plain_finite_baseline.aggregate.tex
     - command:
       - scripts/make_finite_objective_comparison.py
       requires:
@@ -285,7 +313,6 @@ suites:
       outputs:
       - runs/paper_tables/2d_d4_rotation_with_gfno_5seed.runs.csv
       - runs/paper_tables/2d_d4_rotation_with_gfno_5seed.aggregate.csv
-      - runs/paper_tables/2d_d4_rotation_with_gfno_5seed.aggregate.tex
   rmd17:
     paper: Table 11 (three seeds, five methods; unnormalized objective)
     datasets:
@@ -334,7 +361,6 @@ suites:
       outputs:
       - runs/paper_tables/2d_galilean_n64_2pct_semi_supervised_joint.runs.csv
       - runs/paper_tables/2d_galilean_n64_2pct_semi_supervised_joint.aggregate.csv
-      - runs/paper_tables/2d_galilean_n64_2pct_semi_supervised_joint.aggregate.tex
     - command:
       - scripts/make_adaptation_tables.py
       - --runs
@@ -355,7 +381,7 @@ suites:
     - command:
       - scripts/make_solver_closure_tables.py
       - --config
-      - configs/pilot/2d_navier_stokes_galilean.yaml
+      - configs/problems/2d_navier_stokes_galilean.yaml
       - --dataset-path
       - data/2d_ns_vorticity_galilean_n64.pt
       - --num-samples
@@ -371,7 +397,7 @@ suites:
     - command:
       - scripts/make_solver_closure_tables.py
       - --config
-      - configs/pilot/1d_burgers_translation_galilean.yaml
+      - configs/problems/1d_burgers_translation_galilean.yaml
       - --dataset-path
       - data/1d_burgers_n128.pt
       - --num-samples

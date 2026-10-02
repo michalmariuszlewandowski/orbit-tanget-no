@@ -145,7 +145,9 @@ class FNO2d(nn.Module):
         self.fc1 = nn.Linear(width, 2 * width)
         self.fc2 = nn.Linear(2 * width, out_channels)
 
-    def _grid(self, batch: int, h: int, w: int, device: torch.device, dtype: torch.dtype) -> torch.Tensor:
+    def _grid(
+        self, batch: int, h: int, w: int, device: torch.device, dtype: torch.dtype
+    ) -> torch.Tensor:
         y = torch.arange(h, device=device, dtype=dtype) / h
         x = torch.arange(w, device=device, dtype=dtype) / w
         yy, xx = torch.meshgrid(y, x, indexing="ij")

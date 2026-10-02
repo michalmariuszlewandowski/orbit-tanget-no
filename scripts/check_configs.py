@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 from __future__ import annotations
+
 import sys
 from pathlib import Path
 
@@ -64,7 +65,9 @@ def _validate_matrix(path: Path) -> list[str]:
             if not isinstance(seeds, list):
                 seeds = [seeds]
             for seed in seeds:
-                run_dirs.append(f"{str(run_dir).rstrip('/')}/seed_{int(seed)}" if seed is not None else run_dir)
+                run_dirs.append(
+                    f"{str(run_dir).rstrip('/')}/seed_{int(seed)}" if seed is not None else run_dir
+                )
         try:
             validate_config(merged)
             _ = build_model(merged)
@@ -169,7 +172,8 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Validate experiment configs and matrix files.")
     parser.add_argument("--root", default=str(ROOT))
     parser.add_argument(
-        "--require-checkpoints", action="store_true",
+        "--require-checkpoints",
+        action="store_true",
         help="Also require existing evaluation/adaptation checkpoints; omit before training.",
     )
     args = parser.parse_args()
@@ -187,9 +191,13 @@ def main() -> None:
         elif "experiments" in cfg:
             errors.extend(_validate_matrix(path))
         elif "adaptations" in cfg:
-            errors.extend(_validate_adaptation_matrix(path, require_checkpoints=args.require_checkpoints))
+            errors.extend(
+                _validate_adaptation_matrix(path, require_checkpoints=args.require_checkpoints)
+            )
         elif "evaluations" in cfg:
-            errors.extend(_validate_evaluation_matrix(path, require_checkpoints=args.require_checkpoints))
+            errors.extend(
+                _validate_evaluation_matrix(path, require_checkpoints=args.require_checkpoints)
+            )
         else:
             errors.extend(_validate_single_config(path))
     if errors:

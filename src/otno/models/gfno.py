@@ -6,7 +6,6 @@ import torch
 from torch import nn
 from torch.nn import functional as F
 
-
 _D4_ELEMENTS: tuple[tuple[int, bool], ...] = tuple(
     (k, flip) for flip in (False, True) for k in range(4)
 )
@@ -77,7 +76,9 @@ class D4GroupPointwiseConv2d(nn.Module):
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         if x.ndim != 5 or x.shape[2] != 8:
-            raise ValueError(f"D4 group features must have shape [b, c, 8, h, w], got {tuple(x.shape)}")
+            raise ValueError(
+                f"D4 group features must have shape [b, c, 8, h, w], got {tuple(x.shape)}"
+            )
         out = torch.einsum("bithw,stio->bothw", x, self._weight_bank())
         if self.bias is not None:
             out = out + self.bias.view(1, -1, 1, 1, 1)
@@ -122,7 +123,9 @@ class D4GroupSpectralConv2d(nn.Module):
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         if x.ndim != 5 or x.shape[2] != 8:
-            raise ValueError(f"D4 group features must have shape [b, c, 8, h, w], got {tuple(x.shape)}")
+            raise ValueError(
+                f"D4 group features must have shape [b, c, 8, h, w], got {tuple(x.shape)}"
+            )
         _, _, _, h, w = x.shape
         h_full, h_param = _center_slices(h, self.modes1)
         w_full, w_param = _center_slices(w, self.modes2)
@@ -159,7 +162,9 @@ class D4Project(nn.Module):
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         if x.ndim != 5 or x.shape[2] != 8:
-            raise ValueError(f"D4 group features must have shape [b, c, 8, h, w], got {tuple(x.shape)}")
+            raise ValueError(
+                f"D4 group features must have shape [b, c, 8, h, w], got {tuple(x.shape)}"
+            )
         pieces = []
         for s in range(8):
             sign = _d4_parity(s) if self.pseudoscalar else 1.0
@@ -191,7 +196,9 @@ class D4GFNO2d(nn.Module):
     ):
         super().__init__()
         if add_grid:
-            raise ValueError("D4GFNO2d requires add_grid=false; coordinate grids are not D4 scalars.")
+            raise ValueError(
+                "D4GFNO2d requires add_grid=false; coordinate grids are not D4 scalars."
+            )
         self.in_channels = int(in_channels)
         self.out_channels = int(out_channels)
         self.width = int(width)

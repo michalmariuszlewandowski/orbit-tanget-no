@@ -1,3 +1,5 @@
+"""Paired input/output symmetry actions for channels-last field tensors."""
+
 from __future__ import annotations
 
 import math
@@ -17,7 +19,9 @@ def _as_batch_vector(value: torch.Tensor | float, batch: int, device, dtype) -> 
     raise ValueError(f"Expected scalar or [{batch}], got {tuple(value_t.shape)}")
 
 
-def periodic_shift_1d(x: torch.Tensor, shift: torch.Tensor | float, *, length: float = 1.0) -> torch.Tensor:
+def periodic_shift_1d(
+    x: torch.Tensor, shift: torch.Tensor | float, *, length: float = 1.0
+) -> torch.Tensor:
     """Return f(x - shift) for tensors with shape [batch, n, channels]."""
     if x.ndim != 3:
         raise ValueError(f"Expected [batch, n, channels], got {tuple(x.shape)}")
@@ -44,7 +48,9 @@ def periodic_derivative_1d(x: torch.Tensor, *, length: float = 1.0) -> torch.Ten
     return y.permute(0, 2, 1).contiguous()
 
 
-def nonperiodic_shift_1d(x: torch.Tensor, shift: torch.Tensor | float, *, length: float = 1.0) -> torch.Tensor:
+def nonperiodic_shift_1d(
+    x: torch.Tensor, shift: torch.Tensor | float, *, length: float = 1.0
+) -> torch.Tensor:
     """Return f(x - shift) on [0, length] with zero padding outside the interval."""
     if x.ndim != 3:
         raise ValueError(f"Expected [batch, n, channels], got {tuple(x.shape)}")
@@ -97,7 +103,9 @@ def periodic_shift_2d(
     return y.permute(0, 2, 3, 1).contiguous()
 
 
-def periodic_gradient_2d(x: torch.Tensor, *, length: float = 1.0) -> tuple[torch.Tensor, torch.Tensor]:
+def periodic_gradient_2d(
+    x: torch.Tensor, *, length: float = 1.0
+) -> tuple[torch.Tensor, torch.Tensor]:
     """Return x- and y-derivatives of periodic 2D fields."""
     if x.ndim != 4:
         raise ValueError(f"Expected [batch, h, w, channels], got {tuple(x.shape)}")
@@ -118,15 +126,26 @@ def periodic_gradient_2d(x: torch.Tensor, *, length: float = 1.0) -> tuple[torch
 
 @dataclass
 class TransformSample:
+    """Parameters for one action per example and its normalization magnitude."""
+
     params: dict[str, Any]
     epsilon: torch.Tensor
     name: str
 
 
 class BaseTransform:
+    """Contract shared by finite-orbit and augmented-supervision objectives.
+
+    Input and output actions consume the same sample. An optional output mask
+    restricts comparisons to common valid support. Continuous actions can define
+    input/output tangents; the default implementation rejects tangent training.
+    """
+
     name = "base"
 
-    def sample(self, batch_size: int, device: torch.device, dtype: torch.dtype = torch.float32) -> TransformSample:
+    def sample(
+        self, batch_size: int, device: torch.device, dtype: torch.dtype = torch.float32
+    ) -> TransformSample:
         raise NotImplementedError
 
     def apply_input(self, a: torch.Tensor, sample: TransformSample) -> torch.Tensor:
@@ -157,7 +176,9 @@ class Translation1D(BaseTransform):
         self.max_shift = float(max_shift)
         self.length = float(length)
 
-    def sample(self, batch_size: int, device: torch.device, dtype: torch.dtype = torch.float32) -> TransformSample:
+    def sample(
+        self, batch_size: int, device: torch.device, dtype: torch.dtype = torch.float32
+    ) -> TransformSample:
         shift = (2 * torch.rand(batch_size, device=device, dtype=dtype) - 1) * self.max_shift
         eps = shift.abs().clamp_min(1e-6)
         return TransformSample({"shift": shift}, eps, self.name)
@@ -192,7 +213,9 @@ class NonPeriodicTranslation1D(BaseTransform):
         self.use_mask = bool(use_mask)
         self.mask_margin = float(mask_margin)
 
-    def sample(self, batch_size: int, device: torch.device, dtype: torch.dtype = torch.float32) -> TransformSample:
+    def sample(
+        self, batch_size: int, device: torch.device, dtype: torch.dtype = torch.float32
+    ) -> TransformSample:
         shift = (2 * torch.rand(batch_size, device=device, dtype=dtype) - 1) * self.max_shift
         eps = shift.abs().clamp_min(1e-6)
         return TransformSample({"shift": shift}, eps, self.name)
@@ -212,7 +235,9 @@ class NonPeriodicTranslation1D(BaseTransform):
         shift = sample.params["shift"].to(device=u.device, dtype=u.dtype)
         grid_x = torch.linspace(0.0, self.length, n, device=u.device, dtype=u.dtype)
         source = grid_x[None, :] - shift[:, None]
-        return ((source >= self.mask_margin) & (source <= self.length - self.mask_margin)).to(u.dtype)
+        return ((source >= self.mask_margin) & (source <= self.length - self.mask_margin)).to(
+            u.dtype
+        )
 
 
 class Translation2D(BaseTransform):
@@ -222,7 +247,9 @@ class Translation2D(BaseTransform):
         self.max_shift = float(max_shift)
         self.length = float(length)
 
-    def sample(self, batch_size: int, device: torch.device, dtype: torch.dtype = torch.float32) -> TransformSample:
+    def sample(
+        self, batch_size: int, device: torch.device, dtype: torch.dtype = torch.float32
+    ) -> TransformSample:
         shift = (2 * torch.rand(batch_size, 2, device=device, dtype=dtype) - 1) * self.max_shift
         eps = torch.linalg.norm(shift, dim=-1).clamp_min(1e-6)
         return TransformSample({"shift": shift}, eps, self.name)
@@ -247,13 +274,17 @@ class Translation2D(BaseTransform):
 class Burgers1DGalilean(BaseTransform):
     name = "burgers1d_galilean"
 
-    def __init__(self, max_boost: float = 0.5, final_time: float = 0.5, channel: int = 0, length: float = 1.0):
+    def __init__(
+        self, max_boost: float = 0.5, final_time: float = 0.5, channel: int = 0, length: float = 1.0
+    ):
         self.max_boost = float(max_boost)
         self.final_time = float(final_time)
         self.channel = int(channel)
         self.length = float(length)
 
-    def sample(self, batch_size: int, device: torch.device, dtype: torch.dtype = torch.float32) -> TransformSample:
+    def sample(
+        self, batch_size: int, device: torch.device, dtype: torch.dtype = torch.float32
+    ) -> TransformSample:
         boost = (2 * torch.rand(batch_size, device=device, dtype=dtype) - 1) * self.max_boost
         eps = boost.abs().clamp_min(1e-6)
         return TransformSample({"boost": boost}, eps, self.name)
@@ -280,8 +311,8 @@ class Burgers1DGalilean(BaseTransform):
 
     def output_tangent(self, u: torch.Tensor, sample: TransformSample) -> torch.Tensor:
         boost = sample.params["boost"]
-        tangent = -boost.view(-1, 1, 1) * self.final_time * periodic_derivative_1d(
-            u, length=self.length
+        tangent = (
+            -boost.view(-1, 1, 1) * self.final_time * periodic_derivative_1d(u, length=self.length)
         )
         tangent[..., self.channel] = tangent[..., self.channel] + boost.view(-1, 1)
         return tangent
@@ -311,7 +342,9 @@ class NavierStokes2DGalilean(BaseTransform):
         self.boost_x_channel = int(boost_x_channel)
         self.boost_y_channel = int(boost_y_channel)
 
-    def sample(self, batch_size: int, device: torch.device, dtype: torch.dtype = torch.float32) -> TransformSample:
+    def sample(
+        self, batch_size: int, device: torch.device, dtype: torch.dtype = torch.float32
+    ) -> TransformSample:
         boost = (2 * torch.rand(batch_size, 2, device=device, dtype=dtype) - 1) * self.max_boost
         eps = torch.linalg.norm(boost, dim=-1).clamp_min(1e-6)
         return TransformSample({"boost": boost}, eps, self.name)
@@ -350,18 +383,21 @@ class NavierStokes2DGalilean(BaseTransform):
         boost = sample.params["boost"]
         grad_x, grad_y = periodic_gradient_2d(u, length=self.length)
         return -self.final_time * (
-            boost[:, 0].view(-1, 1, 1, 1) * grad_x
-            + boost[:, 1].view(-1, 1, 1, 1) * grad_y
+            boost[:, 0].view(-1, 1, 1, 1) * grad_x + boost[:, 1].view(-1, 1, 1, 1) * grad_y
         )
 
 
 class D4Scalar2D(BaseTransform):
     name = "d4_scalar2d"
 
-    def sample(self, batch_size: int, device: torch.device, dtype: torch.dtype = torch.float32) -> TransformSample:
+    def sample(
+        self, batch_size: int, device: torch.device, dtype: torch.dtype = torch.float32
+    ) -> TransformSample:
         k = torch.randint(0, 4, (batch_size,), device=device)
         flip = torch.rand(batch_size, device=device) < 0.5
-        return TransformSample({"k": k, "flip": flip}, torch.ones(batch_size, device=device, dtype=dtype), self.name)
+        return TransformSample(
+            {"k": k, "flip": flip}, torch.ones(batch_size, device=device, dtype=dtype), self.name
+        )
 
     def _apply_spatial(self, x: torch.Tensor, sample: TransformSample) -> torch.Tensor:
         if x.ndim != 4:
@@ -389,7 +425,9 @@ class D4Pseudoscalar2D(D4Scalar2D):
     def _apply_pseudoscalar(self, x: torch.Tensor, sample: TransformSample) -> torch.Tensor:
         y = self._apply_spatial(x, sample)
         flip = sample.params["flip"].to(device=x.device)
-        sign = torch.where(flip, -torch.ones_like(flip, dtype=x.dtype), torch.ones_like(flip, dtype=x.dtype))
+        sign = torch.where(
+            flip, -torch.ones_like(flip, dtype=x.dtype), torch.ones_like(flip, dtype=x.dtype)
+        )
         return y * sign.view(-1, 1, 1, 1)
 
     def apply_input(self, a: torch.Tensor, sample: TransformSample) -> torch.Tensor:
@@ -406,18 +444,26 @@ class MolecularRigidMotion(BaseTransform):
         self.max_angle = float(max_angle)
         self.max_translation = float(max_translation)
 
-    def sample(self, batch_size: int, device: torch.device, dtype: torch.dtype = torch.float32) -> TransformSample:
+    def sample(
+        self, batch_size: int, device: torch.device, dtype: torch.dtype = torch.float32
+    ) -> TransformSample:
         axis = torch.randn(batch_size, 3, device=device, dtype=dtype)
         axis = axis / axis.norm(dim=-1, keepdim=True).clamp_min(1e-8)
         angle = (2 * torch.rand(batch_size, device=device, dtype=dtype) - 1) * self.max_angle
         rotation = _axis_angle_rotation(axis, angle)
-        translation = (2 * torch.rand(batch_size, 3, device=device, dtype=dtype) - 1) * self.max_translation
+        translation = (
+            2 * torch.rand(batch_size, 3, device=device, dtype=dtype) - 1
+        ) * self.max_translation
         epsilon = (angle.abs() + translation.norm(dim=-1)).clamp_min(1e-6)
-        return TransformSample({"rotation": rotation, "translation": translation}, epsilon, self.name)
+        return TransformSample(
+            {"rotation": rotation, "translation": translation}, epsilon, self.name
+        )
 
     def apply_input(self, a: torch.Tensor, sample: TransformSample) -> torch.Tensor:
         if a.ndim != 3 or a.shape[-1] < 3:
-            raise ValueError(f"{self.name} expects [batch, atoms, channels>=3], got {tuple(a.shape)}")
+            raise ValueError(
+                f"{self.name} expects [batch, atoms, channels>=3], got {tuple(a.shape)}"
+            )
         rotation = sample.params["rotation"].to(device=a.device, dtype=a.dtype)
         translation = sample.params["translation"].to(device=a.device, dtype=a.dtype)
         y = a.clone()
@@ -426,7 +472,9 @@ class MolecularRigidMotion(BaseTransform):
 
     def apply_output(self, u: torch.Tensor, sample: TransformSample) -> torch.Tensor:
         if u.ndim != 3 or u.shape[-1] != 3:
-            raise ValueError(f"{self.name} expects force outputs [batch, atoms, 3], got {tuple(u.shape)}")
+            raise ValueError(
+                f"{self.name} expects force outputs [batch, atoms, 3], got {tuple(u.shape)}"
+            )
         rotation = sample.params["rotation"].to(device=u.device, dtype=u.dtype)
         return torch.bmm(u, rotation.transpose(1, 2))
 
@@ -468,7 +516,9 @@ class CompositeTransform(BaseTransform):
             self.probabilities = probs / probs.sum()
         self._last_transform: BaseTransform | None = None
 
-    def sample(self, batch_size: int, device: torch.device, dtype: torch.dtype = torch.float32) -> TransformSample:
+    def sample(
+        self, batch_size: int, device: torch.device, dtype: torch.dtype = torch.float32
+    ) -> TransformSample:
         idx = int(torch.multinomial(self.probabilities, num_samples=1).item())
         transform = self.transforms[idx]
         self._last_transform = transform

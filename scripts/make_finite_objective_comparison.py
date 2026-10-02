@@ -21,7 +21,6 @@ from scipy.stats import t as student_t
 
 from otno.reporting import collect_run_rows, value_matches
 
-
 DEFAULT_OUT_PREFIX = "runs/paper_tables/2d_galilean_n64_2pct_finite_objective_comparison"
 FIVE_SEEDS = (23, 31, 47, 59, 71)
 RAW_SEEDS = FIVE_SEEDS
@@ -223,9 +222,7 @@ def _load_objective(spec: ObjectiveSpec) -> pd.DataFrame:
     )
     df = df.copy()
     df["seed"] = _validate_seed_set(df, spec)
-    _validate_constant(
-        df, column="method", expected=spec.training_method, objective=spec.objective
-    )
+    _validate_constant(df, column="method", expected=spec.training_method, objective=spec.objective)
     _validate_constant(
         df,
         column="config.training.method",
@@ -238,15 +235,11 @@ def _load_objective(spec: ObjectiveSpec) -> pd.DataFrame:
         expected=0.02,
         objective=spec.objective,
     )
-    _validate_constant(
-        df, column="config.training.epochs", expected=150, objective=spec.objective
-    )
+    _validate_constant(df, column="config.training.epochs", expected=150, objective=spec.objective)
     _validate_constant(
         df, column="config.training.batch_size", expected=16, objective=spec.objective
     )
-    _validate_constant(
-        df, column="config.training.lr", expected=0.001, objective=spec.objective
-    )
+    _validate_constant(df, column="config.training.lr", expected=0.001, objective=spec.objective)
     _validate_constant(
         df,
         column="config.training.weight_decay",
@@ -381,9 +374,7 @@ def _aggregate(run_df: pd.DataFrame, specs: tuple[ObjectiveSpec, ...]) -> pd.Dat
             "weight_name": spec.weight_name,
             "weight": spec.weight,
             "steps_per_epoch": spec.steps_per_epoch,
-            "batch_forward_evaluations_per_epoch": (
-                spec.batch_forward_evaluations_per_epoch
-            ),
+            "batch_forward_evaluations_per_epoch": (spec.batch_forward_evaluations_per_epoch),
             "seed_count": int(group["seed"].nunique()),
             "seeds": ",".join(str(int(seed)) for seed in group["seed"]),
         }
@@ -410,12 +401,8 @@ def _paired_metric_rows(
     metadata_columns = ("normalization", "uses_jvp", "weight_name", "weight")
     _require_columns(reference_df, metadata_columns, reference)
     _require_columns(candidate_df, metadata_columns, candidate)
-    reference_metadata = {
-        column: reference_df[column].iloc[0] for column in metadata_columns
-    }
-    candidate_metadata = {
-        column: candidate_df[column].iloc[0] for column in metadata_columns
-    }
+    reference_metadata = {column: reference_df[column].iloc[0] for column in metadata_columns}
+    candidate_metadata = {column: candidate_df[column].iloc[0] for column in metadata_columns}
     rows: list[dict[str, Any]] = []
     for metric in CORE_METRICS:
         left = reference_df[["seed", metric]].rename(columns={metric: "reference_value"})
@@ -485,109 +472,6 @@ def _paired(run_df: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
-def _fmt(value: float) -> str:
-    return f"{value:.4f}"
-
-
-def _fmt_pm(mean: float, std: float) -> str:
-    return rf"\({_fmt(mean)}\pm{_fmt(std)}\)"
-
-
-def _tex_table(
-    aggregate: pd.DataFrame,
-    run_df: pd.DataFrame | None = None,
-) -> str:
-    rows = {str(row["objective"]): row for _, row in aggregate.iterrows()}
-    normalized_matched = rows["normalized finite"].copy()
-    if run_df is not None:
-        matched = run_df[
-            (run_df["objective"] == "normalized finite")
-            & (run_df["seed"].isin(RAW_SEEDS))
-        ].sort_values("seed")
-        found = tuple(int(seed) for seed in matched["seed"])
-        if found != RAW_SEEDS:
-            raise ComparisonValidationError(
-                "normalized finite TeX panel: expected matched seeds "
-                f"{list(RAW_SEEDS)}, found {list(found)}"
-            )
-        normalized_matched = normalized_matched.copy()
-        normalized_matched["seed_count"] = len(RAW_SEEDS)
-        for metric in CORE_METRICS:
-            values = pd.to_numeric(matched[metric], errors="raise")
-            normalized_matched[f"{metric}_mean"] = float(values.mean())
-            normalized_matched[f"{metric}_std"] = float(values.std(ddof=1))
-
-    lines = [
-        r"\begin{table*}[t]",
-        r"\centering",
-        r"\small",
-        (
-            r"\caption{Finite-objective comparison on the N64 Galilean task at 2\% labels. "
-            r"Entries are mean $\pm$ sample standard deviation within each panel. "
-            r"Both panels use five matched seeds. "
-            r"The augmentation baseline and both finite objectives use 12 batch-level "
-            r"model-forward evaluations per epoch. The tangent objective uses an explicit "
-            r"JVP and is not compute-matched. The raw finite weight $2.4$ is a leading-order "
-            r"average-scale match to normalized finite weight $0.10$, not a tuned equivalence.}"
-        ),
-        r"\label{tab:n64-finite-objective-comparison}",
-        r"\resizebox{\textwidth}{!}{%",
-        r"\begin{tabular}{llllrrrr}",
-        r"\toprule",
-        r"Method & Weight & Step normalization & JVP & ID $L^2$ & Orbit-shift $L^2$ "
-        r"& Eq. defect & Seeds \\",
-        r"\midrule",
-        r"\multicolumn{8}{l}{\emph{Panel A: finite versus tangent, five matched seeds}} \\",
-    ]
-
-    def append_row(objective: str, row: pd.Series) -> None:
-        normalization = {
-            "augmentation baseline": "n/a",
-            "tangent": "n/a",
-            "normalized finite": r"$\epsilon^2+\eta$",
-            "raw finite": "none",
-        }[objective]
-        jvp = "yes" if bool(row["uses_jvp"]) else "no"
-        weight = {
-            "augmentation baseline": r"$\lambda_{\rm aug}=1$",
-            "tangent": r"$\lambda_{\rm tangent}=0.1$",
-            "normalized finite": r"$\lambda_{\rm orb}=0.1$",
-            "raw finite": r"$\lambda_{\rm raw}=2.4$",
-        }[objective]
-        defect = _fmt_pm(
-            row["equivariance_defect_relative_mean"],
-            row["equivariance_defect_relative_std"],
-        )
-        lines.append(
-            f"{row['method_label']} & {weight} & {normalization} & {jvp} & "
-            f"{_fmt_pm(row['relative_l2_mean'], row['relative_l2_std'])} & "
-            f"{_fmt_pm(row['orbit_ood_relative_l2_mean'], row['orbit_ood_relative_l2_std'])} & "
-            f"{defect} & "
-            f"{int(row['seed_count'])} \\\\"
-        )
-
-    for objective in ("augmentation baseline", "tangent", "normalized finite"):
-        append_row(objective, rows[objective])
-    lines.extend(
-        [
-            r"\addlinespace",
-            r"\multicolumn{8}{l}{\emph{Panel B: normalized versus raw finite, five matched seeds}} \\",
-        ]
-    )
-    append_row("normalized finite", normalized_matched)
-    append_row("raw finite", rows["raw finite"])
-    lines.extend(
-        [
-            r"\bottomrule",
-            r"\end{tabular}",
-            r"}",
-            r"\end{table*}",
-            "",
-        ]
-    )
-    return "\n".join(lines)
-
-
 def _output_path(prefix: Path, suffix: str) -> Path:
     return Path(f"{prefix}{suffix}")
 
@@ -653,12 +537,10 @@ def main() -> int:
         "runs": _output_path(out_prefix, ".runs.csv"),
         "aggregate": _output_path(out_prefix, ".aggregate.csv"),
         "paired": _output_path(out_prefix, ".paired.csv"),
-        "tex": _output_path(out_prefix, ".tex"),
     }
     paths["runs"].write_text(run_df.to_csv(index=False), encoding="utf-8")
     paths["aggregate"].write_text(aggregate.to_csv(index=False), encoding="utf-8")
     paths["paired"].write_text(paired.to_csv(index=False), encoding="utf-8")
-    paths["tex"].write_text(_tex_table(aggregate, run_df), encoding="utf-8")
     for path in paths.values():
         print(f"wrote {path}")
     return 0

@@ -16,7 +16,9 @@ def test_advection_translation_commutes_with_solver():
         epsilon=torch.ones(3),
         name="translation1d",
     )
-    left = solve_advection_1d(transform.apply_input(u0, sample)[..., 0], velocity=0.8, final_time=0.25)[..., None]
+    left = solve_advection_1d(
+        transform.apply_input(u0, sample)[..., 0], velocity=0.8, final_time=0.25
+    )[..., None]
     right = transform.apply_output(
         solve_advection_1d(u0[..., 0], velocity=0.8, final_time=0.25)[..., None], sample
     )
@@ -58,7 +60,9 @@ def test_navier_stokes_translation_commutes_with_solver_small_time():
         transform.apply_input(omega0, sample)[..., 0], viscosity=1e-2, final_time=0.01, dt=0.005
     )[..., None]
     right = transform.apply_output(
-        solve_navier_stokes_vorticity_2d(omega0[..., 0], viscosity=1e-2, final_time=0.01, dt=0.005)[..., None],
+        solve_navier_stokes_vorticity_2d(omega0[..., 0], viscosity=1e-2, final_time=0.01, dt=0.005)[
+            ..., None
+        ],
         sample,
     )
     assert torch.allclose(left, right, atol=2e-4, rtol=2e-4)

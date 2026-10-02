@@ -1,7 +1,7 @@
 experiments:
   # D4 orbit-weight sweep at 1% labels. The 0.05 weight and augmentation baseline
   # are defined in 2d_d4_focused_low_label_pilot.
-  - config: configs/pilot/2d_navier_stokes_translation_d4.yaml
+  - config: configs/problems/2d_navier_stokes_translation_d4.yaml
     seeds: [23]
     overrides:
       symmetry.transforms:
@@ -14,7 +14,7 @@ experiments:
       runtime.overwrite: false
       runtime.run_dir: runs/ablations/2d_d4_focused_lambda_refinement/fraction_0.01/aug_orbit_lambda_0.01_steps_4
 
-  - config: configs/pilot/2d_navier_stokes_translation_d4.yaml
+  - config: configs/problems/2d_navier_stokes_translation_d4.yaml
     seeds: [23]
     overrides:
       symmetry.transforms:
@@ -27,7 +27,7 @@ experiments:
       runtime.overwrite: false
       runtime.run_dir: runs/ablations/2d_d4_focused_lambda_refinement/fraction_0.01/aug_orbit_lambda_0.1_steps_4
 
-  - config: configs/pilot/2d_navier_stokes_translation_d4.yaml
+  - config: configs/problems/2d_navier_stokes_translation_d4.yaml
     seeds: [23]
     overrides:
       symmetry.transforms:

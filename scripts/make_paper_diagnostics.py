@@ -14,7 +14,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-
 METHOD_LABELS = {
     "baseline": "FNO",
     "baseline_steps_4": "FNO",
@@ -109,11 +108,19 @@ def _training_observations(paths: list[Path]) -> pd.DataFrame:
                 "source": "training",
                 "run_dir": run_dir,
                 "method": record.get("method"),
-                "method_label": METHOD_LABELS.get(str(record.get("method")), str(record.get("method"))),
+                "method_label": METHOD_LABELS.get(
+                    str(record.get("method")), str(record.get("method"))
+                ),
                 "seed": record.get("seed"),
-                "data_fraction": record.get("data_fraction", record.get("config.training.data_fraction")),
-                "lambda_orbit": record.get("lambda_orbit", record.get("config.training.lambda_orbit")),
-                "max_boost": record.get("config.symmetry.max_boost", record.get("config.dataset.max_boost")),
+                "data_fraction": record.get(
+                    "data_fraction", record.get("config.training.data_fraction")
+                ),
+                "lambda_orbit": record.get(
+                    "lambda_orbit", record.get("config.training.lambda_orbit")
+                ),
+                "max_boost": record.get(
+                    "config.symmetry.max_boost", record.get("config.dataset.max_boost")
+                ),
                 "relative_l2": record.get("relative_l2"),
                 "orbit_ood_relative_l2": record.get("orbit_ood_relative_l2"),
                 "equivariance_defect_relative": record.get("equivariance_defect_relative"),
@@ -169,13 +176,21 @@ def write_correlation_tables(observations: pd.DataFrame, out_prefix: Path) -> pd
     }
     for scope, df in scopes.items():
         df = _finite_rows(df, ["equivariance_defect_relative", "orbit_ood_relative_l2"])
-        covariates = [col for col in ["source", "method", "data_fraction", "max_boost", "lambda_orbit"] if col in df.columns]
+        covariates = [
+            col
+            for col in ["source", "method", "data_fraction", "max_boost", "lambda_orbit"]
+            if col in df.columns
+        ]
         rows.append(
             {
                 "scope": scope,
                 "n": len(df),
-                "pearson_r": _pearson(df["equivariance_defect_relative"], df["orbit_ood_relative_l2"]),
-                "spearman_rho": _spearman(df["equivariance_defect_relative"], df["orbit_ood_relative_l2"]),
+                "pearson_r": _pearson(
+                    df["equivariance_defect_relative"], df["orbit_ood_relative_l2"]
+                ),
+                "spearman_rho": _spearman(
+                    df["equivariance_defect_relative"], df["orbit_ood_relative_l2"]
+                ),
                 "partial_pearson_r": _partial_pearson(df, covariates),
                 "controls": "+".join(covariates),
             }
@@ -184,11 +199,8 @@ def write_correlation_tables(observations: pd.DataFrame, out_prefix: Path) -> pd
     out_prefix.parent.mkdir(parents=True, exist_ok=True)
     observations.to_csv(out_prefix.with_suffix(".runs.csv"), index=False)
     table.to_csv(out_prefix.with_suffix(".csv"), index=False)
-    with out_prefix.with_suffix(".tex").open("w", encoding="utf-8") as f:
-        f.write(table.to_latex(index=False, escape=False, float_format=lambda value: f"{value:.3f}"))
     print(f"wrote {out_prefix.with_suffix('.runs.csv')}")
     print(f"wrote {out_prefix.with_suffix('.csv')}")
-    print(f"wrote {out_prefix.with_suffix('.tex')}")
     return table
 
 
@@ -320,7 +332,9 @@ def _compute_row(record: dict[str, Any], root: Path) -> dict[str, Any]:
     model_forward_passes = supervised_steps * forward_multiplier
     augmentation_batches = supervised_steps if method in TRAIN_METHODS_WITH_AUG else 0
     orbit_batches = supervised_steps if method in TRAIN_METHODS_WITH_ORBIT else 0
-    wall_seconds = pd.to_numeric(pd.Series([record.get("train_wall_seconds")]), errors="coerce").iloc[0]
+    wall_seconds = pd.to_numeric(
+        pd.Series([record.get("train_wall_seconds")]), errors="coerce"
+    ).iloc[0]
     wall_source = "recorded"
     if not np.isfinite(wall_seconds):
         initial_rng = run_dir / "rng_state_initial.pt"
@@ -394,11 +408,59 @@ def write_compute_table(headline_csv: Path, out_prefix: Path, root: Path) -> pd.
     out_prefix.parent.mkdir(parents=True, exist_ok=True)
     runs.to_csv(out_prefix.with_suffix(".runs.csv"), index=False)
     aggregate.to_csv(out_prefix.with_suffix(".aggregate.csv"), index=False)
-    with out_prefix.with_suffix(".aggregate.tex").open("w", encoding="utf-8") as f:
-        f.write(aggregate.to_latex(index=False, escape=False, float_format=lambda value: f"{value:.3f}"))
     print(f"wrote {out_prefix.with_suffix('.runs.csv')}")
     print(f"wrote {out_prefix.with_suffix('.aggregate.csv')}")
-    print(f"wrote {out_prefix.with_suffix('.aggregate.tex')}")
+    return aggregate
+
+
+def load_cached_compute_table(out_prefix: Path) -> pd.DataFrame:
+    """Validate preserved compute summaries without consulting training logs."""
+    group_cols = {"method_label", "data_fraction", "steps_per_epoch"}
+    count_cols = {
+        "optimizer_steps",
+        "model_forward_passes_est",
+        "backward_passes_est",
+        "augmented_labeled_samples_est",
+        "orbit_consistency_samples_est",
+    }
+    frames = {}
+    for suffix, required in {
+        ".runs.csv": group_cols | count_cols | {"run_dir", "method", "seed"},
+        ".aggregate.csv": group_cols
+        | {f"{col}_{stat}" for col in count_cols for stat in ("mean", "std", "count")},
+    }.items():
+        path = out_prefix.with_suffix(suffix)
+        try:
+            frame = _read_csv(path)
+        except (pd.errors.EmptyDataError, pd.errors.ParserError) as exc:
+            raise SystemExit(f"Invalid cached compute CSV: {path}: {exc}") from exc
+        missing = sorted(required - set(frame.columns))
+        if frame.empty or missing:
+            detail = "no rows" if frame.empty else f"missing columns: {', '.join(missing)}"
+            raise SystemExit(f"Invalid cached compute CSV: {path}: {detail}")
+        finite_cols = (
+            count_cols | {"seed", "data_fraction", "steps_per_epoch"}
+            if suffix == ".runs.csv"
+            else {f"{col}_{stat}" for col in count_cols for stat in ("mean", "count")}
+            | {"data_fraction", "steps_per_epoch"}
+        )
+        values = frame[sorted(finite_cols)].apply(pd.to_numeric, errors="coerce")
+        if not np.isfinite(values.to_numpy()).all() or (values < 0).any().any():
+            raise SystemExit(f"Invalid cached compute CSV: {path}: nonfinite or negative counts")
+        if frame["method_label"].isna().any():
+            raise SystemExit(f"Invalid cached compute CSV: {path}: missing method labels")
+        frames[suffix] = frame
+    runs = frames[".runs.csv"]
+    aggregate = frames[".aggregate.csv"]
+    if runs["run_dir"].isna().any() or runs["run_dir"].duplicated().any():
+        raise SystemExit("Invalid cached compute CSV: missing or duplicate run directories")
+    grouping = sorted(group_cols)
+    run_groups = set(runs[grouping].itertuples(index=False, name=None))
+    aggregate_groups = set(aggregate[grouping].itertuples(index=False, name=None))
+    if run_groups != aggregate_groups or aggregate[grouping].duplicated().any():
+        raise SystemExit("Invalid cached compute CSVs: per-run and aggregate groups differ")
+    print(f"using cached {out_prefix.with_suffix('.runs.csv')}")
+    print(f"using cached {out_prefix.with_suffix('.aggregate.csv')}")
     return aggregate
 
 
@@ -431,35 +493,58 @@ def write_oracle_summary_table(oracle_runs_csv: Path, out_prefix: Path) -> pd.Da
         else str(col)
         for col in aggregate.columns
     ]
-    aggregate["oracle_gap_pct_mean"] = 100.0 * (
-        aggregate["orbit_ood_relative_l2_mean"]
-        - aggregate["oracle_canonical_ood_relative_l2_mean"]
-    ) / aggregate["oracle_canonical_ood_relative_l2_mean"].clip(lower=1e-12)
+    aggregate["oracle_gap_pct_mean"] = (
+        100.0
+        * (
+            aggregate["orbit_ood_relative_l2_mean"]
+            - aggregate["oracle_canonical_ood_relative_l2_mean"]
+        )
+        / aggregate["oracle_canonical_ood_relative_l2_mean"].clip(lower=1e-12)
+    )
     aggregate = aggregate.sort_values(["severity_scale", "method_label"])
     out_prefix.parent.mkdir(parents=True, exist_ok=True)
     aggregate.to_csv(out_prefix.with_suffix(".csv"), index=False)
-    with out_prefix.with_suffix(".tex").open("w", encoding="utf-8") as f:
-        f.write(aggregate.to_latex(index=False, escape=False, float_format=lambda value: f"{value:.3f}"))
     print(f"wrote {out_prefix.with_suffix('.csv')}")
-    print(f"wrote {out_prefix.with_suffix('.tex')}")
     return aggregate
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Build paper diagnostics from cached N64 results.")
-    parser.add_argument("--headline-csv", default="runs/paper_tables/2d_galilean_n64_2pct_headline_lambda_0p1.runs.csv")
-    parser.add_argument("--label-csv", default="runs/paper_tables/2d_galilean_n64_label_efficiency_lambda_0p1.runs.csv")
-    parser.add_argument("--lambda-csv", default="runs/paper_tables/2d_galilean_n64_2pct_lambda_robustness.runs.csv")
-    parser.add_argument("--severity-csv", default="runs/paper_tables/2d_galilean_n64_2pct_ood_severity_lambda_0p1.runs.csv")
-    parser.add_argument("--oracle-runs-csv", default="runs/paper_tables/2d_galilean_n64_2pct_oracle_canonicalization.runs.csv")
+    parser.add_argument(
+        "--headline-csv",
+        default="runs/paper_tables/2d_galilean_n64_2pct_headline_lambda_0p1.runs.csv",
+    )
+    parser.add_argument(
+        "--label-csv",
+        default="runs/paper_tables/2d_galilean_n64_label_efficiency_lambda_0p1.runs.csv",
+    )
+    parser.add_argument(
+        "--lambda-csv", default="runs/paper_tables/2d_galilean_n64_2pct_lambda_robustness.runs.csv"
+    )
+    parser.add_argument(
+        "--severity-csv",
+        default="runs/paper_tables/2d_galilean_n64_2pct_ood_severity_lambda_0p1.runs.csv",
+    )
+    parser.add_argument(
+        "--oracle-runs-csv",
+        default="runs/paper_tables/2d_galilean_n64_2pct_oracle_canonicalization.runs.csv",
+    )
     parser.add_argument("--table-dir", default="runs/paper_tables")
     parser.add_argument("--figures-dir", default="runs/figures")
     parser.add_argument("--root", default=".")
+    parser.add_argument(
+        "--cached-compute",
+        action="store_true",
+        help="Validate and preserve existing training-compute CSVs without reading training logs.",
+    )
     args = parser.parse_args()
 
     root = Path(args.root)
     table_dir = Path(args.table_dir)
     figures_dir = Path(args.figures_dir)
+    compute_prefix = table_dir / "2d_galilean_n64_training_compute"
+    if args.cached_compute:
+        load_cached_compute_table(compute_prefix)
     observations = build_correlation_observations(
         headline_csv=Path(args.headline_csv),
         label_csv=Path(args.label_csv),
@@ -468,12 +553,11 @@ def main() -> None:
     )
     corr_prefix = table_dir / "2d_galilean_n64_defect_ood_correlation"
     corr_table = write_correlation_tables(observations, corr_prefix)
-    plot_correlation(observations, corr_table, figures_dir / "2d_galilean_n64_defect_ood_correlation")
-    write_compute_table(
-        Path(args.headline_csv),
-        table_dir / "2d_galilean_n64_training_compute",
-        root,
+    plot_correlation(
+        observations, corr_table, figures_dir / "2d_galilean_n64_defect_ood_correlation"
     )
+    if not args.cached_compute:
+        write_compute_table(Path(args.headline_csv), compute_prefix, root)
     write_oracle_summary_table(
         Path(args.oracle_runs_csv),
         table_dir / "2d_galilean_n64_2pct_oracle_canonicalization_summary",

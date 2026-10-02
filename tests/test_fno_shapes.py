@@ -128,8 +128,10 @@ def test_d4_gfno2d_pseudoscalar_equivariance(size, modes):
     rhs = transform.apply_output(model(x), sample)
     assert torch.allclose(lhs, rhs, atol=1e-4, rtol=1e-4)
     lhs.square().mean().backward()
-    assert all(parameter.grad is not None and torch.isfinite(parameter.grad).all()
-               for parameter in model.parameters())
+    assert all(
+        parameter.grad is not None and torch.isfinite(parameter.grad).all()
+        for parameter in model.parameters()
+    )
 
 
 def test_observable_galilean_canonical_fno2d_shape():

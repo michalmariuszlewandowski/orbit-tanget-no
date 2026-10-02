@@ -6,6 +6,7 @@ from dataclasses import dataclass
 import torch
 from torch import nn
 
+from otno.definitions import canonicalizer_names
 from otno.models.fno import FNO1d, FNO2d
 from otno.symmetry.transforms import periodic_shift_1d, periodic_shift_2d
 
@@ -92,13 +93,14 @@ class CanonicalFNO1d(nn.Module):
         modes: int = 16,
         depth: int = 4,
         add_grid: bool = True,
-        canonicalizers: list[str] | tuple[str, ...] = ("translation_first_mode",),
+        canonicalizers: str | list[str] | tuple[str, ...] = ("translation_first_mode",),
         canonical_channel: int = 0,
         translation_mode: int = 1,
         length: float = 1.0,
         final_time: float = 0.5,
     ):
         super().__init__()
+        self.canonicalizers = canonicalizer_names(canonicalizers)
         self.base = FNO1d(
             in_channels=in_channels,
             out_channels=out_channels,
@@ -107,7 +109,6 @@ class CanonicalFNO1d(nn.Module):
             depth=depth,
             add_grid=add_grid,
         )
-        self.canonicalizers = tuple(canonicalizers)
         self.canonical_channel = int(canonical_channel)
         self.translation_mode = int(translation_mode)
         self.length = float(length)

@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import importlib
+import pickle
 import subprocess
+import zipfile
 from pathlib import Path
 
 import pytest
@@ -39,6 +41,39 @@ def test_scans_unknown_extensions_and_printable_binary_metadata(tmp_path, scanne
     assert all("local user path" in finding for finding in findings)
 
 
+def test_torch_zip_scans_pickle_metadata_and_member_names_without_reading_tensors(
+    tmp_path, scanner, monkeypatch
+):
+    path = tmp_path / "checkpoint.pt"
+    private_path = "/" + "home/" + "researcher/project"
+    with zipfile.ZipFile(path, "w") as archive:
+        archive.writestr("checkpoint/data.pkl", pickle.dumps({"source": private_path}))
+        archive.writestr("checkpoint/version", "3\n")
+        archive.writestr("checkpoint/data/0", b"tensor" + private_path.encode())
+        archive.writestr("checkpoint/researcher-note", b"opaque storage")
+    original_read = zipfile.ZipFile.read
+    reads = []
+
+    def read_metadata_only(archive, member, *args, **kwargs):
+        name = member.filename if isinstance(member, zipfile.ZipInfo) else member
+        assert name.endswith(".pkl"), "scanner attempted to read tensor storage"
+        reads.append(name)
+        return original_read(archive, member, *args, **kwargs)
+
+    monkeypatch.setattr(scanner.zipfile.ZipFile, "read", read_metadata_only)
+    findings = scanner.check(tmp_path, [(path, path.name)], terms=["researcher"])
+    assert reads == ["checkpoint/data.pkl"]
+    assert any(
+        "checkpoint.pt!checkpoint/data.pkl:" in item and "local user path" in item
+        for item in findings
+    )
+    assert any(
+        "checkpoint.pt!checkpoint/researcher-note:" in item and "identifying search term" in item
+        for item in findings
+    )
+    assert all("data/0" not in item for item in findings)
+
+
 def test_reference_exception_does_not_allow_a_different_repository(tmp_path, scanner):
     public_url = "https://github.com/" + "camlab-ethz/ConvolutionalNeuralOperator"
     path = tmp_path / "references.md"
@@ -73,13 +108,31 @@ def test_git_metadata_finds_names_remotes_and_full_or_abbreviated_commits(tmp_pa
     path.write_text("Researcher Name\n", encoding="utf-8")
     subprocess.run(["git", "-C", str(tmp_path), "add", "."], check=True)
     subprocess.run(
-        ["git", "-C", str(tmp_path), "-c", "user.name=Researcher Name", "-c",
-         "user.email=researcher" + "@" + "example.org", "commit", "--quiet", "-m", "initial"],
+        [
+            "git",
+            "-C",
+            str(tmp_path),
+            "-c",
+            "user.name=Researcher Name",
+            "-c",
+            "user.email=researcher" + "@" + "example.org",
+            "commit",
+            "--quiet",
+            "-m",
+            "initial",
+        ],
         check=True,
     )
     subprocess.run(
-        ["git", "-C", str(tmp_path), "remote", "add", "origin",
-         "https://github.com/" + "research-group/example"],
+        [
+            "git",
+            "-C",
+            str(tmp_path),
+            "remote",
+            "add",
+            "origin",
+            "https://github.com/" + "research-group/example",
+        ],
         check=True,
     )
     terms, commits = scanner.git_identities(tmp_path)

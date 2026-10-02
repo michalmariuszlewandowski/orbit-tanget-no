@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 import argparse
-import math
 import sys
 from dataclasses import dataclass
 from pathlib import Path
@@ -17,10 +16,15 @@ if str(SRC) not in sys.path:
 
 import numpy as np
 import pandas as pd
-from scipy.stats import t as student_t
 
-from otno.reporting import RunValidation, collect_run_rows, is_missing
-
+from otno.reporting import (
+    RunValidation,
+    backbone_training_summary,
+    collect_run_rows,
+    is_missing,
+    metric_mean_std,
+    paired_protocol_comparison,
+)
 
 EXPECTED_SEEDS = (23, 31, 47, 59, 71)
 EXPECTED_DATASET_SHA256 = "defc9703dbc41494fabf9fcfe9e3408eb2e1c3890814e47fe03d0f6b849e3f50"
@@ -42,13 +46,9 @@ CONSISTENT_PROVENANCE_FIELDS = (
     "environment.cuda_version",
     "environment.cudnn_version",
 )
-DEFAULT_RUN_ROOT = Path(
-    "runs/ablations/2d_galilean_n64_2pct_cno2d_5seed/fraction_0.02"
-)
+DEFAULT_RUN_ROOT = Path("runs/ablations/2d_galilean_n64_2pct_cno2d_5seed/fraction_0.02")
 DEFAULT_OUT_PREFIX = Path("runs/paper_tables/2d_galilean_n64_2pct_cno2d_5seed")
-DEFAULT_FNO_RUNS = Path(
-    "runs/paper_tables/2d_galilean_n64_2pct_headline_lambda_0p1.runs.csv"
-)
+DEFAULT_FNO_RUNS = Path("runs/paper_tables/2d_galilean_n64_2pct_headline_lambda_0p1.runs.csv")
 CORE_METRICS = (
     "relative_l2",
     "orbit_ood_relative_l2",
@@ -59,9 +59,7 @@ AGGREGATE_METRICS = CORE_METRICS + (
     "latency_ms_per_sample",
 )
 FINITE_METRICS = AGGREGATE_METRICS + ("train_wall_seconds",)
-RESUME_AUTHORIZATION_SOURCE = (
-    "runs/ablations/2d_galilean_n64_2pct_cno2d_5seed/PAUSED.md"
-)
+RESUME_AUTHORIZATION_SOURCE = "runs/ablations/2d_galilean_n64_2pct_cno2d_5seed/PAUSED.md"
 
 
 class CNO2dProtocolError(ValueError):
@@ -120,22 +118,14 @@ METHOD_SPECS = (
 AUTHORIZED_RESUMES = {
     ("baseline", 23): ResumeSpec(
         last_completed_epoch=108,
-        last_checkpoint_sha256=(
-            "2bd7a1e0f067fe3e5975816c69a5547991a34bc9b0a179871ed057f64e28b208"
-        ),
-        best_checkpoint_sha256=(
-            "9b9457c84e7e6925e842e2cfe0e38ac928340c9586ad50d86cda31b56019339e"
-        ),
+        last_checkpoint_sha256=("2bd7a1e0f067fe3e5975816c69a5547991a34bc9b0a179871ed057f64e28b208"),
+        best_checkpoint_sha256=("9b9457c84e7e6925e842e2cfe0e38ac928340c9586ad50d86cda31b56019339e"),
         resumed_config_hash="57d7580e4a21",
     ),
     ("aug_orbit", 59): ResumeSpec(
         last_completed_epoch=103,
-        last_checkpoint_sha256=(
-            "37579559adb2f66305a4502aa1a913eafacf042fe40aef7cc49d45ce7e387a70"
-        ),
-        best_checkpoint_sha256=(
-            "a3031d0f375ff34ce1090203121b2c593f7ac47f8bcddd3390ebd6e78096eb02"
-        ),
+        last_checkpoint_sha256=("37579559adb2f66305a4502aa1a913eafacf042fe40aef7cc49d45ce7e387a70"),
+        best_checkpoint_sha256=("a3031d0f375ff34ce1090203121b2c593f7ac47f8bcddd3390ebd6e78096eb02"),
         resumed_config_hash="c3963fd57bc2",
     ),
 }
@@ -196,21 +186,15 @@ def _annotate_authorized_resumes(
                 "resume_source_best_checkpoint_sha256": (
                     authorization.best_checkpoint_sha256 if resumed else None
                 ),
-                "resume_authorization_source": (
-                    RESUME_AUTHORIZATION_SOURCE if resumed else None
-                ),
-                "train_wall_seconds_scope": (
-                    "post_resume_segment" if resumed else "full_run"
-                ),
+                "resume_authorization_source": (RESUME_AUTHORIZATION_SOURCE if resumed else None),
+                "train_wall_seconds_scope": ("post_resume_segment" if resumed else "full_run"),
             }
         )
 
     missing = sorted(set(expected).difference(observed))
     if missing:
         rendered = ", ".join(f"{method}/seed_{seed}" for method, seed in missing)
-        raise CNO2dProtocolError(
-            f"{context}: expected authorized checkpoint resume(s) {rendered}"
-        )
+        raise CNO2dProtocolError(f"{context}: expected authorized checkpoint resume(s) {rendered}")
 
     for column in annotations[0] if annotations else ():
         out[column] = [annotation[column] for annotation in annotations]
@@ -285,8 +269,7 @@ def _expected_protocol(spec: MethodSpec, *, fresh_runs: bool = False) -> dict[st
         "config.runtime.device": "auto",
         "config.runtime.overwrite": False,
         "config.runtime.source_snapshot": (
-            "runs/ablations/2d_galilean_n64_2pct_cno2d_5seed/"
-            "_provenance/source_snapshot.zip"
+            "runs/ablations/2d_galilean_n64_2pct_cno2d_5seed/_provenance/source_snapshot.zip"
         ),
         "config.runtime.source_snapshot_sha256": (
             "73a64bfda1a3e6ba63eab3a372e1cd6b64d22fda76c0405dfd5facaa765fdb33"
@@ -303,7 +286,8 @@ def _expected_protocol(spec: MethodSpec, *, fresh_runs: bool = False) -> dict[st
         )
     if fresh_runs:
         for key in (
-            "dataset_sha256", "config.runtime.source_snapshot",
+            "dataset_sha256",
+            "config.runtime.source_snapshot",
             "config.runtime.source_snapshot_sha256",
         ):
             protocol.pop(key)
@@ -316,7 +300,8 @@ def _load_method(
     run_root: Path,
     spec: MethodSpec,
     expected_seeds: tuple[int, ...] = EXPECTED_SEEDS,
-    *, fresh_runs: bool = False,
+    *,
+    fresh_runs: bool = False,
 ) -> pd.DataFrame:
     method_root = run_root / spec.relative_dir
     df = pd.DataFrame(collect_run_rows(method_root))
@@ -335,9 +320,7 @@ def _load_method(
         validation.consistent(df, column, context)
     for _, row in df.iterrows():
         if int(row["seed"]) != int(row["config.seed"]):
-            raise CNO2dProtocolError(
-                f"{context}: metrics/config seed mismatch in {row['run_dir']}"
-            )
+            raise CNO2dProtocolError(f"{context}: metrics/config seed mismatch in {row['run_dir']}")
         if row.get("config_hash") != row.get("environment.config_hash"):
             raise CNO2dProtocolError(
                 f"{context}: metrics/environment config hash mismatch in {row['run_dir']}"
@@ -360,7 +343,8 @@ def _load_method(
 def build_run_frame(
     run_root: Path,
     expected_seeds: tuple[int, ...] = EXPECTED_SEEDS,
-    *, fresh_runs: bool = False,
+    *,
+    fresh_runs: bool = False,
 ) -> pd.DataFrame:
     frames = [
         _load_method(run_root, spec, expected_seeds=expected_seeds, fresh_runs=fresh_runs)
@@ -386,43 +370,35 @@ def build_run_frame(
 
 
 def aggregate_runs(run_df: pd.DataFrame) -> pd.DataFrame:
+    """Summarize metrics and disclose the scope of historical resumed-run timings."""
     rows: list[dict[str, Any]] = []
     for spec in METHOD_SPECS:
         group = run_df[run_df["method"] == spec.method].sort_values("seed")
-        row: dict[str, Any] = {
-            "method": spec.method,
-            "method_label": spec.label,
-            "steps_per_epoch": spec.steps_per_epoch,
-            "optimizer_steps": spec.steps_per_epoch * 150,
-            "model_forwards_per_epoch": spec.model_forwards_per_epoch,
-            "model_forwards_total": spec.model_forwards_per_epoch * 150,
-            "backward_passes_total": spec.steps_per_epoch * 150,
-            "seed_count": int(group["seed"].nunique()),
-            "seeds": ",".join(str(int(seed)) for seed in group["seed"]),
-            "parameters": int(group["parameters"].iloc[0]),
-            "checkpoint_resumed_count": int(group["checkpoint_resumed"].sum()),
-            "checkpoint_resumed_seeds": ",".join(
-                str(int(seed))
-                for seed in group.loc[group["checkpoint_resumed"], "seed"]
-            ),
-        }
-        for metric in AGGREGATE_METRICS:
-            values = pd.to_numeric(group[metric], errors="raise")
-            row[f"{metric}_mean"] = float(values.mean())
-            row[f"{metric}_std"] = float(values.std(ddof=1))
+        row = backbone_training_summary(
+            group,
+            method=spec.method,
+            label=spec.label,
+            epochs=150,
+            steps_per_epoch=spec.steps_per_epoch,
+            model_forwards_per_epoch=spec.model_forwards_per_epoch,
+        )
+        row.update(
+            {
+                "checkpoint_resumed_count": int(group["checkpoint_resumed"].sum()),
+                "checkpoint_resumed_seeds": ",".join(
+                    str(int(seed)) for seed in group.loc[group["checkpoint_resumed"], "seed"]
+                ),
+            }
+        )
+        row.update(metric_mean_std(group, metrics=AGGREGATE_METRICS))
+        # A post-resume segment is not comparable to a complete training wall time.
         uninterrupted_wall = pd.to_numeric(
             group.loc[~group["checkpoint_resumed"], "train_wall_seconds"],
             errors="raise",
         )
-        row["train_wall_seconds_uninterrupted_count"] = int(
-            uninterrupted_wall.shape[0]
-        )
-        row["train_wall_seconds_uninterrupted_mean"] = float(
-            uninterrupted_wall.mean()
-        )
-        row["train_wall_seconds_uninterrupted_std"] = float(
-            uninterrupted_wall.std(ddof=1)
-        )
+        row["train_wall_seconds_uninterrupted_count"] = int(uninterrupted_wall.shape[0])
+        row["train_wall_seconds_uninterrupted_mean"] = float(uninterrupted_wall.mean())
+        row["train_wall_seconds_uninterrupted_std"] = float(uninterrupted_wall.std(ddof=1))
         rows.append(row)
     return pd.DataFrame(rows)
 
@@ -431,123 +407,27 @@ def paired_primary(
     run_df: pd.DataFrame,
     expected_seeds: tuple[int, ...] = EXPECTED_SEEDS,
 ) -> pd.DataFrame:
+    """Pair the primary methods while retaining their historical resume disclosures."""
     reference = run_df[run_df["method"] == "aug"]
     candidate = run_df[run_df["method"] == "aug_orbit"]
     reference_resumed_seeds = ",".join(
-        str(int(seed))
-        for seed in reference.loc[reference["checkpoint_resumed"], "seed"]
+        str(int(seed)) for seed in reference.loc[reference["checkpoint_resumed"], "seed"]
     )
     candidate_resumed_seeds = ",".join(
-        str(int(seed))
-        for seed in candidate.loc[candidate["checkpoint_resumed"], "seed"]
+        str(int(seed)) for seed in candidate.loc[candidate["checkpoint_resumed"], "seed"]
     )
-    rows: list[dict[str, Any]] = []
-    for metric in CORE_METRICS:
-        paired = (
-            reference[["seed", metric]]
-            .rename(columns={metric: "augmentation"})
-            .merge(
-                candidate[["seed", metric]].rename(columns={metric: "augmentation_loco"}),
-                on="seed",
-                how="inner",
-                validate="one_to_one",
-            )
-            .sort_values("seed")
-        )
-        seeds = tuple(int(seed) for seed in paired["seed"])
-        if seeds != expected_seeds:
-            raise CNO2dProtocolError(
-                f"primary paired comparison for {metric}: expected "
-                f"{expected_seeds}, found {seeds}"
-            )
-        differences = paired["augmentation_loco"] - paired["augmentation"]
-        n = int(differences.shape[0])
-        delta = float(differences.mean())
-        delta_std = float(differences.std(ddof=1))
-        delta_sem = delta_std / math.sqrt(n)
-        half_width = float(student_t.ppf(0.975, n - 1)) * delta_sem
-        reference_mean = float(paired["augmentation"].mean())
-        candidate_mean = float(paired["augmentation_loco"].mean())
-        rows.append(
-            {
-                "comparison": "augmentation_plus_loco_minus_augmentation",
-                "difference_direction": "candidate_minus_reference",
-                "metric": metric,
-                "seed_count": n,
-                "seeds": ",".join(str(seed) for seed in expected_seeds),
-                "reference_checkpoint_resumed_seeds": reference_resumed_seeds,
-                "candidate_checkpoint_resumed_seeds": candidate_resumed_seeds,
-                "reference_mean": reference_mean,
-                "candidate_mean": candidate_mean,
-                "paired_delta_mean": delta,
-                "paired_delta_std": delta_std,
-                "paired_delta_sem": delta_sem,
-                "paired_delta_ci95_low": delta - half_width,
-                "paired_delta_ci95_high": delta + half_width,
-                "relative_reduction_pct": (
-                    100.0 * (reference_mean - candidate_mean) / reference_mean
-                ),
-                "ci_excludes_zero": bool(delta - half_width > 0 or delta + half_width < 0),
-            }
-        )
-    return pd.DataFrame(rows)
-
-
-def _fmt_pm(mean: float, std: float, *, bold: bool = False) -> str:
-    value = rf"{mean:.4f}\pm{std:.4f}"
-    return rf"\(\mathbf{{{value}}}\)" if bold else rf"\({value}\)"
-
-
-def latex_table(aggregate: pd.DataFrame) -> str:
-    rows = {str(row["method"]): row for _, row in aggregate.iterrows()}
-    seed_values = str(rows["baseline"]["seeds"]).replace(",", ", ")
-    lines = [
-        r"\begin{table*}[t]",
-        r"\centering",
-        r"\small",
-        (
-            r"\caption{CNO2d reproduction on the 2\%-label N64 Galilean task over "
-            f"the same training seeds as the FNO comparison, "
-            rf"\(\{{{seed_values}\}}\). All rows use the same 2,667,743-parameter "
-            r"architecture. The augmentation and augmentation-plus-normalized-LOCO "
-            r"rows are matched at 12 batch-level model evaluations per epoch; optimizer "
-            r"and backward-pass counts differ and are shown. Entries are mean $\pm$ "
-            r"sample standard deviation. Latency and wall time remain available in the "
-            r"per-run manifest; these eight-thread CPU training runs are not used for "
-            r"cross-backbone efficiency comparisons. Baseline seed 23 and "
-            r"augmentation-plus-LOCO seed 59 were resumed from fully saved checkpoints "
-            r"after epochs 108 and 103, respectively. Their post-resume minibatch "
-            r"streams need not reproduce uninterrupted runs, and their segment-local "
-            r"wall times are excluded from timing summaries.}"
-        ),
-        r"\label{tab:cno2d-backbone}",
-        r"\resizebox{\textwidth}{!}{%",
-        r"\begin{tabular}{lrrrrrr}",
-        r"\toprule",
-        "Method & Steps/epoch & Model fwds., total & Bwd. passes, total & ID $L^2$ & "
-        "Orbit OOD $L^2$ & Eq. defect \\\\",
-        r"\midrule",
-    ]
-    for spec in METHOD_SPECS:
-        row = rows[spec.method]
-        bold = spec.method == "aug_orbit"
-        relative = _fmt_pm(row["relative_l2_mean"], row["relative_l2_std"], bold=bold)
-        orbit_ood = _fmt_pm(
-            row["orbit_ood_relative_l2_mean"],
-            row["orbit_ood_relative_l2_std"],
-            bold=bold,
-        )
-        defect = _fmt_pm(
-            row["equivariance_defect_relative_mean"],
-            row["equivariance_defect_relative_std"],
-            bold=bold,
-        )
-        lines.append(
-            f"{row['method_label']} & {int(row['steps_per_epoch'])} & "
-            f"{int(row['model_forwards_total'])} & {int(row['backward_passes_total'])} & "
-            f"{relative} & {orbit_ood} & {defect} \\\\")
-    lines.extend([r"\bottomrule", r"\end{tabular}", r"}", r"\end{table*}", ""])
-    return "\n".join(lines)
+    paired = paired_protocol_comparison(
+        reference,
+        candidate,
+        metrics=CORE_METRICS,
+        expected_seeds=expected_seeds,
+        comparison="augmentation_plus_loco_minus_augmentation",
+        error_type=CNO2dProtocolError,
+    )
+    # Keep the published CSV schema: resume disclosures follow the paired seed set.
+    paired.insert(5, "reference_checkpoint_resumed_seeds", reference_resumed_seeds)
+    paired.insert(6, "candidate_checkpoint_resumed_seeds", candidate_resumed_seeds)
+    return paired
 
 
 def _manifest(run_df: pd.DataFrame) -> pd.DataFrame:
@@ -599,7 +479,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--run-root", type=Path, default=DEFAULT_RUN_ROOT)
     parser.add_argument("--out-prefix", type=Path, default=DEFAULT_OUT_PREFIX)
     parser.add_argument(
-        "--fresh-runs", action="store_true",
+        "--fresh-runs",
+        action="store_true",
         help="Validate new runs against their source manifest and dataset hashes.",
     )
     parser.add_argument(
@@ -615,7 +496,9 @@ def main() -> int:
     args = parse_args()
     try:
         fno_seeds = load_fno_reference_seeds(args.fno_runs)
-        run_df = build_run_frame(args.run_root, expected_seeds=fno_seeds, fresh_runs=args.fresh_runs)
+        run_df = build_run_frame(
+            args.run_root, expected_seeds=fno_seeds, fresh_runs=args.fresh_runs
+        )
         aggregate = aggregate_runs(run_df)
         paired = paired_primary(run_df, expected_seeds=fno_seeds)
     except CNO2dProtocolError as exc:
@@ -627,7 +510,6 @@ def main() -> int:
         "runs": Path(f"{args.out_prefix}.runs.csv"),
         "aggregate": Path(f"{args.out_prefix}.aggregate.csv"),
         "paired": Path(f"{args.out_prefix}.paired.csv"),
-        "tex": Path(f"{args.out_prefix}.tex"),
     }
     outputs["runs"].write_text(
         _manifest(run_df).to_csv(index=False, lineterminator="\n"), encoding="utf-8"
@@ -635,10 +517,7 @@ def main() -> int:
     outputs["aggregate"].write_text(
         aggregate.to_csv(index=False, lineterminator="\n"), encoding="utf-8"
     )
-    outputs["paired"].write_text(
-        paired.to_csv(index=False, lineterminator="\n"), encoding="utf-8"
-    )
-    outputs["tex"].write_text(latex_table(aggregate), encoding="utf-8")
+    outputs["paired"].write_text(paired.to_csv(index=False, lineterminator="\n"), encoding="utf-8")
     for path in outputs.values():
         print(f"wrote {path}")
     return 0

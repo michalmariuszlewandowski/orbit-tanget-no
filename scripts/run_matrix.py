@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 from __future__ import annotations
+
 import sys
 from pathlib import Path
 
@@ -66,13 +67,22 @@ def _completed_metrics(run_dir: Path) -> bool:
     except json.JSONDecodeError as error:
         raise ValueError(f"Invalid completed metrics: {path}") from error
     required = (
-        "relative_l2", "orbit_ood_relative_l2", "equivariance_defect_relative",
-        "latency_ms_per_sample", "best_val_relative_l2", "parameters",
+        "relative_l2",
+        "orbit_ood_relative_l2",
+        "equivariance_defect_relative",
+        "latency_ms_per_sample",
+        "best_val_relative_l2",
+        "parameters",
     )
-    if not isinstance(metrics, dict) or any(
-        type(metrics.get(key)) not in (int, float) or not math.isfinite(metrics[key])
-        for key in required
-    ) or not isinstance(metrics.get("method"), str) or not metrics["method"]:
+    if (
+        not isinstance(metrics, dict)
+        or any(
+            type(metrics.get(key)) not in (int, float) or not math.isfinite(metrics[key])
+            for key in required
+        )
+        or not isinstance(metrics.get("method"), str)
+        or not metrics["method"]
+    ):
         raise ValueError(f"Invalid completed metrics: {path}")
     return True
 
@@ -93,9 +103,7 @@ def main() -> None:
     parser.add_argument(
         "--skip-completed",
         action="store_true",
-        help=(
-            "Skip jobs whose runtime.run_dir contains valid final test metrics."
-        ),
+        help=("Skip jobs whose runtime.run_dir contains valid final test metrics."),
     )
     parser.add_argument(
         "--seed",

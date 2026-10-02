@@ -2,7 +2,7 @@ experiments:
   # N64 Galilean label-efficiency comparison with six augmentation updates or
   # four augmentation-plus-orbit updates per epoch. Each setting uses
   # 12 batch-level model evaluations per epoch.
-  - config: configs/pilot/2d_navier_stokes_galilean.yaml
+  - config: configs/problems/2d_navier_stokes_galilean.yaml
     seeds: [23, 31, 47]
     overrides:
       training.method: aug
@@ -11,7 +11,7 @@ experiments:
       runtime.overwrite: false
       runtime.run_dir: runs/ablations/2d_galilean_n64_label_efficiency_compute_matched/fraction_0.005/aug_steps_6
 
-  - config: configs/pilot/2d_navier_stokes_galilean.yaml
+  - config: configs/problems/2d_navier_stokes_galilean.yaml
     seeds: [23, 31, 47]
     overrides:
       training.method: aug_orbit
@@ -21,7 +21,7 @@ experiments:
       runtime.overwrite: false
       runtime.run_dir: runs/ablations/2d_galilean_n64_label_efficiency_compute_matched/fraction_0.005/aug_orbit_lambda_0.05_steps_4
 
-  - config: configs/pilot/2d_navier_stokes_galilean.yaml
+  - config: configs/problems/2d_navier_stokes_galilean.yaml
     seeds: [23, 31, 47]
     overrides:
       training.method: aug
@@ -31,7 +31,7 @@ experiments:
       runtime.run_dir: runs/ablations/2d_galilean_n64_label_efficiency_compute_matched/fraction_0.01/aug_steps_6
 
   # At 1%, aug_orbit_steps_4 spans the seed-23 pilot and seeds-31/47 replication.
-  - config: configs/pilot/2d_navier_stokes_galilean.yaml
+  - config: configs/problems/2d_navier_stokes_galilean.yaml
     seeds: [23]
     overrides:
       training.method: aug_orbit
@@ -41,7 +41,7 @@ experiments:
       runtime.overwrite: false
       runtime.run_dir: runs/ablations/2d_galilean_n64_low_label_pilot/fraction_0.01/aug_orbit_lambda_0.05_steps_4
 
-  - config: configs/pilot/2d_navier_stokes_galilean.yaml
+  - config: configs/problems/2d_navier_stokes_galilean.yaml
     seeds: [31, 47]
     overrides:
       training.method: aug_orbit
@@ -51,7 +51,7 @@ experiments:
       runtime.overwrite: false
       runtime.run_dir: runs/ablations/2d_galilean_n64_low_label_seed_replication/fraction_0.01/aug_orbit_lambda_0.05_steps_4
 
-  - config: configs/pilot/2d_navier_stokes_galilean.yaml
+  - config: configs/problems/2d_navier_stokes_galilean.yaml
     seeds: [23, 31, 47]
     overrides:
       training.method: aug
@@ -60,7 +60,7 @@ experiments:
       runtime.overwrite: false
       runtime.run_dir: runs/ablations/2d_galilean_n64_label_efficiency_compute_matched/fraction_0.02/aug_steps_6
 
-  - config: configs/pilot/2d_navier_stokes_galilean.yaml
+  - config: configs/problems/2d_navier_stokes_galilean.yaml
     seeds: [23, 31, 47]
     overrides:
       training.method: aug_orbit
@@ -70,7 +70,7 @@ experiments:
       runtime.overwrite: false
       runtime.run_dir: runs/ablations/2d_galilean_n64_paper_ladder/fraction_0.02/aug_orbit_lambda_0.05_steps_4
 
-  - config: configs/pilot/2d_navier_stokes_galilean.yaml
+  - config: configs/problems/2d_navier_stokes_galilean.yaml
     seeds: [23, 31, 47]
     overrides:
       training.method: aug
@@ -79,7 +79,7 @@ experiments:
       runtime.overwrite: false
       runtime.run_dir: runs/ablations/2d_galilean_n64_compute_matched/fraction_0.05/aug_steps_6
 
-  - config: configs/pilot/2d_navier_stokes_galilean.yaml
+  - config: configs/problems/2d_navier_stokes_galilean.yaml
     seeds: [23, 31, 47]
     overrides:
       training.method: aug_orbit

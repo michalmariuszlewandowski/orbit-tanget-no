@@ -1,11 +1,12 @@
-from __future__ import annotations
+"""Generate benchmark splits and validate dataset caches before reuse."""
 
-from pathlib import Path
-from typing import Any
+from __future__ import annotations
 
 import copy
 import hashlib
 import json
+from pathlib import Path
+from typing import Any
 
 import numpy as np
 import torch
@@ -46,12 +47,13 @@ def _metadata(kind: str, config: dict[str, Any]) -> dict[str, Any]:
 
 
 def validate_existing_dataset(path: str | Path, config: dict[str, Any]) -> None:
-    """Raise when an existing dataset file was generated from different parameters."""
+    """Reject non-finite tensors or a cache generated from different parameters."""
     path = Path(path)
     if not path.exists():
         return
     config = config.get("dataset", config)
     payload = torch.load(path, map_location="cpu", weights_only=False)
+    _validate_finite_splits(payload)
     metadata = payload.get("metadata", {})
     expected = dataset_config_fingerprint(config)
     actual = metadata.get("config_fingerprint")
@@ -76,7 +78,19 @@ def _split_counts(config: dict[str, Any]) -> dict[str, int]:
     }
 
 
+def _validate_finite_splits(payload: dict[str, Any]) -> None:
+    """Stop failed numerical solves from becoming reusable training evidence."""
+    for split, tensors in payload.get("splits", {}).items():
+        for name, tensor in tensors.items():
+            if isinstance(tensor, torch.Tensor) and not torch.isfinite(tensor).all():
+                raise ValueError(
+                    f"Non-finite values in dataset {split}.{name}; "
+                    "check solver time step and generation settings."
+                )
+
+
 def _save_dataset(payload: dict[str, Any], out_path: str | Path) -> Path:
+    _validate_finite_splits(payload)
     out_path = Path(out_path)
     out_path.parent.mkdir(parents=True, exist_ok=True)
     torch.save(payload, out_path)
@@ -141,7 +155,10 @@ def generate_burgers_1d(config: dict[str, Any], out_path: str | Path) -> Path:
             generated += b
         a_cat = torch.cat(a_all, dim=0)
         u_cat = torch.cat(u_all, dim=0)
-        payload["splits"][split] = {"a": a_cat[..., None].contiguous(), "u": u_cat[..., None].contiguous()}
+        payload["splits"][split] = {
+            "a": a_cat[..., None].contiguous(),
+            "u": u_cat[..., None].contiguous(),
+        }
         offset += 100_000
     return _save_dataset(payload, out_path)
 
@@ -221,7 +238,10 @@ def generate_navier_stokes_2d(config: dict[str, Any], out_path: str | Path) -> P
     seed = int(config.get("seed", 0))
     counts = _split_counts(config)
     batch_size = int(config.get("solver_batch_size", 8))
-    payload: dict[str, Any] = {"metadata": _metadata("navier_stokes_vorticity2d", config), "splits": {}}
+    payload: dict[str, Any] = {
+        "metadata": _metadata("navier_stokes_vorticity2d", config),
+        "splits": {},
+    }
     offset = 0
     for split, num in counts.items():
         a_all = []
@@ -248,7 +268,10 @@ def generate_navier_stokes_2d(config: dict[str, Any], out_path: str | Path) -> P
             generated += b
         a_cat = torch.cat(a_all, dim=0)
         u_cat = torch.cat(u_all, dim=0)
-        payload["splits"][split] = {"a": a_cat[..., None].contiguous(), "u": u_cat[..., None].contiguous()}
+        payload["splits"][split] = {
+            "a": a_cat[..., None].contiguous(),
+            "u": u_cat[..., None].contiguous(),
+        }
         offset += 100_000
     return _save_dataset(payload, out_path)
 
@@ -262,7 +285,10 @@ def generate_boosted_navier_stokes_2d(config: dict[str, Any], out_path: str | Pa
     seed = int(config.get("seed", 0))
     counts = _split_counts(config)
     batch_size = int(config.get("solver_batch_size", 8))
-    payload: dict[str, Any] = {"metadata": _metadata("navier_stokes_vorticity2d_boosted", config), "splits": {}}
+    payload: dict[str, Any] = {
+        "metadata": _metadata("navier_stokes_vorticity2d_boosted", config),
+        "splits": {},
+    }
     offset = 0
     for split, num in counts.items():
         a_all = []
@@ -362,7 +388,9 @@ def generate_rmd17_force(config: dict[str, Any], out_path: str | Path) -> Path:
     return _save_dataset(payload, out_path)
 
 
-def generate_dataset_from_config(config: dict[str, Any], out_path: str | Path | None = None) -> Path:
+def generate_dataset_from_config(
+    config: dict[str, Any], out_path: str | Path | None = None
+) -> Path:
     dataset_cfg = config.get("dataset", config)
     kind = str(dataset_cfg.get("kind", dataset_cfg.get("name", "burgers1d"))).lower()
     out_path = Path(out_path or dataset_cfg.get("path", f"data/{kind}.pt"))

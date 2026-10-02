@@ -29,9 +29,7 @@ def _periodic_coordinate_features(height: int, width: int, modes: int) -> torch.
     frequencies = torch.arange(1, modes + 1, dtype=torch.float32)
     phase_x = 2.0 * math.pi * xx[..., None] * frequencies
     phase_y = 2.0 * math.pi * yy[..., None] * frequencies
-    features = torch.cat(
-        [phase_x.sin(), phase_x.cos(), phase_y.sin(), phase_y.cos()], dim=-1
-    )
+    features = torch.cat([phase_x.sin(), phase_x.cos(), phase_y.sin(), phase_y.cos()], dim=-1)
     return features.reshape(height * width, 4 * modes)
 
 

@@ -1,7 +1,7 @@
 PYTHON ?= python
 TEST_ENV = PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 NUMEXPR_NUM_THREADS=1
 
-.PHONY: install test smoke format lint clean check-configs validate-solvers quality dry-run tables compile
+.PHONY: install test smoke format check-format lint clean check-configs validate-solvers quality dry-run tables compile
 
 install:
 	$(PYTHON) -m pip install -e ".[dev]"
@@ -35,6 +35,9 @@ lint:
 
 format:
 	$(PYTHON) -m ruff format src scripts tests
+
+check-format:
+	$(PYTHON) -m ruff format --check src scripts tests
 
 clean:
 	$(PYTHON) scripts/clean.py

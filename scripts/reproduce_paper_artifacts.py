@@ -16,8 +16,8 @@ if str(SRC) not in sys.path:
 import pandas as pd
 
 from otno.reporting import collect_run_rows, drop_empty_config_columns
-from run_ood_severity_matrix import _jobs as _iter_severity_jobs, _symmetry_value
-
+from run_ood_severity_matrix import _jobs as _iter_severity_jobs
+from run_ood_severity_matrix import _symmetry_value
 
 METRIC_COLS = [
     "relative_l2",
@@ -106,8 +106,7 @@ TRAINING_SPECS = {
             "lambda_orbit": 0.10,
         },
         {
-            "prefix": "runs/ablations/2d_galilean_n64_compute_matched/"
-            "fraction_0.05/aug_steps_6",
+            "prefix": "runs/ablations/2d_galilean_n64_compute_matched/fraction_0.05/aug_steps_6",
             "method": "aug",
             "data_fraction": 0.05,
             "steps_per_epoch": 6,
@@ -258,9 +257,7 @@ def _aggregate(df: pd.DataFrame, group_cols: list[str]) -> pd.DataFrame:
     if df.empty or not value_cols:
         return pd.DataFrame()
     aggregate = (
-        df.groupby(group_cols, dropna=False)[value_cols]
-        .agg(["mean", "std", "count"])
-        .reset_index()
+        df.groupby(group_cols, dropna=False)[value_cols].agg(["mean", "std", "count"]).reset_index()
     )
     return _flatten_columns(aggregate)
 
@@ -271,14 +268,8 @@ def _write_table(df: pd.DataFrame, out_prefix: Path, group_cols: list[str]) -> p
     df.to_csv(out_prefix.with_suffix(".runs.csv"), index=False)
     aggregate = _aggregate(df, group_cols)
     aggregate.to_csv(out_prefix.with_suffix(".aggregate.csv"), index=False)
-    with out_prefix.with_suffix(".aggregate.tex").open("w", encoding="utf-8") as f:
-        if aggregate.empty:
-            f.write("% No completed runs found.\n")
-        else:
-            f.write(aggregate.to_latex(index=False, escape=False))
     print(f"wrote {out_prefix.with_suffix('.runs.csv')}", flush=True)
     print(f"wrote {out_prefix.with_suffix('.aggregate.csv')}", flush=True)
-    print(f"wrote {out_prefix.with_suffix('.aggregate.tex')}", flush=True)
     return aggregate
 
 
@@ -413,7 +404,9 @@ def _manifest_for_severity(df: pd.DataFrame) -> list[dict[str, Any]]:
                 "paper_table": record.get("paper_table", "ood_severity"),
                 "method": record.get("method"),
                 "data_fraction": 0.02,
-                "lambda_orbit": 0.10 if record.get("method") == "aug_orbit_lambda_0.1_steps_4" else None,
+                "lambda_orbit": 0.10
+                if record.get("method") == "aug_orbit_lambda_0.1_steps_4"
+                else None,
                 "seed": record.get("seed"),
                 "severity": record.get("severity"),
                 "run_dir": run_dir_text,
@@ -466,8 +459,8 @@ def _claim_summary(
     headline: pd.DataFrame,
     label_efficiency: pd.DataFrame,
     severity: pd.DataFrame,
-    out_path: Path,
-) -> None:
+) -> pd.DataFrame:
+    """Calculate claim reductions from aggregates without writing files."""
     rows: list[dict[str, Any]] = []
     for metric in ["orbit_ood_relative_l2", "equivariance_defect_relative"]:
         _add_reduction(
@@ -521,9 +514,7 @@ def _claim_summary(
                 ),
                 n=5,
             )
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-    pd.DataFrame(rows).to_csv(out_path, index=False)
-    print(f"wrote {out_path}", flush=True)
+    return pd.DataFrame(rows)
 
 
 def _regenerate_figures(*, table_dir: Path, figures_dir: Path) -> None:
@@ -572,6 +563,65 @@ def _regenerate_diagnostics(*, table_dir: Path, figures_dir: Path) -> None:
     subprocess.run(cmd, check=True)
 
 
+def _collect_artifact_tables(runs: str | Path) -> dict[str, pd.DataFrame]:
+    """Select and validate all recorded experiments before writing tables."""
+    all_runs = pd.DataFrame(collect_run_rows(runs))
+    if all_runs.empty:
+        raise SystemExit(f"No test_metrics.json files found under {runs}")
+    tables = {name: _select_training_rows(all_runs, name) for name in TABLE_OUTPUTS}
+    tables["severity"] = _collect_severity_rows()
+    tables["oracle_canonicalization"] = _collect_oracle_rows()
+    return tables
+
+
+def _write_artifact_tables(
+    tables: dict[str, pd.DataFrame], out_dir: Path
+) -> dict[str, pd.DataFrame]:
+    """Write per-run and seed-aggregate CSVs using the declared group columns."""
+    aggregates = {}
+    for name, output in TABLE_OUTPUTS.items():
+        aggregates[name] = _write_table(
+            tables[name], out_dir / output["out_prefix"], list(output["group_cols"])
+        )
+    for name, prefix in (
+        ("severity", "2d_galilean_n64_2pct_ood_severity_lambda_0p1"),
+        ("oracle_canonicalization", "2d_galilean_n64_2pct_oracle_canonicalization"),
+    ):
+        aggregates[name] = _write_table(
+            tables[name], out_dir / prefix, ["severity", "severity_scale", "max_boost", "method"]
+        )
+    return aggregates
+
+
+def _build_artifact_manifest(tables: dict[str, pd.DataFrame]) -> pd.DataFrame:
+    """Inspect the source evidence for every selected training and evaluation run."""
+    training = pd.concat([tables[name] for name in TABLE_OUTPUTS], ignore_index=True)
+    rows = _manifest_for_training(training)
+    rows.extend(_manifest_for_severity(tables["severity"]))
+    rows.extend(_manifest_for_severity(tables["oracle_canonicalization"]))
+    return pd.DataFrame(rows).sort_values(
+        ["artifact_type", "paper_table", "data_fraction", "method", "severity", "seed"],
+        na_position="last",
+    )
+
+
+def _write_csv(rows: pd.DataFrame, path: Path) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    rows.to_csv(path, index=False)
+    print(f"wrote {path}", flush=True)
+
+
+def _write_artifact_manifest(manifest: pd.DataFrame, path: Path) -> None:
+    """Retain a diagnostic manifest even when source evidence is incomplete."""
+    _write_csv(manifest, path)
+    if not manifest["complete"].all():
+        incomplete = manifest[~manifest["complete"]]
+        raise SystemExit(
+            "Incomplete final artifacts:\n"
+            + incomplete[["artifact_type", "run_dir", "missing_files"]].to_string(index=False)
+        )
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(
         description="Regenerate N64 Galilean tables and figures from recorded metrics."
@@ -583,58 +633,16 @@ def main() -> None:
     args = parser.parse_args()
 
     out_dir = Path(args.out_dir)
-    all_runs = pd.DataFrame(collect_run_rows(args.runs))
-    if all_runs.empty:
-        raise SystemExit(f"No test_metrics.json files found under {args.runs}")
-
-    selected_training: list[pd.DataFrame] = []
-    aggregates: dict[str, pd.DataFrame] = {}
-    for table_name, output in TABLE_OUTPUTS.items():
-        rows = _select_training_rows(all_runs, table_name)
-        selected_training.append(rows)
-        aggregates[table_name] = _write_table(
-            rows,
-            out_dir / output["out_prefix"],
-            list(output["group_cols"]),
-        )
-
-    severity_rows = _collect_severity_rows()
-    aggregates["severity"] = _write_table(
-        severity_rows,
-        out_dir / "2d_galilean_n64_2pct_ood_severity_lambda_0p1",
-        ["severity", "severity_scale", "max_boost", "method"],
-    )
-    oracle_rows = _collect_oracle_rows()
-    aggregates["oracle_canonicalization"] = _write_table(
-        oracle_rows,
-        out_dir / "2d_galilean_n64_2pct_oracle_canonicalization",
-        ["severity", "severity_scale", "max_boost", "method"],
-    )
-
-    manifest_rows = []
-    manifest_rows.extend(_manifest_for_training(pd.concat(selected_training, ignore_index=True)))
-    manifest_rows.extend(_manifest_for_severity(severity_rows))
-    manifest_rows.extend(_manifest_for_severity(oracle_rows))
-    manifest = pd.DataFrame(manifest_rows).sort_values(
-        ["artifact_type", "paper_table", "data_fraction", "method", "severity", "seed"],
-        na_position="last",
-    )
-    manifest_path = out_dir / "2d_galilean_n64_final_manifest.csv"
-    manifest.to_csv(manifest_path, index=False)
-    print(f"wrote {manifest_path}", flush=True)
-    if not manifest["complete"].all():
-        incomplete = manifest[~manifest["complete"]]
-        raise SystemExit(
-            "Incomplete final artifacts:\n"
-            + incomplete[["artifact_type", "run_dir", "missing_files"]].to_string(index=False)
-        )
-
-    _claim_summary(
+    tables = _collect_artifact_tables(args.runs)
+    aggregates = _write_artifact_tables(tables, out_dir)
+    manifest = _build_artifact_manifest(tables)
+    _write_artifact_manifest(manifest, out_dir / "2d_galilean_n64_final_manifest.csv")
+    claims = _claim_summary(
         headline=aggregates["headline"],
         label_efficiency=aggregates["label_efficiency"],
         severity=aggregates["severity"],
-        out_path=out_dir / "2d_galilean_n64_claim_summary.csv",
     )
+    _write_csv(claims, out_dir / "2d_galilean_n64_claim_summary.csv")
     _regenerate_diagnostics(table_dir=out_dir, figures_dir=Path(args.figures_dir))
     if not args.skip_figures:
         _regenerate_figures(table_dir=out_dir, figures_dir=Path(args.figures_dir))

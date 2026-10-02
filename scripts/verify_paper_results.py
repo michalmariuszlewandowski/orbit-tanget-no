@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 """Recompute paper table statistics from the released per-seed CSV records."""
+
 from __future__ import annotations
 
 import argparse
@@ -47,7 +48,9 @@ def verify(root: Path, reference: Path) -> tuple[int, int]:
                     exponent = int(printed.lower().split("e")[1]) if "e" in printed.lower() else 0
                     tolerance = 0.50001 * 10.0 ** (exponent - decimals)
                     if abs(observed - float(printed)) > tolerance:
-                        raise ValueError(f"{label}: {metric} {statistic}={observed:.10g}, PDF={printed}")
+                        raise ValueError(
+                            f"{label}: {metric} {statistic}={observed:.10g}, PDF={printed}"
+                        )
                     values_checked += 1
             rows_checked += 1
     return rows_checked, values_checked
@@ -60,7 +63,9 @@ def main() -> None:
     args = parser.parse_args()
     root = args.root.resolve()
     rows, values = verify(root, root / args.reference)
-    print(f"PAPER VALUES VERIFIED: {rows} rows, {values} mean/std values; seed sets and hash fields checked")
+    print(
+        f"PAPER VALUES VERIFIED: {rows} rows, {values} mean/std values; seed sets and hash fields checked"
+    )
 
 
 if __name__ == "__main__":

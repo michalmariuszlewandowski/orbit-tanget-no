@@ -5,7 +5,9 @@ import math
 import torch
 
 
-def make_grid_1d(n: int, *, device: torch.device | None = None, dtype=torch.float32) -> torch.Tensor:
+def make_grid_1d(
+    n: int, *, device: torch.device | None = None, dtype=torch.float32
+) -> torch.Tensor:
     return torch.arange(n, device=device, dtype=dtype) / n
 
 
@@ -37,7 +39,9 @@ def random_fourier_field_1d(
     return amplitude * fields + mean
 
 
-def _fft_frequencies_1d(n: int, length: float, device: torch.device, dtype: torch.dtype) -> torch.Tensor:
+def _fft_frequencies_1d(
+    n: int, length: float, device: torch.device, dtype: torch.dtype
+) -> torch.Tensor:
     return 2 * math.pi * torch.fft.fftfreq(n, d=length / n, device=device).to(dtype)
 
 
@@ -53,7 +57,9 @@ def dealias_1d(u: torch.Tensor, *, keep_fraction: float = 2.0 / 3.0) -> torch.Te
     return torch.fft.ifft(u_hat * mask, dim=-1).real
 
 
-def spectral_derivatives_1d(u: torch.Tensor, *, length: float = 1.0) -> tuple[torch.Tensor, torch.Tensor]:
+def spectral_derivatives_1d(
+    u: torch.Tensor, *, length: float = 1.0
+) -> tuple[torch.Tensor, torch.Tensor]:
     """Return first and second periodic spectral derivatives for u[..., n]."""
     n = u.shape[-1]
     k = _fft_frequencies_1d(n, length, u.device, u.dtype)
@@ -63,7 +69,9 @@ def spectral_derivatives_1d(u: torch.Tensor, *, length: float = 1.0) -> tuple[to
     return ux, uxx
 
 
-def periodic_shift_1d_spectral(u: torch.Tensor, shift: torch.Tensor | float, *, length: float = 1.0) -> torch.Tensor:
+def periodic_shift_1d_spectral(
+    u: torch.Tensor, shift: torch.Tensor | float, *, length: float = 1.0
+) -> torch.Tensor:
     """Return f(x - shift) for fields u with shape [batch, n]."""
     if u.ndim != 2:
         raise ValueError(f"Expected [batch, n], got {tuple(u.shape)}")
@@ -106,7 +114,9 @@ def burgers_rhs_1d(
     return -nonlinear + viscosity * uxx
 
 
-def _rk4_step_burgers(u: torch.Tensor, dt: float, *, viscosity: float, length: float, dealias: bool) -> torch.Tensor:
+def _rk4_step_burgers(
+    u: torch.Tensor, dt: float, *, viscosity: float, length: float, dealias: bool
+) -> torch.Tensor:
     k1 = burgers_rhs_1d(u, viscosity=viscosity, length=length, dealias=dealias)
     k2 = burgers_rhs_1d(u + 0.5 * dt * k1, viscosity=viscosity, length=length, dealias=dealias)
     k3 = burgers_rhs_1d(u + 0.5 * dt * k2, viscosity=viscosity, length=length, dealias=dealias)

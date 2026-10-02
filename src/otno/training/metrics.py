@@ -1,3 +1,5 @@
+"""Seeded ID/OOD evaluation, equivariance diagnostics, and inference timing."""
+
 from __future__ import annotations
 
 import time
@@ -25,14 +27,22 @@ def _rng_context(seed: int | None):
     return torch.random.fork_rng(devices=devices, enabled=True)
 
 
-def _add_stats(name: str, values: torch.Tensor, sums: dict[str, float], sumsqs: dict[str, float], counts: dict[str, int]) -> None:
+def _add_stats(
+    name: str,
+    values: torch.Tensor,
+    sums: dict[str, float],
+    sumsqs: dict[str, float],
+    counts: dict[str, int],
+) -> None:
     flat = values.detach().reshape(-1).float().cpu()
     sums[name] += float(flat.sum())
     sumsqs[name] += float((flat * flat).sum())
     counts[name] += int(flat.numel())
 
 
-def _finalize(sums: dict[str, float], sumsqs: dict[str, float], counts: dict[str, int]) -> dict[str, float]:
+def _finalize(
+    sums: dict[str, float], sumsqs: dict[str, float], counts: dict[str, int]
+) -> dict[str, float]:
     out: dict[str, float] = {}
     for key, count in counts.items():
         if count <= 0:
@@ -76,7 +86,9 @@ def evaluate_model(
             pred = model(a)
             _add_stats("relative_l2", relative_l2_per_sample(pred, u), sums, sumsqs, counts)
             if u.ndim == 3 and u.shape[-1] > 3:
-                _add_stats("trajectory_nmse", trajectory_nmse_per_sample(pred, u), sums, sumsqs, counts)
+                _add_stats(
+                    "trajectory_nmse", trajectory_nmse_per_sample(pred, u), sums, sumsqs, counts
+                )
             _add_stats("mae", mean_absolute_per_sample(pred - u), sums, sumsqs, counts)
             if u.ndim == 3 and u.shape[-1] == 3:
                 _add_stats("force_mae", mean_absolute_per_sample(pred - u), sums, sumsqs, counts)
@@ -90,7 +102,13 @@ def evaluate_model(
                     pred_t = model(a_t)
                     pred_equiv = transform.apply_output(pred, sample)
                     mask = transform.output_mask(u_t, sample)
-                    _add_stats("orbit_ood_relative_l2", relative_l2_per_sample(pred_t, u_t, mask=mask), sums, sumsqs, counts)
+                    _add_stats(
+                        "orbit_ood_relative_l2",
+                        relative_l2_per_sample(pred_t, u_t, mask=mask),
+                        sums,
+                        sumsqs,
+                        counts,
+                    )
                     if u_t.ndim == 3 and u_t.shape[-1] > 3:
                         _add_stats(
                             "orbit_ood_trajectory_nmse",
@@ -99,11 +117,35 @@ def evaluate_model(
                             sumsqs,
                             counts,
                         )
-                    _add_stats("orbit_ood_mae", mean_absolute_per_sample(pred_t - u_t, mask=mask), sums, sumsqs, counts)
-                    _add_stats("oracle_canonical_ood_relative_l2", relative_l2_per_sample(pred_equiv, u_t, mask=mask), sums, sumsqs, counts)
-                    _add_stats("equivariance_defect_relative", relative_defect_per_sample(pred_t, pred_equiv, mask=mask), sums, sumsqs, counts)
+                    _add_stats(
+                        "orbit_ood_mae",
+                        mean_absolute_per_sample(pred_t - u_t, mask=mask),
+                        sums,
+                        sumsqs,
+                        counts,
+                    )
+                    _add_stats(
+                        "oracle_canonical_ood_relative_l2",
+                        relative_l2_per_sample(pred_equiv, u_t, mask=mask),
+                        sums,
+                        sumsqs,
+                        counts,
+                    )
+                    _add_stats(
+                        "equivariance_defect_relative",
+                        relative_defect_per_sample(pred_t, pred_equiv, mask=mask),
+                        sums,
+                        sumsqs,
+                        counts,
+                    )
                     if u_t.ndim == 3 and u_t.shape[-1] == 3:
-                        _add_stats("orbit_ood_force_mae", mean_absolute_per_sample(pred_t - u_t, mask=mask), sums, sumsqs, counts)
+                        _add_stats(
+                            "orbit_ood_force_mae",
+                            mean_absolute_per_sample(pred_t - u_t, mask=mask),
+                            sums,
+                            sumsqs,
+                            counts,
+                        )
                     _add_stats("epsilon", sample.epsilon, sums, sumsqs, counts)
     elapsed = time.perf_counter() - start
     metrics = _finalize(sums, sumsqs, counts)
@@ -111,7 +153,9 @@ def evaluate_model(
         metrics["epsilon_mean"] = metrics.pop("epsilon")
         metrics["epsilon_mean_std"] = metrics.pop("epsilon_std")
         metrics["epsilon_mean_stderr"] = metrics.pop("epsilon_stderr")
-    metrics.update({"num_samples": num_samples, "num_batches": num_batches, "eval_seconds": elapsed})
+    metrics.update(
+        {"num_samples": num_samples, "num_batches": num_batches, "eval_seconds": elapsed}
+    )
     return metrics
 
 

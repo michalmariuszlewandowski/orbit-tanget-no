@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 from __future__ import annotations
+
 import sys
 from pathlib import Path
 
@@ -15,9 +16,13 @@ from otno.training.trainer import train_from_config
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Train a neural operator with optional orbit consistency.")
+    parser = argparse.ArgumentParser(
+        description="Train a neural operator with optional orbit consistency."
+    )
     parser.add_argument("--config", required=True)
-    parser.add_argument("--override", action="append", default=[], help="Override config values: a.b=value")
+    parser.add_argument(
+        "--override", action="append", default=[], help="Override config values: a.b=value"
+    )
     args = parser.parse_args()
     cfg = recursive_update(load_config(args.config), parse_overrides(args.override))
     results = train_from_config(cfg)

@@ -1,3 +1,9 @@
+"""Collect run records and share validation and statistics across paper reports.
+
+Experiment scripts declare their own methods, metrics, and training protocols;
+this module supplies the common arithmetic and provenance checks.
+"""
+
 from __future__ import annotations
 
 import json
@@ -45,9 +51,7 @@ class RunValidation:
                 f"{context}: expected {column}={expected!r}; found " + "; ".join(failures)
             )
 
-    def optional_constant(
-        self, df: pd.DataFrame, column: str, expected: Any, context: str
-    ) -> None:
+    def optional_constant(self, df: pd.DataFrame, column: str, expected: Any, context: str) -> None:
         if column not in df.columns:
             return
         failures = [
@@ -57,8 +61,7 @@ class RunValidation:
         ]
         if failures:
             raise self.error_type(
-                f"{context}: expected absent or {column}={expected!r}; found "
-                + "; ".join(failures)
+                f"{context}: expected absent or {column}={expected!r}; found " + "; ".join(failures)
             )
 
     def absent(self, df: pd.DataFrame, column: str, context: str) -> None:
@@ -172,6 +175,29 @@ class RunValidation:
         return reference
 
 
+def _paired_difference_statistics(
+    reference: pd.Series, candidate: pd.Series
+) -> dict[str, float | int | bool]:
+    """Compute a Student-t interval from already aligned independent seed pairs."""
+    differences = candidate - reference
+    n = int(differences.shape[0])
+    delta = float(differences.mean())
+    delta_std = float(differences.std(ddof=1))
+    delta_sem = delta_std / math.sqrt(n)
+    half_width = float(student_t.ppf(0.975, n - 1)) * delta_sem
+    return {
+        "seed_count": n,
+        "reference_mean": float(reference.mean()),
+        "candidate_mean": float(candidate.mean()),
+        "paired_delta_mean": delta,
+        "paired_delta_std": delta_std,
+        "paired_delta_sem": delta_sem,
+        "paired_delta_ci95_low": delta - half_width,
+        "paired_delta_ci95_high": delta + half_width,
+        "ci_excludes_zero": bool(delta - half_width > 0 or delta + half_width < 0),
+    }
+
+
 def paired_metric_summary(
     reference: pd.DataFrame, candidate: pd.DataFrame, metric: str, *, context: str
 ) -> dict[str, float | int]:
@@ -183,34 +209,131 @@ def paired_metric_summary(
         raise ValueError(f"{context}: reference and candidate seed sets differ")
     n = len(reference_seeds)
     if n < 2:
-        raise ValueError(f"{context}: at least two paired seeds are required for a confidence interval")
+        raise ValueError(
+            f"{context}: at least two paired seeds are required for a confidence interval"
+        )
     validation.finite_metrics(reference, f"{context}: reference", (metric,))
     validation.finite_metrics(candidate, f"{context}: candidate", (metric,))
     if "dataset_sha256" in reference or "dataset_sha256" in candidate:
         validation.nonempty_consistent(
             pd.concat([reference, candidate], ignore_index=True), "dataset_sha256", context
         )
-    left = pd.DataFrame({"seed": reference_seeds, "reference": pd.to_numeric(reference[metric]).to_numpy()})
-    right = pd.DataFrame({"seed": candidate_seeds, "candidate": pd.to_numeric(candidate[metric]).to_numpy()})
+    left = pd.DataFrame(
+        {"seed": reference_seeds, "reference": pd.to_numeric(reference[metric]).to_numpy()}
+    )
+    right = pd.DataFrame(
+        {"seed": candidate_seeds, "candidate": pd.to_numeric(candidate[metric]).to_numpy()}
+    )
     paired = left.merge(right, on="seed", validate="one_to_one").sort_values("seed")
-    delta = paired["candidate"] - paired["reference"]
-    mean = float(delta.mean())
-    sem = float(delta.std(ddof=1)) / math.sqrt(n)
-    half_width = float(student_t.ppf(0.975, n - 1)) * sem
-    reference_mean = float(paired["reference"].mean())
-    candidate_mean = float(paired["candidate"].mean())
+    statistics = _paired_difference_statistics(paired["reference"], paired["candidate"])
+    reference_mean = statistics["reference_mean"]
+    candidate_mean = statistics["candidate_mean"]
     return {
         "seed_count": n,
         "reference_mean": reference_mean,
         "candidate_mean": candidate_mean,
-        "paired_delta_mean": mean,
-        "paired_delta_ci95_low": mean - half_width,
-        "paired_delta_ci95_high": mean + half_width,
+        "paired_delta_mean": statistics["paired_delta_mean"],
+        "paired_delta_ci95_low": statistics["paired_delta_ci95_low"],
+        "paired_delta_ci95_high": statistics["paired_delta_ci95_high"],
         "relative_reduction_pct": (
             100.0 * (reference_mean - candidate_mean) / reference_mean
-            if reference_mean != 0.0 else math.nan
+            if reference_mean != 0.0
+            else math.nan
         ),
     }
+
+
+def paired_protocol_comparison(
+    reference: pd.DataFrame,
+    candidate: pd.DataFrame,
+    *,
+    metrics: tuple[str, ...],
+    expected_seeds: tuple[int, ...],
+    comparison: str,
+    error_type: type[ValueError] = ValueError,
+) -> pd.DataFrame:
+    """Compare validated backbone runs using their declared metric and seed order.
+
+    Run loaders validate the experiment protocol before this step. The merge still
+    checks that each seed occurs once, and each metric must have the expected pairs.
+    A zero reference mean remains an error for these relative-reduction tables.
+    """
+    rows: list[dict[str, Any]] = []
+    for metric in metrics:
+        paired = (
+            reference[["seed", metric]]
+            .rename(columns={metric: "reference"})
+            .merge(
+                candidate[["seed", metric]].rename(columns={metric: "candidate"}),
+                on="seed",
+                how="inner",
+                validate="one_to_one",
+            )
+            .sort_values("seed")
+        )
+        seeds = tuple(int(seed) for seed in paired["seed"])
+        if seeds != expected_seeds:
+            raise error_type(
+                f"primary paired comparison for {metric}: expected {expected_seeds}, found {seeds}"
+            )
+        statistics = _paired_difference_statistics(paired["reference"], paired["candidate"])
+        reference_mean = statistics["reference_mean"]
+        candidate_mean = statistics["candidate_mean"]
+        rows.append(
+            {
+                "comparison": comparison,
+                "difference_direction": "candidate_minus_reference",
+                "metric": metric,
+                "seed_count": statistics["seed_count"],
+                "seeds": ",".join(str(seed) for seed in expected_seeds),
+                "reference_mean": reference_mean,
+                "candidate_mean": candidate_mean,
+                "paired_delta_mean": statistics["paired_delta_mean"],
+                "paired_delta_std": statistics["paired_delta_std"],
+                "paired_delta_sem": statistics["paired_delta_sem"],
+                "paired_delta_ci95_low": statistics["paired_delta_ci95_low"],
+                "paired_delta_ci95_high": statistics["paired_delta_ci95_high"],
+                "relative_reduction_pct": (
+                    100.0 * (reference_mean - candidate_mean) / reference_mean
+                ),
+                "ci_excludes_zero": statistics["ci_excludes_zero"],
+            }
+        )
+    return pd.DataFrame(rows)
+
+
+def backbone_training_summary(
+    group: pd.DataFrame,
+    *,
+    method: str,
+    label: str,
+    epochs: int,
+    steps_per_epoch: int,
+    model_forwards_per_epoch: int,
+) -> dict[str, Any]:
+    """Describe a validated, seed-sorted method's training budget and seed set."""
+    return {
+        "method": method,
+        "method_label": label,
+        "steps_per_epoch": steps_per_epoch,
+        "optimizer_steps": steps_per_epoch * epochs,
+        "model_forwards_per_epoch": model_forwards_per_epoch,
+        "model_forwards_total": model_forwards_per_epoch * epochs,
+        "backward_passes_total": steps_per_epoch * epochs,
+        "seed_count": int(group["seed"].nunique()),
+        "seeds": ",".join(str(int(seed)) for seed in group["seed"]),
+        "parameters": int(group["parameters"].iloc[0]),
+    }
+
+
+def metric_mean_std(group: pd.DataFrame, *, metrics: tuple[str, ...]) -> dict[str, float]:
+    """Summarize declared metrics in order, using sample standard deviations."""
+    summary = {}
+    for metric in metrics:
+        values = pd.to_numeric(group[metric], errors="raise")
+        summary[f"{metric}_mean"] = float(values.mean())
+        summary[f"{metric}_std"] = float(values.std(ddof=1))
+    return summary
 
 
 def drop_empty_config_columns(df: pd.DataFrame) -> pd.DataFrame:
@@ -228,6 +351,7 @@ def _flatten(prefix: str, value: Any, out: dict[str, Any]) -> None:
 
 
 def collect_run_rows(runs_dir: str | Path) -> list[dict[str, Any]]:
+    """Read completed run metrics and flatten their saved configs into table columns."""
     rows: list[dict[str, Any]] = []
     for metrics_path in sorted(Path(runs_dir).glob("**/test_metrics.json")):
         with metrics_path.open("r", encoding="utf-8") as f:
@@ -273,12 +397,17 @@ def validate_fresh_run_provenance(df: pd.DataFrame, *, source_root: str | Path) 
         except (OSError, ValueError) as exc:
             raise ValueError(f"Missing or invalid source manifest: {manifest_path}") from exc
         recorded_source = row.get("source_sha256")
-        if (not isinstance(manifest, dict)
-                or not isinstance(manifest.get("files"), dict) or not manifest["files"]
-                or stable_json_hash(manifest["files"]) != manifest.get("source_sha256")
-                or recorded_source != manifest.get("source_sha256")
-                or recorded_source != current_source):
-            raise ValueError(f"Fresh run source_sha256 does not match the actual release source: {run_dir}")
+        if (
+            not isinstance(manifest, dict)
+            or not isinstance(manifest.get("files"), dict)
+            or not manifest["files"]
+            or stable_json_hash(manifest["files"]) != manifest.get("source_sha256")
+            or recorded_source != manifest.get("source_sha256")
+            or recorded_source != current_source
+        ):
+            raise ValueError(
+                f"Fresh run source_sha256 does not match the actual release source: {run_dir}"
+            )
         if row.get("environment.torch_num_threads") != 1:
             raise ValueError(f"Fresh campaign requires environment.torch_num_threads=1: {run_dir}")
         dataset_path = root / str(row["config.dataset.path"])
@@ -286,13 +415,20 @@ def validate_fresh_run_provenance(df: pd.DataFrame, *, source_root: str | Path) 
             dataset_hashes[dataset_path] = file_sha256(dataset_path)
         actual_dataset = dataset_hashes[dataset_path]
         if row.get("dataset_sha256") != actual_dataset:
-            raise ValueError(f"Fresh run dataset_sha256 does not match the actual dataset: {run_dir}")
+            raise ValueError(
+                f"Fresh run dataset_sha256 does not match the actual dataset: {run_dir}"
+            )
         if campaign_dataset is not None and actual_dataset != campaign_dataset:
             raise ValueError("Fresh campaign contains inconsistent dataset_sha256 values")
         campaign_dataset = actual_dataset
 
 
 def aggregate_runs(df: pd.DataFrame, *, group_cols: list[str] | None = None) -> pd.DataFrame:
+    """Group general run tables into mean/std/count columns for available metrics.
+
+    Backbone tables additionally disclose their experiment budgets and resume
+    history, so their scripts use the explicit summary helpers above instead.
+    """
     if df.empty:
         return df
     group_cols = group_cols or [

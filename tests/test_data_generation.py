@@ -5,7 +5,11 @@ import pytest
 import torch
 
 from otno.data.datasets import load_tensor_dataset
-from otno.data.generators import generate_dataset_from_config, validate_existing_dataset
+from otno.data.generators import (
+    dataset_config_fingerprint,
+    generate_dataset_from_config,
+    validate_existing_dataset,
+)
 
 
 def test_generate_tiny_advection_dataset(tmp_path: Path):
@@ -162,8 +166,7 @@ def test_dataset_fraction_must_select_a_valid_subset(tmp_path, fraction):
 
 def test_generator_rejects_fractional_sample_counts_before_writing(tmp_path):
     path = tmp_path / "invalid.pt"
-    config = {"kind": "advection1d", "n": 8, "num_train": 2.5,
-              "num_val": 1, "num_test": 1}
+    config = {"kind": "advection1d", "n": 8, "num_train": 2.5, "num_val": 1, "num_test": 1}
     with pytest.raises(ValueError, match="num_train"):
         generate_dataset_from_config(config, path)
     assert not path.exists()
@@ -173,3 +176,45 @@ def test_dataset_validation_accepts_nested_allow_stale_option(tmp_path):
     path = tmp_path / "old.pt"
     torch.save({"metadata": {}}, path)
     validate_existing_dataset(path, {"dataset": {"allow_stale": True}})
+
+
+def test_failed_solver_does_not_overwrite_dataset(tmp_path, monkeypatch):
+    from otno.data import generators
+
+    path = tmp_path / "data.pt"
+    original = b"existing dataset"
+    path.write_bytes(original)
+    monkeypatch.setattr(
+        generators,
+        "solve_burgers_1d",
+        lambda inputs, **kwargs: torch.full_like(inputs, float("nan")),
+    )
+    config = {
+        "kind": "burgers1d",
+        "n": 8,
+        "num_train": 1,
+        "num_val": 1,
+        "num_test": 1,
+        "dt": 0.001,
+        "final_time": 0.01,
+        "overwrite": True,
+    }
+    with pytest.raises(ValueError, match="Non-finite values.*train.u"):
+        generate_dataset_from_config(config, path)
+    assert path.read_bytes() == original
+
+
+def test_matching_cache_fingerprint_does_not_hide_nonfinite_targets(tmp_path):
+    path = tmp_path / "invalid.pt"
+    config = {"kind": "burgers1d", "n": 8}
+    torch.save(
+        {
+            "metadata": {"config_fingerprint": dataset_config_fingerprint(config)},
+            "splits": {
+                "train": {"a": torch.ones(1, 8, 1), "u": torch.full((1, 8, 1), float("inf"))}
+            },
+        },
+        path,
+    )
+    with pytest.raises(ValueError, match="Non-finite values.*train.u"):
+        validate_existing_dataset(path, config)

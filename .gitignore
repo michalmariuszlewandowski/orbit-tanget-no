@@ -7,13 +7,17 @@ __pycache__/
 *.py[cod]
 *.egg-info/
 
-# Large/generated experiment artifacts.
+# Generated experiment artifacts. Keep the cached result tables public.
 /data/*
 !/data/rmd17/
 /data/rmd17/*
-runs/*
-!runs/paper_tables/
-!runs/paper_tables/**
+/runs/*
+!/runs/paper_tables/
+/runs/paper_tables/*
+!/runs/paper_tables/*.csv
+!/runs/paper_tables/*.json
+!/runs/paper_tables/*.md
+/checkpoints/
 
 # Model/data binaries and checkpoints.
 *.pt
@@ -24,6 +28,7 @@ runs/*
 *.npz
 *.pkl
 !/data/rmd17/rmd17_ethanol_force_500.pt
+!/data/2d_ns_vorticity_galilean_n64.pt
 
 # Local build and editor noise.
 .agents/
@@ -38,5 +43,20 @@ tmp/
 *.aux
 *.out
 *.toc
+*.tex
+*.bib
+*.bbl
+*.blg
+*.fdb_latexmk
+*.fls
+*.synctex.gz
+*.lof
+*.lot
+*.nav
+*.snm
+*.vrb
+*.xdv
+*.dvi
+*.ps
 .DS_Store
 Thumbs.db

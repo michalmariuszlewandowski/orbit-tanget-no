@@ -8,13 +8,14 @@ from pathlib import Path
 
 import pytest
 
-
 ROOT = Path(__file__).resolve().parents[1]
 
 
 @pytest.fixture(scope="module")
 def release():
-    spec = importlib.util.spec_from_file_location("reproduce_release", ROOT / "scripts/reproduce_release.py")
+    spec = importlib.util.spec_from_file_location(
+        "reproduce_release", ROOT / "scripts/reproduce_release.py"
+    )
     module = importlib.util.module_from_spec(spec)
     sys.modules[spec.name] = module
     spec.loader.exec_module(module)
@@ -25,7 +26,12 @@ def test_fresh_release_plan_has_all_training_and_report_dependencies(release, tm
     registry = release.load_registry()
     plan = release.build_plan(registry, release.selected_suites(registry, ["all"]))
     # The checkout includes the fixed rMD17 split.
-    # Other data, checkpoints and intermediate tables must all have producers.
+    # The figure protocol is source-controlled; checkpoints are produced by training.
+    figure_spec = "figure_specs/2d_galilean_n64_id_ood_seed23.yaml"
+    destination = tmp_path / figure_spec
+    destination.parent.mkdir(parents=True)
+    destination.write_bytes((ROOT / figure_spec).read_bytes())
+    # Other data, training checkpoints and intermediate tables must have producers.
     preserved = next(step for step in plan if step.immutable)
     target = tmp_path / preserved.produces[0]
     target.parent.mkdir(parents=True)
@@ -47,6 +53,17 @@ def test_release_plan_includes_controls_and_excludes_unreported_pilots(release):
     assert not any("fraction_0.005" in run for run in runs)
     assert not any("labels_100/" in run or "lpsda" in run for run in runs)
     assert all("--overwrite" not in step.command for step in plan)
+
+
+def test_experiment_stages_do_not_require_historical_figure_checkpoint_bytes(release):
+    registry = release.load_registry()
+    plan = release.build_plan(registry, release.selected_suites(registry, ["main"]))
+    experiments = release.select_stages(plan, "experiments")
+    assert {step.stage for step in experiments} == {"data", "train", "evaluate", "reports"}
+    assert not any(step.input_sha256 for step in experiments)
+    figures = release.select_stages(plan, "figures")
+    assert any(step.input_sha256 for step in figures)
+    assert release.select_stages(plan, "all") == plan
 
 
 def test_report_manifest_accepts_best_checkpoint_without_last(release, tmp_path, monkeypatch):
@@ -74,9 +91,16 @@ def test_report_manifest_accepts_best_checkpoint_without_last(release, tmp_path,
 def test_partial_training_is_rejected_before_starting_other_jobs(release, tmp_path):
     (tmp_path / "runs/partial").mkdir(parents=True)
     (tmp_path / "runs/partial/config.yaml").write_text("seed: 23", encoding="utf-8")
-    plan = [release.Step("new", "train", [], produces=["runs/new/test_metrics.json"]),
-            release.Step("partial", "train", [], produces=["runs/partial/test_metrics.json"],
-                         protected_dir="runs/partial")]
+    plan = [
+        release.Step("new", "train", [], produces=["runs/new/test_metrics.json"]),
+        release.Step(
+            "partial",
+            "train",
+            [],
+            produces=["runs/partial/test_metrics.json"],
+            protected_dir="runs/partial",
+        ),
+    ]
     assert "Partial protected run" in release.preflight(plan, tmp_path)[0]
     assert not (tmp_path / "runs/new").exists()
 
@@ -84,15 +108,22 @@ def test_partial_training_is_rejected_before_starting_other_jobs(release, tmp_pa
 def test_existing_report_does_not_hide_missing_raw_evidence(release, tmp_path):
     table = tmp_path / "cached.csv"
     table.write_text("preserved table", encoding="utf-8")
-    step = release.Step("report", "reports", [], requires=["missing/test_metrics.json"],
-                        produces=["cached.csv"])
+    step = release.Step(
+        "report", "reports", [], requires=["missing/test_metrics.json"], produces=["cached.csv"]
+    )
     assert "missing prerequisite" in release.preflight([step], tmp_path)[0]
     assert table.read_text(encoding="utf-8") == "preserved table"
 
 
 def test_preserved_split_is_required_and_hash_verified(release, tmp_path):
-    step = release.Step("data:rmd17", "data", [], produces=["historical.pt"],
-                        immutable=True, sha256=hashlib.sha256(b"correct").hexdigest())
+    step = release.Step(
+        "data:rmd17",
+        "data",
+        [],
+        produces=["historical.pt"],
+        immutable=True,
+        sha256=hashlib.sha256(b"correct").hexdigest(),
+    )
     assert "cannot regenerate" in release.preflight([step], tmp_path)[0]
     (tmp_path / "historical.pt").write_bytes(b"wrong")
     assert "SHA-256 mismatch" in release.preflight([step], tmp_path)[0]
@@ -128,14 +159,17 @@ def test_existing_dataset_with_wrong_generation_parameters_is_rejected(release, 
     target = tmp_path / "data.pt"
     torch.save({"metadata": {"config_fingerprint": "different-parameters"}}, target)
     original = target.read_bytes()
-    step = release.Step("data", "data", [], produces=["data.pt"],
-                        expected_config={"dataset": {"n": 64, "seed": 31}})
+    step = release.Step(
+        "data", "data", [], produces=["data.pt"], expected_config={"dataset": {"n": 64, "seed": 31}}
+    )
     assert "does not match requested config" in release.preflight([step], tmp_path)[0]
     assert target.read_bytes() == original
 
 
 def test_default_dry_run_never_invokes_a_child_command(release, monkeypatch, capsys):
-    monkeypatch.setattr(sys, "argv", ["reproduce_release.py", "--suite", "main", "--stage", "train"])
+    monkeypatch.setattr(
+        sys, "argv", ["reproduce_release.py", "--suite", "main", "--stage", "train"]
+    )
 
     def unexpected(*args, **kwargs):
         raise AssertionError("dry-run attempted to execute a child command")
@@ -146,8 +180,12 @@ def test_default_dry_run_never_invokes_a_child_command(release, monkeypatch, cap
 
 
 def test_backbone_report_selects_fresh_audit_and_rejects_mixed_campaign(release, tmp_path):
-    step = release.Step("cno", "reports", ["python", "table.py"],
-                        fresh_report_inputs=["seed_23/meta.json", "seed_31/meta.json"])
+    step = release.Step(
+        "cno",
+        "reports",
+        ["python", "table.py"],
+        fresh_report_inputs=["seed_23/meta.json", "seed_31/meta.json"],
+    )
     assert release.report_command(step, tmp_path)[-1] == "--fresh-runs"
     target = tmp_path / step.fresh_report_inputs[0]
     target.parent.mkdir()
@@ -161,12 +199,15 @@ def test_backbone_report_selects_fresh_audit_and_rejects_mixed_campaign(release,
 @pytest.mark.parametrize("module_name", ["run_matrix", "run_adapt_matrix"])
 def test_matrix_overrides_keep_yaml_types_and_literal_ellipses(release, module_name):
     import importlib
+
     from otno.config import parse_overrides
 
     runner = importlib.import_module(module_name)
     values = {"a": "false", "b": "001", "c": ["a...b"], "d": "", "e": None, "f": True}
     command = runner._command("base.yaml", values)
-    parsed = parse_overrides([command[index + 1] for index, arg in enumerate(command) if arg == "--override"])
+    parsed = parse_overrides(
+        [command[index + 1] for index, arg in enumerate(command) if arg == "--override"]
+    )
     assert parsed == values
     assert type(parsed["a"]) is str
     assert type(parsed["b"]) is str
@@ -177,8 +218,12 @@ def test_suites_execute_dependencies_before_dependents_regardless_of_registry_or
     assert release.selected_suites(registry, ["dependent"]) == ["base", "dependent"]
 
 
-@pytest.mark.parametrize("module_name", ["run_ood_severity_matrix", "run_observable_canonicalization_matrix"])
-def test_evaluation_dry_run_does_not_write_or_replace_reports(release, tmp_path, monkeypatch, module_name):
+@pytest.mark.parametrize(
+    "module_name", ["run_ood_severity_matrix", "run_observable_canonicalization_matrix"]
+)
+def test_evaluation_dry_run_does_not_write_or_replace_reports(
+    release, tmp_path, monkeypatch, module_name
+):
     import importlib
 
     runner = importlib.import_module(module_name)
@@ -187,23 +232,31 @@ def test_evaluation_dry_run_does_not_write_or_replace_reports(release, tmp_path,
     for directory in (tmp_path, tmp_path / "missing"):
         prefix = directory / "report"
         if directory.exists():
-            for suffix in (".runs.csv", ".aggregate.csv", ".aggregate.tex"):
+            for suffix in (".runs.csv", ".aggregate.csv"):
                 prefix.with_suffix(suffix).write_bytes(b"published table")
         before = {path: path.read_bytes() for path in tmp_path.rglob("*") if path.is_file()}
-        monkeypatch.setattr(sys, "argv", [module_name, "--matrix", str(matrix), "--out-prefix", str(prefix), "--dry-run"])
+        monkeypatch.setattr(
+            sys,
+            "argv",
+            [module_name, "--matrix", str(matrix), "--out-prefix", str(prefix), "--dry-run"],
+        )
         runner.main()
         after = {path: path.read_bytes() for path in tmp_path.rglob("*") if path.is_file()}
         assert after == before
     assert not (tmp_path / "missing").exists()
 
 
-@pytest.mark.parametrize("module_name", ["run_ood_severity_matrix", "run_observable_canonicalization_matrix"])
+@pytest.mark.parametrize(
+    "module_name", ["run_ood_severity_matrix", "run_observable_canonicalization_matrix"]
+)
 def test_evaluation_cache_reuse_requires_unchanged_job_checkpoint_data_and_metrics(
     release, tmp_path, monkeypatch, module_name, request
 ):
     import importlib
+
     import torch
     import yaml
+
     from otno.models import build_model
     from otno.utils import file_sha256
 
@@ -213,38 +266,75 @@ def test_evaluation_cache_reuse_requires_unchanged_job_checkpoint_data_and_metri
     runner = importlib.import_module(module_name)
     monkeypatch.setattr(runner, "ROOT", tmp_path)
     cfg = {
-        "model": {"name": "fno2d", "in_channels": 3, "out_channels": 1, "width": 4, "modes": 2, "depth": 1},
+        "model": {
+            "name": "fno2d",
+            "in_channels": 3,
+            "out_channels": 1,
+            "width": 4,
+            "modes": 2,
+            "depth": 1,
+        },
         "dataset": {"path": "data.pt"},
         "training": {"batch_size": 2},
     }
     a = torch.randn(2, 8, 8, 3)
     a[..., 1:] = 0
     torch.save({"splits": {"test": {"a": a, "u": a[..., :1]}}}, tmp_path / "data.pt")
-    checkpoint = {"model": build_model(cfg).state_dict(), "config": cfg, "meta": {"dataset_sha256": "0" * 64}}
+    checkpoint = {
+        "model": build_model(cfg).state_dict(),
+        "config": cfg,
+        "meta": {"dataset_sha256": "0" * 64},
+    }
     torch.save(checkpoint, tmp_path / "checkpoint.pt")
     job = {
-        "checkpoint": "checkpoint.pt", "out_dir": "evaluation", "seed": 23, "method": "baseline",
-        "severity": "small", "severity_scale": 1.0, "orbit_samples": 1,
-        "latency_repeats": 1, "latency_warmup": 0,
+        "checkpoint": "checkpoint.pt",
+        "out_dir": "evaluation",
+        "seed": 23,
+        "method": "baseline",
+        "severity": "small",
+        "severity_scale": 1.0,
+        "orbit_samples": 1,
+        "latency_repeats": 1,
+        "latency_warmup": 0,
         "symmetry": {"name": "navier_stokes2d_galilean", "max_boost": 0.01},
     }
     matrix = tmp_path / "matrix.yaml"
     matrix.write_text(yaml.safe_dump({"evaluations": [job]}), encoding="utf-8")
-    monkeypatch.setattr(sys, "argv", [module_name, "--matrix", str(matrix), "--out-prefix", str(tmp_path / "table"), "--device", "cpu"])
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            module_name,
+            "--matrix",
+            str(matrix),
+            "--out-prefix",
+            str(tmp_path / "table"),
+            "--device",
+            "cpu",
+        ],
+    )
     with pytest.raises(ValueError, match="Dataset SHA-256 does not match checkpoint"):
         runner.main()
     assert not (tmp_path / "evaluation").exists()
     checkpoint["meta"]["dataset_sha256"] = file_sha256(tmp_path / "data.pt")
     torch.save(checkpoint, tmp_path / "checkpoint.pt")
     runner.main()
-    relative = "evaluation/severity_metrics.json" if module_name == "run_ood_severity_matrix" else "evaluation/observable_canonicalization/metrics.json"
+    relative = (
+        "evaluation/severity_metrics.json"
+        if module_name == "run_ood_severity_matrix"
+        else "evaluation/observable_canonicalization/metrics.json"
+    )
     output = tmp_path / relative
     original_metrics = output.read_bytes()
 
     def no_recompute(*args, **kwargs):
         raise AssertionError("Unchanged cache should be reused")
 
-    evaluator = "evaluate_model" if module_name == "run_ood_severity_matrix" else "evaluate_observable_canonicalization"
+    evaluator = (
+        "evaluate_model"
+        if module_name == "run_ood_severity_matrix"
+        else "evaluate_observable_canonicalization"
+    )
     monkeypatch.setattr(runner, evaluator, no_recompute)
     runner.main()
     assert output.read_bytes() == original_metrics
@@ -268,9 +358,13 @@ def test_execute_rejects_unverified_partial_evaluation_before_launching_training
     output.write_text('{"relative_l2": 0.1}', encoding="utf-8")
     plan = [
         release.Step("train", "train", ["training"], produces=["new/checkpoints/best.pt"]),
-        release.Step("evaluate", "evaluate", ["evaluation"],
-                     produces=["evaluation/metrics.json", "missing.csv"],
-                     evaluations=[({"checkpoint": "new/checkpoints/best.pt"}, "evaluation/metrics.json")]),
+        release.Step(
+            "evaluate",
+            "evaluate",
+            ["evaluation"],
+            produces=["evaluation/metrics.json", "missing.csv"],
+            evaluations=[({"checkpoint": "new/checkpoints/best.pt"}, "evaluation/metrics.json")],
+        ),
     ]
     assert release.preflight(plan, tmp_path) == []
     monkeypatch.setattr(release, "ROOT", tmp_path)
@@ -289,7 +383,9 @@ def test_execute_rejects_unverified_partial_evaluation_before_launching_training
 
 
 @pytest.mark.parametrize("module_name", ["run_matrix", "run_adapt_matrix"])
-def test_continue_on_error_runs_remaining_jobs_but_reports_failure(release, monkeypatch, module_name):
+def test_continue_on_error_runs_remaining_jobs_but_reports_failure(
+    release, monkeypatch, module_name
+):
     import importlib
     from types import SimpleNamespace
 
@@ -302,7 +398,9 @@ def test_continue_on_error_runs_remaining_jobs_but_reports_failure(release, monk
         return SimpleNamespace(returncode=1 if len(calls) == 1 else 0)
 
     monkeypatch.setattr(runner.subprocess, "run", run)
-    monkeypatch.setattr(sys, "argv", [module_name, "--matrix", "unused.yaml", "--continue-on-error"])
+    monkeypatch.setattr(
+        sys, "argv", [module_name, "--matrix", "unused.yaml", "--continue-on-error"]
+    )
     with pytest.raises(SystemExit) as error:
         runner.main()
     assert error.value.code == 1

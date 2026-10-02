@@ -1,7 +1,7 @@
 experiments:
   # N64 Galilean orbit weights 0.01, 0.05, and 0.10 at 2% labels.
   # The 0.05 setting shares output paths with the paper-ladder matrix.
-  - config: configs/pilot/2d_navier_stokes_galilean.yaml
+  - config: configs/problems/2d_navier_stokes_galilean.yaml
     seeds: [23, 31, 47]
     overrides:
       training.method: aug_orbit
@@ -11,7 +11,7 @@ experiments:
       runtime.overwrite: false
       runtime.run_dir: runs/ablations/2d_galilean_n64_2pct_lambda_robustness/fraction_0.02/aug_orbit_lambda_0.01_steps_4
 
-  - config: configs/pilot/2d_navier_stokes_galilean.yaml
+  - config: configs/problems/2d_navier_stokes_galilean.yaml
     seeds: [23, 31, 47]
     overrides:
       training.method: aug_orbit
@@ -21,7 +21,7 @@ experiments:
       runtime.overwrite: false
       runtime.run_dir: runs/ablations/2d_galilean_n64_paper_ladder/fraction_0.02/aug_orbit_lambda_0.05_steps_4
 
-  - config: configs/pilot/2d_navier_stokes_galilean.yaml
+  - config: configs/problems/2d_navier_stokes_galilean.yaml
     seeds: [23, 31, 47]
     overrides:
       training.method: aug_orbit

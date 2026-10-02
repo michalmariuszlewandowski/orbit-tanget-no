@@ -1,6 +1,6 @@
 experiments:
   # N64 Galilean orbit consistency at 1% labels and lambda=0.10.
-  - config: configs/pilot/2d_navier_stokes_galilean.yaml
+  - config: configs/problems/2d_navier_stokes_galilean.yaml
     seeds: [23, 31, 47]
     overrides:
       training.method: aug_orbit

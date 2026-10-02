@@ -1,14 +1,14 @@
 experiments:
   # Dirichlet heat equation with translations restricted to the domain interior.
   # BaseTransform.output_mask scores the valid overlap region.
-  - config: configs/pilot/1d_heat_dirichlet_nonperiodic.yaml
+  - config: configs/problems/1d_heat_dirichlet_nonperiodic.yaml
     seeds: [23, 31, 47]
     overrides:
       training.method: baseline
       runtime.overwrite: false
       runtime.run_dir: runs/ablations/1d_heat_dirichlet_boundary_mask/baseline
 
-  - config: configs/pilot/1d_heat_dirichlet_nonperiodic.yaml
+  - config: configs/problems/1d_heat_dirichlet_nonperiodic.yaml
     seeds: [23, 31, 47]
     overrides:
       training.method: aug_orbit
@@ -16,7 +16,7 @@ experiments:
       runtime.overwrite: false
       runtime.run_dir: runs/ablations/1d_heat_dirichlet_boundary_mask/aug_orbit_no_mask
 
-  - config: configs/pilot/1d_heat_dirichlet_nonperiodic.yaml
+  - config: configs/problems/1d_heat_dirichlet_nonperiodic.yaml
     seeds: [23, 31, 47]
     overrides:
       training.method: aug_orbit

@@ -4,9 +4,9 @@ from __future__ import annotations
 import argparse
 import re
 import subprocess
+import zipfile
 from collections.abc import Iterable
 from pathlib import Path
-
 
 # This external baseline attribution does not identify the project authors.
 PUBLIC_REFERENCE_URLS = {
@@ -69,11 +69,32 @@ def git_identities(root: Path) -> tuple[set[str], set[str]]:
         commit, *identities = record.split("\0")
         commits.add(commit)
         terms.update(identity for identity in identities if identity)
-    remotes = subprocess.check_output(
-        ["git", "-C", str(root), "remote", "-v"], encoding="utf-8"
-    )
+    remotes = subprocess.check_output(["git", "-C", str(root), "remote", "-v"], encoding="utf-8")
     terms.update(re.findall(r"(?:github|gitlab)\.com[/:]([^/:\s]+)/", remotes, re.I))
     return terms, commits
+
+
+def printable_parts(path: Path) -> list[tuple[str, str]]:
+    """Read Torch ZIP metadata and member names without loading tensor storage."""
+    if path.suffix.lower() in {".pt", ".pth", ".ckpt"} and zipfile.is_zipfile(path):
+        with zipfile.ZipFile(path) as archive:
+            members = archive.infolist()
+            names = {member.filename for member in members}
+            torch_pickle = any(
+                name.rsplit("/", 1)[-1] == "data.pkl"
+                and name.removesuffix("data.pkl") + "version" in names
+                for name in names
+            )
+            if torch_pickle:
+                parts = []
+                for member in members:
+                    content = member.filename
+                    if member.filename.endswith(".pkl"):
+                        content += "\n" + archive.read(member).decode("utf-8", errors="replace")
+                    parts.append((f"!{member.filename}", content))
+                return parts
+    # Preserve printable-byte inspection for older, non-ZIP and unknown formats.
+    return [("", path.read_bytes().decode("utf-8", errors="replace"))]
 
 
 def check(
@@ -102,21 +123,24 @@ def check(
         if any(value.lower() in commit_prefixes for value in COMMIT_PATTERN.findall(rel)):
             findings.append(f"{rel}: repository commit ID in filename")
         try:
-            # Also inspect printable metadata in binary files without deserializing them.
-            content = path.read_bytes().decode("utf-8", errors="replace")
-        except OSError as error:
-            findings.append(f"{rel}: could not read file: {error.strerror}")
+            parts = printable_parts(path)
+        except (OSError, zipfile.BadZipFile, RuntimeError) as error:
+            findings.append(f"{rel}: could not read file: {error}")
             continue
-        for line_no, line in enumerate(content.splitlines(), start=1):
-            for public_url in PUBLIC_REFERENCE_URLS:
-                line = re.sub(re.escape(public_url) + r"(?![\w./-])", "", line)
-            for label, pattern in PATTERNS:
-                if pattern.search(line):
-                    findings.append(f"{rel}:{line_no}: {label}")
-            if any(term in line.casefold() for term in terms):
-                findings.append(f"{rel}:{line_no}: identifying search term")
-            if any(value.lower() in commit_prefixes for value in COMMIT_PATTERN.findall(line)):
-                findings.append(f"{rel}:{line_no}: repository commit ID; redact in anonymous mirror")
+        for member_label, content in parts:
+            location = rel + member_label
+            for line_no, line in enumerate(content.splitlines(), start=1):
+                for public_url in PUBLIC_REFERENCE_URLS:
+                    line = re.sub(re.escape(public_url) + r"(?![\w./-])", "", line)
+                for label, pattern in PATTERNS:
+                    if pattern.search(line):
+                        findings.append(f"{location}:{line_no}: {label}")
+                if any(term in line.casefold() for term in terms):
+                    findings.append(f"{location}:{line_no}: identifying search term")
+                if any(value.lower() in commit_prefixes for value in COMMIT_PATTERN.findall(line)):
+                    findings.append(
+                        f"{location}:{line_no}: repository commit ID; redact in anonymous mirror"
+                    )
     return findings
 
 
@@ -124,10 +148,14 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Check Git candidate files for identifying text.")
     parser.add_argument("--root", default=".", help="Repository directory to scan.")
     parser.add_argument(
-        "--term", action="append", default=[], help="Additional identifying name or term; repeatable."
+        "--term",
+        action="append",
+        default=[],
+        help="Additional identifying name or term; repeatable.",
     )
     parser.add_argument(
-        "--git-identities", action="store_true",
+        "--git-identities",
+        action="store_true",
         help="Also check local Git author names, emails, remote owners, and commit IDs.",
     )
     args = parser.parse_args()
@@ -139,7 +167,10 @@ def main() -> None:
         parser.error(f"Cannot read Git candidate files: {error}")
     findings = check(root, files, terms=terms | set(args.term), commits=commits)
     print(f"Checked {len(files)} existing tracked and nonignored untracked files.")
-    print("Scope: text and printable metadata; review binary contents and Git/hosting metadata separately.")
+    print(
+        "Scope: text, printable metadata and Torch ZIP pickle metadata/member names; "
+        "review tensor contents and Git/hosting metadata separately."
+    )
     if findings:
         print("Potential anonymity issues:")
         for finding in findings:

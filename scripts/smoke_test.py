@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 from __future__ import annotations
+
 import sys
 from pathlib import Path
 
@@ -14,7 +15,9 @@ from otno.training.trainer import train_from_config
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Generate a tiny dataset and run a CPU smoke training job.")
+    parser = argparse.ArgumentParser(
+        description="Generate a tiny dataset and run a CPU smoke training job."
+    )
     parser.add_argument("--work-dir", default="runs/smoke")
     parser.add_argument("--device", default="cpu")
     args = parser.parse_args()

@@ -71,17 +71,25 @@ def ensure_dir(path: str | Path) -> Path:
 
 
 def check_run_directory(
-    path: str | Path, *, output_files: tuple[str, ...], overwrite: bool,
+    path: str | Path,
+    *,
+    output_files: tuple[str, ...],
+    overwrite: bool,
 ) -> Path:
     """Reject protected outputs without creating or changing any files."""
     path = Path(path)
     if not overwrite and any((path / name).exists() for name in output_files):
-        raise FileExistsError(f"Run directory already contains outputs and runtime.overwrite=false: {path}")
+        raise FileExistsError(
+            f"Run directory already contains outputs and runtime.overwrite=false: {path}"
+        )
     return path
 
 
 def prepare_run_directory(
-    path: str | Path, *, output_files: tuple[str, ...], overwrite: bool,
+    path: str | Path,
+    *,
+    output_files: tuple[str, ...],
+    overwrite: bool,
 ) -> Path:
     """Remove prior outputs after the caller has validated a fresh run's inputs."""
     path = check_run_directory(path, output_files=output_files, overwrite=overwrite)
@@ -137,22 +145,35 @@ def get_git_commit(root: str | Path | None = None) -> str | None:
 def source_manifest(root: str | Path) -> dict[str, Any]:
     """Identify the actual source tree, including edits not represented by HEAD."""
     root = Path(root)
-    paths = sorted({
-        path
-        for folder in ("src", "scripts")
-        for path in (root / folder).rglob("*.py")
-        if "__pycache__" not in path.parts
-    } | {root / name for name in ("pyproject.toml", "uv.lock", "requirements.txt")})
-    files = {path.relative_to(root).as_posix(): file_sha256(path) for path in paths if path.is_file()}
+    paths = sorted(
+        {
+            path
+            for folder in ("src", "scripts")
+            for path in (root / folder).rglob("*.py")
+            if "__pycache__" not in path.parts
+        }
+        | {root / name for name in ("pyproject.toml", "uv.lock", "requirements.txt")}
+    )
+    files = {
+        path.relative_to(root).as_posix(): file_sha256(path) for path in paths if path.is_file()
+    }
     try:
-        dirty = bool(subprocess.check_output(
-            ["git", "status", "--porcelain", "--untracked-files=normal"],
-            cwd=root, stderr=subprocess.DEVNULL, text=True,
-        ).strip())
+        dirty = bool(
+            subprocess.check_output(
+                ["git", "status", "--porcelain", "--untracked-files=normal"],
+                cwd=root,
+                stderr=subprocess.DEVNULL,
+                text=True,
+            ).strip()
+        )
     except (OSError, subprocess.CalledProcessError):
         dirty = None
-    return {"git_commit": get_git_commit(root), "git_dirty": dirty,
-            "source_sha256": stable_json_hash(files), "files": files}
+    return {
+        "git_commit": get_git_commit(root),
+        "git_dirty": dirty,
+        "source_sha256": stable_json_hash(files),
+        "files": files,
+    }
 
 
 def environment_fingerprint(root: str | Path | None = None) -> dict[str, Any]:
@@ -162,7 +183,9 @@ def environment_fingerprint(root: str | Path | None = None) -> dict[str, Any]:
         "torch": torch.__version__,
         "cuda_available": torch.cuda.is_available(),
         "cuda_version": torch.version.cuda,
-        "cudnn_version": torch.backends.cudnn.version() if torch.backends.cudnn.is_available() else None,
+        "cudnn_version": torch.backends.cudnn.version()
+        if torch.backends.cudnn.is_available()
+        else None,
         "git_commit": get_git_commit(root),
         "numpy": np.__version__,
         "torch_num_threads": torch.get_num_threads(),

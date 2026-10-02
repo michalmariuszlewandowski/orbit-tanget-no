@@ -1,13 +1,20 @@
-import json
 import importlib.util
+import io
+import json
 import math
+import sys
 from pathlib import Path
 
 import pandas as pd
 import pytest
 from scipy.stats import t as student_t
 
-from otno.reporting import RunValidation, aggregate_runs, collect_run_rows, drop_empty_config_columns
+from otno.reporting import (
+    RunValidation,
+    aggregate_runs,
+    collect_run_rows,
+    drop_empty_config_columns,
+)
 
 
 def test_collect_run_rows_adds_label_fraction_from_config(tmp_path):
@@ -63,11 +70,17 @@ def test_aggregate_runs_groups_by_fraction_and_flattens_columns():
 
 
 def test_filtered_tables_drop_unrelated_config_fields_but_keep_metric_and_provenance_schema():
-    all_runs = pd.DataFrame([
-        {"method": "fno", "config.dataset.n": 64, "environment.cuda_version": None,
-         "relative_l2": None},
-        {"method": "molecular", "config.dataset.molecule": "ethanol"},
-    ])
+    all_runs = pd.DataFrame(
+        [
+            {
+                "method": "fno",
+                "config.dataset.n": 64,
+                "environment.cuda_version": None,
+                "relative_l2": None,
+            },
+            {"method": "molecular", "config.dataset.molecule": "ethanol"},
+        ]
+    )
     fno_runs = all_runs[all_runs["method"] == "fno"]
     table = drop_empty_config_columns(fno_runs)
     assert "config.dataset.molecule" not in table
@@ -100,12 +113,20 @@ def _comparison_rows(module_name, reference, candidate):
 
 
 def _paired_input(values):
-    return pd.DataFrame([
-        {"seed": 23 + index, "dataset_sha256": "same-dataset", "relative_l2": value,
-         "orbit_ood_relative_l2": value, "equivariance_defect_relative": value,
-         "force_mae": value, "orbit_ood_force_mae": value}
-        for index, value in enumerate(values)
-    ])
+    return pd.DataFrame(
+        [
+            {
+                "seed": 23 + index,
+                "dataset_sha256": "same-dataset",
+                "relative_l2": value,
+                "orbit_ood_relative_l2": value,
+                "equivariance_defect_relative": value,
+                "force_mae": value,
+                "orbit_ood_force_mae": value,
+            }
+            for index, value in enumerate(values)
+        ]
+    )
 
 
 @pytest.mark.parametrize("module_name", ["reviewer", "rmd17"])
@@ -159,8 +180,14 @@ def test_rmd17_aggregate_rejects_invalid_evidence(problem):
 
 def test_rmd17_run_root_filter_excludes_similarly_named_campaigns(tmp_path):
     root = tmp_path / "labels_500"
-    df = pd.DataFrame({"run_dir": [str(root / "aug" / "seed_23"),
-                                    str(tmp_path / "labels_5000" / "aug" / "seed_31")]})
+    df = pd.DataFrame(
+        {
+            "run_dir": [
+                str(root / "aug" / "seed_23"),
+                str(tmp_path / "labels_5000" / "aug" / "seed_31"),
+            ]
+        }
+    )
     selected = _table_script("rmd17")._filter_runs(df, str(root))
     assert list(selected["run_dir"]) == [str(root / "aug" / "seed_23")]
 
@@ -171,3 +198,49 @@ def test_rmd17_single_seed_summary_does_not_claim_zero_variance():
     assert result["seed_count"] == 1
     assert result["relative_l2_mean"] == 1.0
     assert math.isnan(result["relative_l2_std"])
+
+
+def _backbone_script(backbone):
+    path = Path(__file__).resolve().parents[1] / "scripts" / f"make_{backbone}_backbone_table.py"
+    spec = importlib.util.spec_from_file_location(f"test_{backbone}_backbone_table", path)
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+@pytest.mark.parametrize("backbone", ["deeponet", "cno2d"])
+def test_backbone_statistics_preserve_published_csv_schema_and_values(backbone):
+    module = _backbone_script(backbone)
+    root = Path(__file__).resolve().parents[1]
+    prefix = root / module.DEFAULT_OUT_PREFIX
+    runs = pd.read_csv(f"{prefix}.runs.csv")
+
+    for name, table in (
+        ("aggregate", module.aggregate_runs(runs)),
+        ("paired", module.paired_primary(runs)),
+    ):
+        # Parse both CSVs alike so empty resume disclosures and seed lists retain
+        # their existing on-disk representation. No saved artifact is overwritten.
+        actual = pd.read_csv(io.StringIO(table.to_csv(index=False)))
+        expected = pd.read_csv(f"{prefix}.{name}.csv")
+        pd.testing.assert_frame_equal(actual, expected, rtol=1e-12, atol=1e-12)
+
+
+@pytest.mark.parametrize("backbone", ["deeponet", "cno2d"])
+@pytest.mark.parametrize("problem", ["missing", "duplicate", "zero_reference"])
+def test_backbone_pair_preserves_error_types(backbone, problem):
+    module = _backbone_script(backbone)
+    reference = _paired_input([1.0, 2.0]).assign(method="aug", checkpoint_resumed=False)
+    candidate = _paired_input([0.8, 1.6]).assign(method="aug_orbit", checkpoint_resumed=False)
+    if problem == "missing":
+        candidate = candidate.iloc[[0]]
+        error_type = module.validation.error_type
+    elif problem == "duplicate":
+        candidate = pd.concat([candidate, candidate.iloc[[0]]])
+        error_type = pd.errors.MergeError
+    else:
+        reference[list(module.CORE_METRICS)] = 0.0
+        error_type = ZeroDivisionError
+    with pytest.raises(error_type):
+        module.paired_primary(pd.concat([reference, candidate]), expected_seeds=(23, 24))

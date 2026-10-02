@@ -1,7 +1,7 @@
 experiments:
   # Tangent propagation at 2% labels: explicit infinitesimal equivariance
   # matching with the same FNO2d architecture as finite-orbit LOCO.
-  - config: configs/pilot/2d_navier_stokes_galilean.yaml
+  - config: configs/problems/2d_navier_stokes_galilean.yaml
     seeds: [23, 31, 47, 59, 71]
     overrides:
       training.method: tangent
@@ -11,7 +11,7 @@ experiments:
       runtime.overwrite: false
       runtime.run_dir: runs/ablations/2d_galilean_n64_2pct_tangent_baseline/fraction_0.02/tangent_lambda_0.1_steps_4
 
-  - config: configs/pilot/2d_navier_stokes_galilean.yaml
+  - config: configs/problems/2d_navier_stokes_galilean.yaml
     seeds: [23, 31, 47, 59, 71]
     overrides:
       training.method: aug_tangent

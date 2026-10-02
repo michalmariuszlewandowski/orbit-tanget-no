@@ -55,8 +55,7 @@ def periodic_resize2d(
     """
     if x.ndim != 4:
         raise ValueError(
-            "periodic_resize2d expects [batch, channels, height, width], "
-            f"got {tuple(x.shape)}"
+            f"periodic_resize2d expects [batch, channels, height, width], got {tuple(x.shape)}"
         )
     output_height, output_width = _pair(output_size)
     if output_height < 1 or output_width < 1:
@@ -290,9 +289,7 @@ class CNO2d(nn.Module):
         self.lift_channels = channel_multiplier // 2
 
         self.encoder_features = [self.lift_channels]
-        self.encoder_features.extend(
-            (2**level) * channel_multiplier for level in range(n_layers)
-        )
+        self.encoder_features.extend((2**level) * channel_multiplier for level in range(n_layers))
         decoder_features_in = list(reversed(self.encoder_features[1:]))
         self.decoder_features_out = list(reversed(self.encoder_features[:-1]))
         for level in range(1, n_layers):
@@ -375,12 +372,12 @@ class CNO2d(nn.Module):
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         if x.ndim != 4:
-            raise ValueError(f"CNO2d expects [batch, height, width, channels], got {tuple(x.shape)}")
+            raise ValueError(
+                f"CNO2d expects [batch, height, width, channels], got {tuple(x.shape)}"
+            )
         _, height, width, channels = x.shape
         if channels != self.in_channels:
-            raise ValueError(
-                f"CNO2d expects {self.in_channels} input channels, got {channels}"
-            )
+            raise ValueError(f"CNO2d expects {self.in_channels} input channels, got {channels}")
         divisor = 2**self.n_layers
         if height % divisor or width % divisor:
             raise ValueError(

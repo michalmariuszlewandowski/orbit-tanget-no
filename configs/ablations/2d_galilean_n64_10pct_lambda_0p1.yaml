@@ -1,7 +1,7 @@
 experiments:
   # N64 Galilean comparison at 10% labels: compute-matched augmentation and
   # augmentation plus orbit consistency at lambda=0.10.
-  - config: configs/pilot/2d_navier_stokes_galilean.yaml
+  - config: configs/problems/2d_navier_stokes_galilean.yaml
     seeds: [23, 31, 47]
     overrides:
       training.method: aug
@@ -10,7 +10,7 @@ experiments:
       runtime.overwrite: false
       runtime.run_dir: runs/ablations/2d_galilean_n64_10pct_lambda_0p1/fraction_0.10/aug_steps_6
 
-  - config: configs/pilot/2d_navier_stokes_galilean.yaml
+  - config: configs/problems/2d_navier_stokes_galilean.yaml
     seeds: [23, 31, 47]
     overrides:
       training.method: aug_orbit

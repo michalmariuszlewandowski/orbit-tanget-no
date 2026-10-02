@@ -5,7 +5,9 @@ import math
 import torch
 
 
-def make_grid_2d(n: int, *, device: torch.device | None = None, dtype=torch.float32) -> torch.Tensor:
+def make_grid_2d(
+    n: int, *, device: torch.device | None = None, dtype=torch.float32
+) -> torch.Tensor:
     x = torch.arange(n, device=device, dtype=dtype) / n
     yy, xx = torch.meshgrid(x, x, indexing="ij")
     return torch.stack([xx, yy], dim=-1)
@@ -92,7 +94,9 @@ def navier_stokes_vorticity_rhs_2d(
         if boost.ndim == 1 and boost.numel() == 2:
             boost = boost[None, :].expand(omega.shape[0], 2)
         if boost.shape != (omega.shape[0], 2):
-            raise ValueError(f"ambient_velocity must be [2] or [batch, 2], got {tuple(boost.shape)}")
+            raise ValueError(
+                f"ambient_velocity must be [2] or [batch, 2], got {tuple(boost.shape)}"
+            )
         vel_x = vel_x + boost[:, 0].view(-1, 1, 1)
         vel_y = vel_y + boost[:, 1].view(-1, 1, 1)
     omega_x = torch.fft.ifft2(1j * kx_grid * omega_hat, dim=(-2, -1)).real

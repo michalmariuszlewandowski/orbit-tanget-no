@@ -1,7 +1,7 @@
 experiments:
   # D4 comparison at seeds 59 and 71. Seeds 23, 31, and 47 are defined in the
   # pilot, refinement, and replication matrices.
-  - config: configs/pilot/2d_navier_stokes_translation_d4.yaml
+  - config: configs/problems/2d_navier_stokes_translation_d4.yaml
     seeds: [59, 71]
     overrides:
       symmetry.transforms:
@@ -13,7 +13,7 @@ experiments:
       runtime.overwrite: false
       runtime.run_dir: runs/ablations/2d_d4_five_seed_completion/fraction_0.01/aug_steps_4
 
-  - config: configs/pilot/2d_navier_stokes_translation_d4.yaml
+  - config: configs/problems/2d_navier_stokes_translation_d4.yaml
     seeds: [59, 71]
     overrides:
       symmetry.transforms:
@@ -26,7 +26,7 @@ experiments:
       runtime.overwrite: false
       runtime.run_dir: runs/ablations/2d_d4_five_seed_completion/fraction_0.01/aug_orbit_lambda_0.2_steps_4
 
-  - config: configs/pilot/2d_navier_stokes_translation_d4.yaml
+  - config: configs/problems/2d_navier_stokes_translation_d4.yaml
     seeds: [59, 71]
     overrides:
       model.name: d4_gfno2d

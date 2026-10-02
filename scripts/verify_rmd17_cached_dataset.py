@@ -58,9 +58,7 @@ def main() -> None:
         rows = [lookup[value] for value in selected_ids]
         coords = torch.as_tensor(raw["coords"][rows], dtype=torch.float32)
         coords = coords - coords.mean(dim=1, keepdim=True)
-        inputs = torch.cat(
-            [coords, charge_channel.expand(coords.shape[0], -1, -1)], dim=-1
-        )
+        inputs = torch.cat([coords, charge_channel.expand(coords.shape[0], -1, -1)], dim=-1)
         forces = torch.as_tensor(raw["forces"][rows], dtype=torch.float32)
         max_input_diff = max(max_input_diff, float((inputs - cached["a"]).abs().max()))
         max_force_diff = max(max_force_diff, float((forces - cached["u"]).abs().max()))

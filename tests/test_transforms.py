@@ -9,8 +9,8 @@ from otno.symmetry.transforms import (
     MolecularRigidMotion,
     NavierStokes2DGalilean,
     NonPeriodicTranslation1D,
-    Translation1D,
     TransformSample,
+    Translation1D,
     periodic_shift_1d,
     periodic_shift_2d,
 )

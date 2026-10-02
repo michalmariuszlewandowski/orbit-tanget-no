@@ -215,22 +215,22 @@
     {
       "bytes": 132549,
       "path": "runs/figures/2d_galilean_n64_id_ood_fields.pdf",
-      "sha256": "5f8db8a1a49ce63bfdf2d7ccbcbc1b6aeebee101abeffd9e92bd864b9cdfca37"
+      "sha256": "9253540d8a05c155c1d2e13984f07f4affefb10c0e5289b498052b097c67cb8a"
     },
     {
-      "bytes": 225427,
+      "bytes": 205234,
       "path": "runs/figures/2d_galilean_n64_fixed_stress_diagnostics.png",
       "pixel_shape": [
         677,
         2023,
         4
       ],
-      "sha256": "82ad18563513632b4e9c9a075796d08e8c758012c5de3ae50969be7dfab1d94a"
+      "sha256": "c6c4391e4861c6df9c3933ddb17f170e6f6dc44d235facaf1308defa81c8e479"
     },
     {
-      "bytes": 38550,
+      "bytes": 38088,
       "path": "runs/figures/2d_galilean_n64_fixed_stress_diagnostics.pdf",
-      "sha256": "774848092941c09b3fe0f272b22958b4a3aef8e5bdac1dba85ee3264aa83aeae"
+      "sha256": "127f83424921c40e3e2e8e977c104a5f182782ece1fb5ce1ba2352db9ddc2d3c"
     },
     {
       "bytes": 177057,
@@ -245,7 +245,7 @@
     {
       "bytes": 64610,
       "path": "runs/figures/2d_galilean_n64_equivariance_residuals.pdf",
-      "sha256": "5b0df10b8ea54b2ed8a1d428aef0ca47a9b3e5ed3bcac4f88beea51dc035df3e"
+      "sha256": "12e5904e459fe9b0377e14f38d07f2161134374fd842a14064ffbc833efc2298"
     }
   ],
   "generation_batch_size": 16,
@@ -270,7 +270,7 @@
     "vorticity_symmetric_abs_max": 2.6419005393981934
   },
   "plot_script": "scripts/plot_navier_stokes_qualitative.py",
-  "plot_script_sha256": "4a625ebdb727b45a7e451f5045921294a80dac2695c09afa8b6a62faa52f1848",
+  "plot_script_sha256": "6b0d333ff47ac8bb34d9dfb2653cc27b4e80fceb0f28f7cf3649f488301042e1",
   "selected_gradient_error_summary": {
     "aug_id": {
       "high_gradient_mae": 0.38131874799728394,

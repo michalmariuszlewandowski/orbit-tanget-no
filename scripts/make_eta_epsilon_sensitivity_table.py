@@ -16,7 +16,9 @@ from otno.reporting import aggregate_runs, collect_run_rows
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Aggregate N64 Galilean eta/epsilon sensitivity runs.")
+    parser = argparse.ArgumentParser(
+        description="Aggregate N64 Galilean eta/epsilon sensitivity runs."
+    )
     parser.add_argument(
         "--run-root",
         default="runs/ablations/2d_galilean_n64_2pct_eta_epsilon_sensitivity",
@@ -57,11 +59,8 @@ def main() -> None:
     out_prefix.parent.mkdir(parents=True, exist_ok=True)
     run_df.to_csv(out_prefix.with_suffix(".runs.csv"), index=False)
     aggregate.to_csv(out_prefix.with_suffix(".aggregate.csv"), index=False)
-    with out_prefix.with_suffix(".aggregate.tex").open("w", encoding="utf-8") as f:
-        f.write(aggregate.to_latex(index=False, escape=False))
     print(f"wrote {out_prefix.with_suffix('.runs.csv')}")
     print(f"wrote {out_prefix.with_suffix('.aggregate.csv')}")
-    print(f"wrote {out_prefix.with_suffix('.aggregate.tex')}")
 
 
 if __name__ == "__main__":

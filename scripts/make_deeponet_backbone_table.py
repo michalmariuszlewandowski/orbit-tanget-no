@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 import argparse
-import math
 import sys
 from dataclasses import dataclass
 from pathlib import Path
@@ -16,10 +15,15 @@ if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
 import pandas as pd
-from scipy.stats import t as student_t
 
-from otno.reporting import RunValidation, collect_run_rows, validate_fresh_run_provenance
-
+from otno.reporting import (
+    RunValidation,
+    backbone_training_summary,
+    collect_run_rows,
+    metric_mean_std,
+    paired_protocol_comparison,
+    validate_fresh_run_provenance,
+)
 
 EXPECTED_SEEDS = (23, 31, 47, 59, 71)
 EXPECTED_DATASET_SHA256 = "defc9703dbc41494fabf9fcfe9e3408eb2e1c3890814e47fe03d0f6b849e3f50"
@@ -42,9 +46,7 @@ CONSISTENT_PROVENANCE_FIELDS = (
 )
 DEFAULT_RUN_ROOT = Path("runs/ablations/2d_galilean_n64_2pct_deeponet_5seed/fraction_0.02")
 DEFAULT_OUT_PREFIX = Path("runs/paper_tables/2d_galilean_n64_2pct_deeponet_5seed")
-DEFAULT_FNO_RUNS = Path(
-    "runs/paper_tables/2d_galilean_n64_2pct_headline_lambda_0p1.runs.csv"
-)
+DEFAULT_FNO_RUNS = Path("runs/paper_tables/2d_galilean_n64_2pct_headline_lambda_0p1.runs.csv")
 CORE_METRICS = (
     "relative_l2",
     "orbit_ood_relative_l2",
@@ -243,25 +245,19 @@ def build_run_frame(
 
 
 def aggregate_runs(run_df: pd.DataFrame) -> pd.DataFrame:
+    """Report each declared method's training budget and across-seed statistics."""
     rows: list[dict[str, Any]] = []
     for spec in METHOD_SPECS:
         group = run_df[run_df["method"] == spec.method].sort_values("seed")
-        row: dict[str, Any] = {
-            "method": spec.method,
-            "method_label": spec.label,
-            "steps_per_epoch": spec.steps_per_epoch,
-            "optimizer_steps": spec.steps_per_epoch * 150,
-            "model_forwards_per_epoch": spec.model_forwards_per_epoch,
-            "model_forwards_total": spec.model_forwards_per_epoch * 150,
-            "backward_passes_total": spec.steps_per_epoch * 150,
-            "seed_count": int(group["seed"].nunique()),
-            "seeds": ",".join(str(int(seed)) for seed in group["seed"]),
-            "parameters": int(group["parameters"].iloc[0]),
-        }
-        for metric in AGGREGATE_METRICS:
-            values = pd.to_numeric(group[metric], errors="raise")
-            row[f"{metric}_mean"] = float(values.mean())
-            row[f"{metric}_std"] = float(values.std(ddof=1))
+        row = backbone_training_summary(
+            group,
+            method=spec.method,
+            label=spec.label,
+            epochs=150,
+            steps_per_epoch=spec.steps_per_epoch,
+            model_forwards_per_epoch=spec.model_forwards_per_epoch,
+        )
+        row.update(metric_mean_std(group, metrics=AGGREGATE_METRICS))
         rows.append(row)
     return pd.DataFrame(rows)
 
@@ -270,112 +266,17 @@ def paired_primary(
     run_df: pd.DataFrame,
     expected_seeds: tuple[int, ...] = EXPECTED_SEEDS,
 ) -> pd.DataFrame:
+    """Pair augmentation and augmentation-plus-LOCO on the declared FNO seeds."""
     reference = run_df[run_df["method"] == "aug"]
     candidate = run_df[run_df["method"] == "aug_orbit"]
-    rows: list[dict[str, Any]] = []
-    for metric in CORE_METRICS:
-        paired = (
-            reference[["seed", metric]]
-            .rename(columns={metric: "augmentation"})
-            .merge(
-                candidate[["seed", metric]].rename(columns={metric: "augmentation_loco"}),
-                on="seed",
-                how="inner",
-                validate="one_to_one",
-            )
-            .sort_values("seed")
-        )
-        seeds = tuple(int(seed) for seed in paired["seed"])
-        if seeds != expected_seeds:
-            raise DeepONetProtocolError(
-                f"primary paired comparison for {metric}: expected "
-                f"{expected_seeds}, found {seeds}"
-            )
-        differences = paired["augmentation_loco"] - paired["augmentation"]
-        n = int(differences.shape[0])
-        delta = float(differences.mean())
-        delta_std = float(differences.std(ddof=1))
-        delta_sem = delta_std / math.sqrt(n)
-        half_width = float(student_t.ppf(0.975, n - 1)) * delta_sem
-        reference_mean = float(paired["augmentation"].mean())
-        candidate_mean = float(paired["augmentation_loco"].mean())
-        rows.append(
-            {
-                "comparison": "augmentation_plus_loco_minus_augmentation",
-                "difference_direction": "candidate_minus_reference",
-                "metric": metric,
-                "seed_count": n,
-                "seeds": ",".join(str(seed) for seed in expected_seeds),
-                "reference_mean": reference_mean,
-                "candidate_mean": candidate_mean,
-                "paired_delta_mean": delta,
-                "paired_delta_std": delta_std,
-                "paired_delta_sem": delta_sem,
-                "paired_delta_ci95_low": delta - half_width,
-                "paired_delta_ci95_high": delta + half_width,
-                "relative_reduction_pct": (
-                    100.0 * (reference_mean - candidate_mean) / reference_mean
-                ),
-                "ci_excludes_zero": bool(delta - half_width > 0 or delta + half_width < 0),
-            }
-        )
-    return pd.DataFrame(rows)
-
-
-def _fmt_pm(mean: float, std: float, *, bold: bool = False) -> str:
-    value = rf"{mean:.4f}\pm{std:.4f}"
-    return rf"\(\mathbf{{{value}}}\)" if bold else rf"\({value}\)"
-
-
-def latex_table(aggregate: pd.DataFrame) -> str:
-    rows = {str(row["method"]): row for _, row in aggregate.iterrows()}
-    seed_values = str(rows["baseline"]["seeds"]).replace(",", ", ")
-    lines = [
-        r"\begin{table*}[t]",
-        r"\centering",
-        r"\small",
-        (
-            r"\caption{DeepONet reproduction on the 2\%-label N64 Galilean task over "
-            f"the same training seeds as the FNO comparison, "
-            rf"\(\{{{seed_values}\}}\). All rows use the same 2,688,033-parameter "
-            r"architecture. The "
-            r"augmentation and augmentation-plus-normalized-LOCO rows are matched at 12 "
-            r"batch-level model evaluations per epoch; optimizer and backward-pass counts "
-            r"differ and are shown. Entries are mean $\pm$ sample standard deviation. "
-            r"Latency and wall time remain available in the per-run manifest; seed shards "
-            r"ran concurrently, so they are not used as efficiency comparisons.}"
-        ),
-        r"\label{tab:deeponet-backbone}",
-        r"\resizebox{\textwidth}{!}{%",
-        r"\begin{tabular}{lrrrrrr}",
-        r"\toprule",
-        "Method & Steps/epoch & Model fwds., total & Bwd. passes, total & ID $L^2$ & "
-        "Orbit OOD $L^2$ & Eq. defect \\\\",
-        r"\midrule",
-    ]
-    for spec in METHOD_SPECS:
-        row = rows[spec.method]
-        bold = spec.method == "aug_orbit"
-        relative = _fmt_pm(
-            row["relative_l2_mean"], row["relative_l2_std"], bold=bold
-        )
-        orbit_ood = _fmt_pm(
-            row["orbit_ood_relative_l2_mean"],
-            row["orbit_ood_relative_l2_std"],
-            bold=bold,
-        )
-        defect = _fmt_pm(
-            row["equivariance_defect_relative_mean"],
-            row["equivariance_defect_relative_std"],
-            bold=bold,
-        )
-        lines.append(
-            f"{row['method_label']} & {int(row['steps_per_epoch'])} & "
-            f"{int(row['model_forwards_total'])} & {int(row['backward_passes_total'])} & "
-            f"{relative} & {orbit_ood} & {defect} \\\\"
-        )
-    lines.extend([r"\bottomrule", r"\end{tabular}", r"}", r"\end{table*}", ""])
-    return "\n".join(lines)
+    return paired_protocol_comparison(
+        reference,
+        candidate,
+        metrics=CORE_METRICS,
+        expected_seeds=expected_seeds,
+        comparison="augmentation_plus_loco_minus_augmentation",
+        error_type=DeepONetProtocolError,
+    )
 
 
 def _manifest(run_df: pd.DataFrame) -> pd.DataFrame:
@@ -421,7 +322,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--run-root", type=Path, default=DEFAULT_RUN_ROOT)
     parser.add_argument("--out-prefix", type=Path, default=DEFAULT_OUT_PREFIX)
     parser.add_argument(
-        "--fresh-runs", action="store_true",
+        "--fresh-runs",
+        action="store_true",
         help="Validate new runs against their source manifest and dataset hashes.",
     )
     parser.add_argument(
@@ -437,7 +339,9 @@ def main() -> int:
     args = parse_args()
     try:
         fno_seeds = load_fno_reference_seeds(args.fno_runs)
-        run_df = build_run_frame(args.run_root, expected_seeds=fno_seeds, fresh_runs=args.fresh_runs)
+        run_df = build_run_frame(
+            args.run_root, expected_seeds=fno_seeds, fresh_runs=args.fresh_runs
+        )
         aggregate = aggregate_runs(run_df)
         paired = paired_primary(run_df, expected_seeds=fno_seeds)
     except DeepONetProtocolError as exc:
@@ -449,7 +353,6 @@ def main() -> int:
         "runs": Path(f"{args.out_prefix}.runs.csv"),
         "aggregate": Path(f"{args.out_prefix}.aggregate.csv"),
         "paired": Path(f"{args.out_prefix}.paired.csv"),
-        "tex": Path(f"{args.out_prefix}.tex"),
     }
     outputs["runs"].write_text(
         _manifest(run_df).to_csv(index=False, lineterminator="\n"), encoding="utf-8"
@@ -457,10 +360,7 @@ def main() -> int:
     outputs["aggregate"].write_text(
         aggregate.to_csv(index=False, lineterminator="\n"), encoding="utf-8"
     )
-    outputs["paired"].write_text(
-        paired.to_csv(index=False, lineterminator="\n"), encoding="utf-8"
-    )
-    outputs["tex"].write_text(latex_table(aggregate), encoding="utf-8")
+    outputs["paired"].write_text(paired.to_csv(index=False, lineterminator="\n"), encoding="utf-8")
     for path in outputs.values():
         print(f"wrote {path}")
     return 0

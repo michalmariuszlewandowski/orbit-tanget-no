@@ -2,7 +2,7 @@ experiments:
   # Four-method CNO2d comparison under the FNO/DeepONet protocol.
   # Augmentation and augmentation plus LOCO each use 12 batch-level model
   # evaluations per epoch (6 x 2 and 4 x 3, respectively).
-  - config: configs/pilot/2d_navier_stokes_galilean_cno2d.yaml
+  - config: configs/problems/2d_navier_stokes_galilean_cno2d.yaml
     seeds: [23, 31, 47, 59, 71]
     overrides:
       training.method: baseline
@@ -10,7 +10,7 @@ experiments:
       runtime.overwrite: false
       runtime.run_dir: runs/ablations/2d_galilean_n64_2pct_cno2d_5seed/fraction_0.02/baseline_steps_4
 
-  - config: configs/pilot/2d_navier_stokes_galilean_cno2d.yaml
+  - config: configs/problems/2d_navier_stokes_galilean_cno2d.yaml
     seeds: [23, 31, 47, 59, 71]
     overrides:
       training.method: orbit
@@ -19,7 +19,7 @@ experiments:
       runtime.overwrite: false
       runtime.run_dir: runs/ablations/2d_galilean_n64_2pct_cno2d_5seed/fraction_0.02/orbit_lambda_0.05_steps_4
 
-  - config: configs/pilot/2d_navier_stokes_galilean_cno2d.yaml
+  - config: configs/problems/2d_navier_stokes_galilean_cno2d.yaml
     seeds: [23, 31, 47, 59, 71]
     overrides:
       training.method: aug
@@ -27,7 +27,7 @@ experiments:
       runtime.overwrite: false
       runtime.run_dir: runs/ablations/2d_galilean_n64_2pct_cno2d_5seed/fraction_0.02/aug_steps_6
 
-  - config: configs/pilot/2d_navier_stokes_galilean_cno2d.yaml
+  - config: configs/problems/2d_navier_stokes_galilean_cno2d.yaml
     seeds: [23, 31, 47, 59, 71]
     overrides:
       training.method: aug_orbit

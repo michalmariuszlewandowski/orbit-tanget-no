@@ -86,7 +86,12 @@ def _symmetry_value(symmetry: dict[str, Any], key: str) -> Any:
 
 
 def _evaluation_metadata(
-    job: dict, dataset_path: str, root: Path, device: str, *, expected_dataset_sha256: str | None = None
+    job: dict,
+    dataset_path: str,
+    root: Path,
+    device: str,
+    *,
+    expected_dataset_sha256: str | None = None,
 ) -> dict:
     metadata = {
         "job": {key: value for key, value in job.items() if key != "overwrite"},
@@ -103,17 +108,26 @@ def _evaluation_metadata(
 def _read_cached_metrics(job: dict, path: Path, root: Path, device: str) -> dict:
     metadata_path = path.with_suffix(".evaluation.json")
     if not metadata_path.is_file():
-        raise ValueError(f"Cached evaluation has no input record: {path}; use --overwrite to recompute")
+        raise ValueError(
+            f"Cached evaluation has no input record: {path}; use --overwrite to recompute"
+        )
     metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
     if not isinstance(metadata, dict) or not isinstance(metadata.get("dataset_path"), str):
         raise ValueError(f"Invalid evaluation input record: {metadata_path}")
     expected = _evaluation_metadata(job, metadata["dataset_path"], root, device)
     expected["metrics_sha256"] = file_sha256(path)
     if metadata != expected:
-        raise ValueError(f"Cached evaluation inputs or metrics changed: {path}; use --overwrite to recompute")
+        raise ValueError(
+            f"Cached evaluation inputs or metrics changed: {path}; use --overwrite to recompute"
+        )
     metrics = json.loads(path.read_text(encoding="utf-8"))
-    if not isinstance(metrics, dict) or not metrics or any(
-        isinstance(value, (int, float)) and not math.isfinite(value) for value in metrics.values()
+    if (
+        not isinstance(metrics, dict)
+        or not metrics
+        or any(
+            isinstance(value, (int, float)) and not math.isfinite(value)
+            for value in metrics.values()
+        )
     ):
         raise ValueError(f"Invalid cached evaluation metrics: {path}")
     return metrics
@@ -121,16 +135,22 @@ def _read_cached_metrics(job: dict, path: Path, root: Path, device: str) -> dict
 
 def _write_metrics(metrics: dict, path: Path, metadata: dict) -> None:
     dump_json(metrics, path)
-    dump_json({**metadata, "metrics_sha256": file_sha256(path)}, path.with_suffix(".evaluation.json"))
+    dump_json(
+        {**metadata, "metrics_sha256": file_sha256(path)}, path.with_suffix(".evaluation.json")
+    )
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Evaluate checkpoints under OOD symmetry severity sweeps.")
+    parser = argparse.ArgumentParser(
+        description="Evaluate checkpoints under OOD symmetry severity sweeps."
+    )
     parser.add_argument("--matrix", required=True, help="Evaluation matrix YAML file")
     parser.add_argument("--out-prefix", default="runs/paper_tables/ood_severity")
     parser.add_argument("--device", default="auto")
     parser.add_argument("--dry-run", action="store_true")
-    parser.add_argument("--overwrite", action="store_true", help="Recompute metrics even when outputs exist.")
+    parser.add_argument(
+        "--overwrite", action="store_true", help="Recompute metrics even when outputs exist."
+    )
     args = parser.parse_args()
 
     out_prefix = Path(args.out_prefix)
@@ -154,7 +174,10 @@ def main() -> None:
             if cfg is None:
                 raise KeyError(f"Checkpoint missing config/base_config: {checkpoint}")
             metadata = _evaluation_metadata(
-                job, cfg["dataset"]["path"], ROOT, str(device),
+                job,
+                cfg["dataset"]["path"],
+                ROOT,
+                str(device),
                 expected_dataset_sha256=ckpt.get("meta", {}).get("dataset_sha256"),
             )
             model = build_model(cfg).to(device)
@@ -189,18 +212,16 @@ def main() -> None:
     if args.dry_run:
         return
     out_prefix.parent.mkdir(parents=True, exist_ok=True)
-    runs = pd.DataFrame(rows).sort_values(["severity_scale", "method", "seed"]) if rows else pd.DataFrame()
+    runs = (
+        pd.DataFrame(rows).sort_values(["severity_scale", "method", "seed"])
+        if rows
+        else pd.DataFrame()
+    )
     runs.to_csv(out_prefix.with_suffix(".runs.csv"), index=False)
     aggregate = _aggregate(rows)
     aggregate.to_csv(out_prefix.with_suffix(".aggregate.csv"), index=False)
-    with out_prefix.with_suffix(".aggregate.tex").open("w", encoding="utf-8") as f:
-        if aggregate.empty:
-            f.write("% No severity evaluations found.\n")
-        else:
-            f.write(aggregate.to_latex(index=False, escape=False))
     print(f"wrote {out_prefix.with_suffix('.runs.csv')}")
     print(f"wrote {out_prefix.with_suffix('.aggregate.csv')}")
-    print(f"wrote {out_prefix.with_suffix('.aggregate.tex')}")
 
 
 if __name__ == "__main__":

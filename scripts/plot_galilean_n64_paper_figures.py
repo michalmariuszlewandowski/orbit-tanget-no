@@ -8,10 +8,9 @@ import matplotlib
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
-from matplotlib.transforms import blended_transform_factory
-from matplotlib.ticker import NullLocator
 import pandas as pd
-
+from matplotlib.ticker import NullLocator
+from matplotlib.transforms import blended_transform_factory
 
 METHOD_LABELS = {
     "aug": "Augmentation",

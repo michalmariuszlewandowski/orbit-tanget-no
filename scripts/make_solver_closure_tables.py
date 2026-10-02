@@ -37,65 +37,12 @@ def _sample_indices(total: int, count: int, seed: int) -> torch.Tensor:
     return torch.randperm(total, generator=generator)[:count]
 
 
-def _sample_boosts(count: int, max_boost: float, seed: int, dtype: torch.dtype, dim: int) -> torch.Tensor:
+def _sample_boosts(
+    count: int, max_boost: float, seed: int, dtype: torch.dtype, dim: int
+) -> torch.Tensor:
     generator = torch.Generator().manual_seed(int(seed) + 10_000)
     shape = (count,) if dim == 1 else (count, dim)
     return (2 * torch.rand(shape, generator=generator, dtype=dtype) - 1) * float(max_boost)
-
-
-def _format_radius(value: float) -> str:
-    rounded_2 = round(value, 2)
-    if abs(value - rounded_2) < 1e-12:
-        return f"{value:.2f}"
-    return f"{value:.3f}"
-
-
-def _format_sci(value: float) -> str:
-    mantissa, exponent = f"{value:.2e}".split("e")
-    return rf"\({mantissa}\times10^{{{int(exponent)}}}\)"
-
-
-def _write_tex(summary: pd.DataFrame, path: Path) -> None:
-    problem = str(summary["problem"].iloc[0])
-    if problem == "n128_burgers_galilean":
-        caption = (
-            "Solver-level Galilean closure for the N128 1D Burgers dataset. "
-            "The residual is $\\|S(T_g a)-T_gS(a)\\|_2/\\|T_gS(a)\\|_2$ "
-            "at the training boost radius and OOD severity radii."
-        )
-        label = "tab:burgers-solver-closure"
-    else:
-        caption = (
-            "Solver-level Galilean closure for the N64 2D Navier--Stokes dataset. "
-            "The residual is $\\|S(T_g a)-T_gS(a)\\|_2/\\|T_gS(a)\\|_2$ "
-            "at the training boost radius and OOD severity radii."
-        )
-        label = "tab:n64-solver-closure"
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("w", encoding="utf-8") as f:
-        f.write(
-            "\\begin{table}[t]\n"
-            "\\centering\n"
-            "\\small\n"
-            f"\\caption{{{caption}}}\n"
-            f"\\label{{{label}}}\n"
-            "\\begin{tabular}{rrrrr}\n"
-            "\\toprule\n"
-            "Samples & Max boost & Mean residual & P95 & Max \\\\\n"
-            "\\midrule\n"
-        )
-        for _, row in summary.sort_values("max_boost").iterrows():
-            f.write(
-                f"{int(row['num_samples'])} & {_format_radius(float(row['max_boost']))} & "
-                f"{_format_sci(float(row['closure_residual_mean']))} & "
-                f"{_format_sci(float(row['closure_residual_p95']))} & "
-                f"{_format_sci(float(row['closure_residual_max']))} \\\\\n"
-            )
-        f.write(
-            "\\bottomrule\n"
-            "\\end{tabular}\n"
-            "\\end{table}\n"
-        )
 
 
 def _find_galilean_transform(transform: Any) -> Burgers1DGalilean | NavierStokes2DGalilean:
@@ -104,10 +51,14 @@ def _find_galilean_transform(transform: Any) -> Burgers1DGalilean | NavierStokes
     for candidate in getattr(transform, "transforms", []):
         if isinstance(candidate, (Burgers1DGalilean, NavierStokes2DGalilean)):
             return candidate
-    raise TypeError("Solver closure table expects a Burgers1DGalilean or NavierStokes2DGalilean symmetry")
+    raise TypeError(
+        "Solver closure table expects a Burgers1DGalilean or NavierStokes2DGalilean symmetry"
+    )
 
 
-def run_closure(config: dict[str, Any], args: argparse.Namespace) -> tuple[pd.DataFrame, pd.DataFrame]:
+def run_closure(
+    config: dict[str, Any], args: argparse.Namespace
+) -> tuple[pd.DataFrame, pd.DataFrame]:
     dataset_cfg = config["dataset"]
     dataset_path = Path(args.dataset_path or dataset_cfg["path"])
     split = str(args.split)
@@ -124,8 +75,12 @@ def run_closure(config: dict[str, Any], args: argparse.Namespace) -> tuple[pd.Da
     device = torch.device(args.device)
     rows: list[dict[str, Any]] = []
     batch_size = int(args.batch_size or dataset_cfg.get("solver_batch_size", 8))
-    viscosity = float(args.viscosity if args.viscosity is not None else dataset_cfg.get("viscosity", 1e-3))
-    final_time = float(args.final_time if args.final_time is not None else dataset_cfg.get("final_time", 0.5))
+    viscosity = float(
+        args.viscosity if args.viscosity is not None else dataset_cfg.get("viscosity", 1e-3)
+    )
+    final_time = float(
+        args.final_time if args.final_time is not None else dataset_cfg.get("final_time", 0.5)
+    )
     dt = float(args.dt if args.dt is not None else dataset_cfg.get("dt", 1e-3))
     dealias = bool(dataset_cfg.get("dealias", True))
 
@@ -162,7 +117,9 @@ def run_closure(config: dict[str, Any], args: argparse.Namespace) -> tuple[pd.Da
             )[..., None]
         transformed_target = transform.apply_output(u_b, sample)
         residual = _relative_l2_per_sample(solved_transformed, transformed_target)
-        abs_l2 = torch.linalg.norm((solved_transformed - transformed_target).reshape(stop - start, -1), dim=1)
+        abs_l2 = torch.linalg.norm(
+            (solved_transformed - transformed_target).reshape(stop - start, -1), dim=1
+        )
         ref_l2 = torch.linalg.norm(transformed_target.reshape(stop - start, -1), dim=1)
         for local_idx, value in enumerate(residual.detach().cpu()):
             sample_idx = int(indices[start + local_idx].item())
@@ -197,7 +154,11 @@ def run_closure(config: dict[str, Any], args: argparse.Namespace) -> tuple[pd.Da
 
     sample_df = pd.DataFrame(rows).sort_values("sample_index")
     residuals = sample_df["closure_residual_relative"]
-    problem = "n128_burgers_galilean" if isinstance(transform, Burgers1DGalilean) else "n64_navier_stokes_galilean"
+    problem = (
+        "n128_burgers_galilean"
+        if isinstance(transform, Burgers1DGalilean)
+        else "n64_navier_stokes_galilean"
+    )
     summary = pd.DataFrame(
         [
             {
@@ -225,10 +186,8 @@ def run_closure(config: dict[str, Any], args: argparse.Namespace) -> tuple[pd.Da
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(
-        description="Build solver-level Galilean closure tables."
-    )
-    parser.add_argument("--config", default="configs/pilot/2d_navier_stokes_galilean.yaml")
+    parser = argparse.ArgumentParser(description="Build solver-level Galilean closure tables.")
+    parser.add_argument("--config", default="configs/problems/2d_navier_stokes_galilean.yaml")
     parser.add_argument("--dataset-path", default=None)
     parser.add_argument("--split", default="test")
     parser.add_argument("--num-samples", type=int, default=16)
@@ -250,7 +209,9 @@ def main() -> None:
     with Path(args.config).open("r", encoding="utf-8") as f:
         config = yaml.safe_load(f)
     if args.max_boosts:
-        boost_values = [float(value.strip()) for value in str(args.max_boosts).split(",") if value.strip()]
+        boost_values = [
+            float(value.strip()) for value in str(args.max_boosts).split(",") if value.strip()
+        ]
     else:
         boost_values = [args.max_boost]
     samples = []
@@ -267,10 +228,8 @@ def main() -> None:
     out_prefix.parent.mkdir(parents=True, exist_ok=True)
     sample_df.to_csv(out_prefix.with_suffix(".samples.csv"), index=False)
     summary.to_csv(out_prefix.with_suffix(".summary.csv"), index=False)
-    _write_tex(summary, out_prefix.with_suffix(".tex"))
     print(f"wrote {out_prefix.with_suffix('.samples.csv')}")
     print(f"wrote {out_prefix.with_suffix('.summary.csv')}")
-    print(f"wrote {out_prefix.with_suffix('.tex')}")
     print(summary.to_string(index=False))
 
 

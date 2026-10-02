@@ -109,11 +109,7 @@ def test_cno2d_loads_exact_shared_fno_seed_set(tmp_path):
 def test_cno2d_rejects_inconsistent_fno_seed_sets(tmp_path):
     module = _load_module()
     rows = _fno_reference_rows(module)
-    rows = [
-        row
-        for row in rows
-        if not (row["method"] == "aug_orbit" and row["seed"] == 71)
-    ]
+    rows = [row for row in rows if not (row["method"] == "aug_orbit" and row["seed"] == 71)]
     path = tmp_path / "fno.runs.csv"
     pd.DataFrame(rows).to_csv(path, index=False)
     with pytest.raises(module.CNO2dProtocolError, match="shared FNO seeds"):
@@ -143,33 +139,23 @@ def test_cno2d_primary_pair_uses_candidate_minus_reference():
     assert paired.loc["relative_l2", "candidate_checkpoint_resumed_seeds"] == "59"
 
 
-def test_cno2d_table_discloses_forward_and_backward_counts():
+def test_cno2d_csv_summary_discloses_forward_backward_and_resume_counts():
     module = _load_module()
     rows = []
     for spec in module.METHOD_SPECS:
-        row = {
-            "method": spec.method,
-            "method_label": spec.label,
-            "steps_per_epoch": spec.steps_per_epoch,
-            "model_forwards_total": spec.model_forwards_per_epoch * 150,
-            "backward_passes_total": spec.steps_per_epoch * 150,
-            "seeds": ",".join(str(seed) for seed in module.EXPECTED_SEEDS),
-        }
-        for metric in module.AGGREGATE_METRICS:
-            row[f"{metric}_mean"] = 0.4
-            row[f"{metric}_std"] = 0.01
-        rows.append(row)
-    tex = module.latex_table(pd.DataFrame(rows))
-    assert "Model fwds., total" in tex
-    assert "Bwd. passes, total" in tex
-    assert "CNO2d + aug. + normalized LOCO" in tex
-    assert "same training seeds as the FNO comparison" in tex
-    assert r"\(\{23, 31, 47, 59, 71\}\)" in tex
-    assert r"\mathbf{0.4000\pm0.0100}" in tex
-    assert "Latency ms/sample" not in tex
-    assert "Baseline seed 23" in tex
-    assert "augmentation-plus-LOCO seed 59" in tex
-    assert "segment-local wall times are excluded" in tex
+        for row in _valid_method_rows(module, spec):
+            row["method"] = spec.method
+            row["checkpoint_resumed"] = (spec.method, row["seed"]) in module.AUTHORIZED_RESUMES
+            rows.append(row)
+    aggregate = module.aggregate_runs(pd.DataFrame(rows)).set_index("method")
+    for spec in module.METHOD_SPECS:
+        row = aggregate.loc[spec.method]
+        assert row["model_forwards_total"] == spec.model_forwards_per_epoch * 150
+        assert row["backward_passes_total"] == spec.steps_per_epoch * 150
+        assert row["seeds"] == ",".join(str(seed) for seed in module.EXPECTED_SEEDS)
+        assert row["method_label"] == spec.label
+    assert aggregate.loc["baseline", "checkpoint_resumed_seeds"] == "23"
+    assert aggregate.loc["aug_orbit", "checkpoint_resumed_seeds"] == "59"
 
 
 def test_cno2d_aggregate_excludes_resumed_segment_wall_times():
@@ -240,9 +226,7 @@ def test_cno2d_manifest_discloses_resume_provenance(monkeypatch):
         ("environment.torch", "different"),
     ],
 )
-def test_cno2d_method_validation_rejects_protocol_drift(
-    monkeypatch, column, bad_value
-):
+def test_cno2d_method_validation_rejects_protocol_drift(monkeypatch, column, bad_value):
     module = _load_module()
     spec = module.METHOD_SPECS[-1]
     rows = _valid_method_rows(module, spec)
@@ -278,14 +262,8 @@ def test_cno2d_method_validation_accepts_only_declared_resumes(
     authorization = module.AUTHORIZED_RESUMES[(method, seed)]
     assert bool(resumed["checkpoint_resumed"])
     assert resumed["resume_last_completed_epoch"] == last_completed_epoch
-    assert (
-        resumed["resume_source_last_checkpoint_sha256"]
-        == authorization.last_checkpoint_sha256
-    )
-    assert (
-        resumed["resume_source_best_checkpoint_sha256"]
-        == authorization.best_checkpoint_sha256
-    )
+    assert resumed["resume_source_last_checkpoint_sha256"] == authorization.last_checkpoint_sha256
+    assert resumed["resume_source_best_checkpoint_sha256"] == authorization.best_checkpoint_sha256
     assert resumed["train_wall_seconds_scope"] == "post_resume_segment"
     assert set(result.index[result["checkpoint_resumed"]]) == {seed}
     assert set(result.loc[~result["checkpoint_resumed"], "train_wall_seconds_scope"]) == {
@@ -299,9 +277,7 @@ def test_cno2d_method_validation_requires_declared_resume(monkeypatch, method):
     spec = next(spec for spec in module.METHOD_SPECS if spec.method == method)
     rows = _valid_method_rows(module, spec)
     resumed_seed = next(
-        seed
-        for authorized_method, seed in module.AUTHORIZED_RESUMES
-        if authorized_method == method
+        seed for authorized_method, seed in module.AUTHORIZED_RESUMES if authorized_method == method
     )
     resumed_row = next(row for row in rows if row["seed"] == resumed_seed)
     resumed_row.pop("config.runtime.resume")
@@ -314,9 +290,7 @@ def test_cno2d_method_validation_requires_declared_resume(monkeypatch, method):
     ("method", "seed"),
     [("baseline", 31), ("orbit", 23), ("aug", 71), ("aug_orbit", 71)],
 )
-def test_cno2d_method_validation_rejects_undeclared_resume(
-    monkeypatch, method, seed
-):
+def test_cno2d_method_validation_rejects_undeclared_resume(monkeypatch, method, seed):
     module = _load_module()
     spec = next(spec for spec in module.METHOD_SPECS if spec.method == method)
     rows = _valid_method_rows(module, spec)
@@ -366,9 +340,7 @@ def test_cno2d_method_validation_rejects_chunking_on_authorized_resume(monkeypat
         ("config.training.stop_after_epochs", 20),
     ],
 )
-def test_cno2d_method_validation_rejects_resumed_or_chunked_runs(
-    monkeypatch, column, value
-):
+def test_cno2d_method_validation_rejects_resumed_or_chunked_runs(monkeypatch, column, value):
     module = _load_module()
     spec = module.METHOD_SPECS[-1]
     rows = _valid_method_rows(module, spec)
@@ -408,9 +380,16 @@ def test_cno2d_campaign_rejects_mixed_git_commits(monkeypatch):
 def _fresh_method_rows(module, spec):
     rows = _valid_method_rows(module, spec)
     for row in rows:
-        row.update({"environment.git_commit": None, "environment.omp_num_threads": "1",
-                    "environment.mkl_num_threads": "1", "source_sha256": "new-source",
-                    "dataset_sha256": "regenerated-container", "config.runtime.resume": False})
+        row.update(
+            {
+                "environment.git_commit": None,
+                "environment.omp_num_threads": "1",
+                "environment.mkl_num_threads": "1",
+                "source_sha256": "new-source",
+                "dataset_sha256": "regenerated-container",
+                "config.runtime.resume": False,
+            }
+        )
         row.pop("config.runtime.source_snapshot")
         row.pop("config.runtime.source_snapshot_sha256")
     return rows
@@ -429,11 +408,14 @@ def test_cno2d_fresh_protocol_uses_current_provenance_not_historical_resume(monk
         module._load_method(Path("unused"), spec)
 
 
-@pytest.mark.parametrize("column,value", [
-    ("config.runtime.source_snapshot", "historical-snapshot.zip"),
-    ("config.runtime.source_snapshot_sha256", "historical-hash"),
-    ("config.runtime.resume", True),
-])
+@pytest.mark.parametrize(
+    "column,value",
+    [
+        ("config.runtime.source_snapshot", "historical-snapshot.zip"),
+        ("config.runtime.source_snapshot_sha256", "historical-hash"),
+        ("config.runtime.resume", True),
+    ],
+)
 def test_cno2d_fresh_protocol_rejects_historical_provenance_claims(monkeypatch, column, value):
     module = _load_module()
     spec = module.METHOD_SPECS[0]

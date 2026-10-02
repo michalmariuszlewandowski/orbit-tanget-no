@@ -1,3 +1,5 @@
+"""Supervised and equivariance losses, reduced per example before averaging."""
+
 from __future__ import annotations
 
 import torch
@@ -24,7 +26,9 @@ def relative_l2_per_sample(
 ) -> torch.Tensor:
     """Return per-example relative L2 errors."""
     if pred.shape != target.shape:
-        raise ValueError(f"pred and target shapes differ: {tuple(pred.shape)} vs {tuple(target.shape)}")
+        raise ValueError(
+            f"pred and target shapes differ: {tuple(pred.shape)} vs {tuple(target.shape)}"
+        )
     diff = pred - target
     ref = target
     if mask is not None:
@@ -55,7 +59,9 @@ def trajectory_nmse_per_sample(
 ) -> torch.Tensor:
     """LPSDA-style average over time of spatial normalized MSE."""
     if pred.shape != target.shape:
-        raise ValueError(f"pred and target shapes differ: {tuple(pred.shape)} vs {tuple(target.shape)}")
+        raise ValueError(
+            f"pred and target shapes differ: {tuple(pred.shape)} vs {tuple(target.shape)}"
+        )
     if pred.ndim != 3:
         return relative_l2_per_sample(pred, target, mask=mask, eps=eps).pow(2)
     diff = pred - target
@@ -120,6 +126,12 @@ def orbit_consistency_loss(
     eta: float = 1e-6,
     target_mode: str = "physical",
 ) -> tuple[torch.Tensor, dict[str, float]]:
+    """Compare ``model(T_input(a))`` with ``T_output(model(a))``.
+
+    Both predictions retain gradients. The squared defect is averaged over valid
+    output entries and optionally divided by ``epsilon**2 + eta`` per example.
+    ``target_mode`` selects the physical action or an explicit control variant.
+    """
     if sample is None:
         sample = transform.sample(a.shape[0], a.device, a.dtype)
     if base_pred is None:
@@ -135,7 +147,14 @@ def orbit_consistency_loss(
         transformed_pred = torch.roll(transformed_pred, shifts=1, dims=0)
         if mask is not None:
             mask = torch.roll(mask, shifts=1, dims=0)
-    elif target_mode in {"physical", "correct", "no_output", "no_output_transform", "input_only", "identity_output"}:
+    elif target_mode in {
+        "physical",
+        "correct",
+        "no_output",
+        "no_output_transform",
+        "input_only",
+        "identity_output",
+    }:
         pass
     else:
         raise ValueError(f"Unknown orbit consistency target_mode={target_mode!r}")

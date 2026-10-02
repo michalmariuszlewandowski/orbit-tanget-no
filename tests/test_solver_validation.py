@@ -6,7 +6,9 @@ from otno.symmetry.transforms import D4Pseudoscalar2D, TransformSample
 
 
 def _rel(x: torch.Tensor, y: torch.Tensor) -> float:
-    return float(torch.linalg.norm((x - y).reshape(-1)) / torch.linalg.norm(y.reshape(-1)).clamp_min(1e-12))
+    return float(
+        torch.linalg.norm((x - y).reshape(-1)) / torch.linalg.norm(y.reshape(-1)).clamp_min(1e-12)
+    )
 
 
 def test_burgers_dt_halving_smoke_converges():
@@ -35,7 +37,9 @@ def test_navier_stokes_d4_pseudoscalar_commutes_with_solver_small_time():
         transform.apply_input(omega0, sample)[..., 0], viscosity=1e-2, final_time=0.01, dt=0.002
     )[..., None]
     right = transform.apply_output(
-        solve_navier_stokes_vorticity_2d(omega0[..., 0], viscosity=1e-2, final_time=0.01, dt=0.002)[..., None],
+        solve_navier_stokes_vorticity_2d(omega0[..., 0], viscosity=1e-2, final_time=0.01, dt=0.002)[
+            ..., None
+        ],
         sample,
     )
     assert _rel(left, right) < 1e-6
