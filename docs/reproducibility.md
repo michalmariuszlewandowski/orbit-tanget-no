@@ -14,6 +14,14 @@ python scripts/plot_galilean_n64_paper_figures.py
 python scripts/make_paper_diagnostics.py --cached-compute
 ```
 
+In the label-efficiency and severity plots, the connected markers show seed
+means and the error bars show plus/minus one sample standard deviation across
+training seeds. Faint markers show individual per-seed results at their actual
+label fraction or boost bound, without horizontal offsets. Individual results
+can lie outside the error bars, which do not represent the minimum-to-maximum
+range or a confidence interval. The severity plot uses five seeds per method
+and boost bound; its legend labels are `Aug.` and `Aug. + LOCO`.
+
 The qualitative fields, fixed-stress diagnostics, and equivariance residuals
 use the two existing local seed-23 checkpoints at their original run paths in
 `figure_specs/2d_galilean_n64_id_ood_seed23.yaml`, together with the Galilean N64

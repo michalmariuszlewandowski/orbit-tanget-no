@@ -15,7 +15,7 @@ with $c=0.7$, on a periodic unit interval. The target is the Fourier shift
 $a(x-cT)$; there is no numerical time step. The small model and dataset
 demonstrate the workflow; they do not establish converged accuracy.
 
-On a successful first run, training produces exactly this tree:
+Training should produce:
 
 ```text
 runs/examples/advection/
