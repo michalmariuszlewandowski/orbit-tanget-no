@@ -26,8 +26,8 @@ def _format_diagnostic_axis(axis: plt.Axes) -> None:
 
 
 def _plot_error_shift(axis: plt.Axes, errors: dict[str, torch.Tensor]) -> None:
-    """Show each example's movement from ID error to fixed-stress error."""
-    # (a) Per-example movement from ID to the same fixed Galilean stress.
+    """Show each example's movement from ID error to fixed-boost error."""
+    # (a) Per-example movement from ID to the same fixed Galilean boost.
     all_values: list[np.ndarray] = []
     for method in ["aug", "loco"]:
         x = errors[f"{method}_id"].numpy()
@@ -60,8 +60,8 @@ def _plot_error_shift(axis: plt.Axes, errors: dict[str, torch.Tensor]) -> None:
     axis.set_ylim(lower, upper)
     axis.set_aspect("equal", adjustable="box")
     axis.set_xlabel(r"ID relative $L^2$")
-    axis.set_ylabel(r"Fixed-stress relative $L^2$")
-    axis.set_title("(a) ID-to-stress error shift")
+    axis.set_ylabel(r"Boosted relative $L^2$ error")
+    axis.set_title("(a) Error before and after boost")
     # Keep the legend readable independently of the point-cloud transparency.
     legend_handles = [
         Line2D(
@@ -154,7 +154,7 @@ def _plot_gradient_errors(
     axis: plt.Axes, fields: dict[str, torch.Tensor]
 ) -> dict[str, dict[str, list[float]]]:
     """Compare MAE across target-gradient percentiles with example-level CIs."""
-    # (c) A target-gradient-conditioned view of the fixed-stress spatial errors.
+    # (c) A target-gradient-conditioned view of the fixed-boost spatial errors.
     gradient_curves = {
         "aug": gradient_binned_mae(fields["target_ood"], fields["aug_ood"]),
         "loco": gradient_binned_mae(fields["target_ood"], fields["loco_ood"]),
@@ -184,7 +184,7 @@ def _plot_gradient_errors(
         )
     axis.set_xlabel("Target-gradient percentile")
     axis.set_ylabel("Mean pixel absolute error")
-    axis.set_title("(c) Fixed-stress error structure")
+    axis.set_title("(c) Error structure under fixed boost")
     axis.set_xticks([5, 25, 50, 75, 95])
     axis.legend(frameon=False, loc="upper left")
     _format_diagnostic_axis(axis)
@@ -218,7 +218,7 @@ def plot_fixed_stress_diagnostics(
     gradient_curves = _plot_gradient_errors(axes[2], fields)
 
     fig.suptitle(
-        rf"Seed 23, fixed Galilean stress $\delta=({boost[0]:+.2f},{boost[1]:+.2f})$",
+        rf"Seed 23, fixed Galilean boost $\delta=({boost[0]:+.2f},{boost[1]:+.2f})$",
         fontsize=15.0,
     )
     out_prefix.parent.mkdir(parents=True, exist_ok=True)

@@ -218,19 +218,19 @@
       "sha256": "9253540d8a05c155c1d2e13984f07f4affefb10c0e5289b498052b097c67cb8a"
     },
     {
-      "bytes": 205234,
+      "bytes": 208709,
       "path": "runs/figures/2d_galilean_n64_fixed_stress_diagnostics.png",
       "pixel_shape": [
         677,
-        2023,
+        2056,
         4
       ],
-      "sha256": "c6c4391e4861c6df9c3933ddb17f170e6f6dc44d235facaf1308defa81c8e479"
+      "sha256": "d36927808f9d6dd6afdf67a613a3f3dedb582dbe103e33733cf1537da2fbf500"
     },
     {
-      "bytes": 38088,
+      "bytes": 38449,
       "path": "runs/figures/2d_galilean_n64_fixed_stress_diagnostics.pdf",
-      "sha256": "127f83424921c40e3e2e8e977c104a5f182782ece1fb5ce1ba2352db9ddc2d3c"
+      "sha256": "1f6405c4e29c6ae1498f0693b64eb83f32bc988a34f23d586e36a181559f83ce"
     },
     {
       "bytes": 177057,
@@ -271,6 +271,13 @@
   },
   "plot_script": "scripts/plot_navier_stokes_qualitative.py",
   "plot_script_sha256": "6b0d333ff47ac8bb34d9dfb2653cc27b4e80fceb0f28f7cf3649f488301042e1",
+  "plot_sources": {
+    "scripts/plot_navier_stokes_qualitative.py": "059dc7c6c1a9bd7861883c1207111d6b213d63a6f4a0213dcf5188fc250661b2",
+    "src/otno/plotting/__init__.py": "9a00da3fa6e09ad9359fdb7dc4eb21f6e06a72f2e1b9288e89c9dca8120e4a58",
+    "src/otno/plotting/field_analysis.py": "d345eb9be7f03d336b952339a302158e168fe65370dba71e9c27fced38681201",
+    "src/otno/plotting/field_diagnostics.py": "685efa47fc74f00cbf115a7a5ecdd105409c5a14e79dd4605fac3788661105c3",
+    "src/otno/plotting/field_panels.py": "258af876bcca1ddc6adacc193e64663bd789a3c1c7e65028191a529490c53b1e"
+  },
   "selected_gradient_error_summary": {
     "aug_id": {
       "high_gradient_mae": 0.38131874799728394,
