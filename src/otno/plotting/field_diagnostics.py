@@ -342,7 +342,7 @@ def plot_equivariance_residuals(
         label="residual gain",
     )
     fig.suptitle(
-        rf"Fixed-stress equivariance residuals: test index {index}, "
+        "Fixed-boost equivariance residuals: "
         rf"$\delta=({boost[0]:+.2f},{boost[1]:+.2f})$",
         fontsize=15.5,
     )

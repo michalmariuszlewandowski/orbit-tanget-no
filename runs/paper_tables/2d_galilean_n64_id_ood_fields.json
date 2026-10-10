@@ -215,7 +215,7 @@
     {
       "bytes": 132549,
       "path": "runs/figures/2d_galilean_n64_id_ood_fields.pdf",
-      "sha256": "9253540d8a05c155c1d2e13984f07f4affefb10c0e5289b498052b097c67cb8a"
+      "sha256": "740690abb4fa6e30c99356316d64f40fc36f1dca128145984a39078c8ce12151"
     },
     {
       "bytes": 208709,
@@ -230,22 +230,22 @@
     {
       "bytes": 38449,
       "path": "runs/figures/2d_galilean_n64_fixed_stress_diagnostics.pdf",
-      "sha256": "1f6405c4e29c6ae1498f0693b64eb83f32bc988a34f23d586e36a181559f83ce"
+      "sha256": "fd7fa82812e30b982baa4eba2ba1a70ab76b5ba1ff0f1c9d821991bde90a7d5b"
     },
     {
-      "bytes": 177057,
+      "bytes": 176326,
       "path": "runs/figures/2d_galilean_n64_equivariance_residuals.png",
       "pixel_shape": [
         692,
         1755,
         4
       ],
-      "sha256": "380d8b48ea632ddd3c7b7669de21e3163147b6c1a02ae236d3f1794707537dca"
+      "sha256": "8af8fdaceefecf318fa77ca1c580bbb6ce51766199efe19e863c2eb3ba1da149"
     },
     {
-      "bytes": 64610,
+      "bytes": 64583,
       "path": "runs/figures/2d_galilean_n64_equivariance_residuals.pdf",
-      "sha256": "12e5904e459fe9b0377e14f38d07f2161134374fd842a14064ffbc833efc2298"
+      "sha256": "d995688269702797bbdd8347d990685c9c5cd104df9f76d0359bee98d75dfaa9"
     }
   ],
   "generation_batch_size": 16,
@@ -270,12 +270,12 @@
     "vorticity_symmetric_abs_max": 2.6419005393981934
   },
   "plot_script": "scripts/plot_navier_stokes_qualitative.py",
-  "plot_script_sha256": "6b0d333ff47ac8bb34d9dfb2653cc27b4e80fceb0f28f7cf3649f488301042e1",
+  "plot_script_sha256": "059dc7c6c1a9bd7861883c1207111d6b213d63a6f4a0213dcf5188fc250661b2",
   "plot_sources": {
     "scripts/plot_navier_stokes_qualitative.py": "059dc7c6c1a9bd7861883c1207111d6b213d63a6f4a0213dcf5188fc250661b2",
     "src/otno/plotting/__init__.py": "9a00da3fa6e09ad9359fdb7dc4eb21f6e06a72f2e1b9288e89c9dca8120e4a58",
     "src/otno/plotting/field_analysis.py": "d345eb9be7f03d336b952339a302158e168fe65370dba71e9c27fced38681201",
-    "src/otno/plotting/field_diagnostics.py": "685efa47fc74f00cbf115a7a5ecdd105409c5a14e79dd4605fac3788661105c3",
+    "src/otno/plotting/field_diagnostics.py": "d6e970438bdd000bac0536dd0f488ceb0bf606a31e3d2e29f3d539a787f02ae8",
     "src/otno/plotting/field_panels.py": "258af876bcca1ddc6adacc193e64663bd789a3c1c7e65028191a529490c53b1e"
   },
   "selected_gradient_error_summary": {
